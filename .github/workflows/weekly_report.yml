@@ -1,0 +1,79 @@
+name: 全球游戏合规周报
+
+on:
+  # 每周一 UTC 01:00 = 北京/新加坡时间 09:00
+  schedule:
+    - cron: '0 1 * * 1'
+  # 支持手动触发（Settings → Actions → Run workflow）
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 允许 CI 提交报告回仓库
+
+jobs:
+  generate-and-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. 拉取代码（含历史 DB + latest 报告）────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Python 环境 ─────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install playwright
+          playwright install --with-deps chromium
+
+      # ── 3. 抓取最新数据 & 生成 HTML 报告 ──────────────────────────
+      - name: Fetch data & generate HTML
+        run: |
+          python monitor.py run --period week
+          python monitor.py report --format html --period week
+
+      # ── 4. 生成 PDF（同时写 latest.html / latest.pdf）─────────────
+      - name: Generate PDF report
+        run: python generate_pdf.py
+
+      # ── 5. 计算本次报告的公开 URL ──────────────────────────────────
+      - name: Set report URLs
+        run: |
+          REPO="${{ github.repository }}"
+          BRANCH="main"
+          BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}/reports"
+          # htmlpreview.github.io 可以在线渲染 GitHub raw HTML，无需开 Pages
+          echo "HTML_URL=https://htmlpreview.github.io/?${BASE}/latest.html" >> $GITHUB_ENV
+          echo "PDF_URL=${BASE}/latest.pdf" >> $GITHUB_ENV
+
+      # ── 6. 发送飞书卡片通知 ────────────────────────────────────────
+      - name: Send Feishu notification
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          REPORT_HTML_URL:    ${{ env.HTML_URL }}
+          REPORT_PDF_URL:     ${{ env.PDF_URL }}
+        run: python feishu_notify.py
+
+      # ── 7. 将更新后的 DB + latest 报告提交回仓库 ───────────────────
+      - name: Commit reports back to repo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/latest.html reports/latest.pdf data/monitor.db
+          # 如果没有变化就跳过 commit（避免空提交报错）
+          git diff --staged --quiet || \
+            git commit -m "📊 周报 $(date -u +%Y-%m-%d) [skip ci]"
+          git push
