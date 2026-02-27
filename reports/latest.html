@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全球游戏行业立法动态监控报告</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "PingFang SC", sans-serif;
+    background: #F1F5F9;
+    color: #1E293B;
+    padding: 24px 20px;
+    min-height: 100vh;
+}
+.container { max-width: 1700px; margin: 0 auto; }
+
+/* ── 头部 ── */
+.header {
+    background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }
+.header .meta { font-size: 12px; color: #94A3B8; margin-top: 4px; }
+
+/* ── 本周重点卡片 ── */
+.highlights {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.hl-card {
+    background: white;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.hl-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+}
+.hl-region {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    background: #F1F5F9;
+    padding: 2px 7px;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+.hl-date {
+    font-size: 11px;
+    color: #94A3B8;
+    margin-left: auto;
+    white-space: nowrap;
+}
+.hl-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1E293B;
+    line-height: 1.45;
+}
+.hl-title a { color: #1D4ED8; text-decoration: none; }
+.hl-title a:hover { text-decoration: underline; }
+.hl-summary {
+    font-size: 12px;
+    color: #475569;
+    line-height: 1.5;
+}
+.highlights-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+}
+
+/* ── 颜色图例 ── */
+.legend {
+    background: white;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.legend::before {
+    content: "分类色标：";
+    font-size: 11px;
+    color: #64748B;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* ── 筛选栏 ── */
+.toolbar {
+    background: white;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.toolbar label { font-size: 12px; color: #64748B; font-weight: 600; }
+.toolbar select, .toolbar input {
+    padding: 6px 10px;
+    border: 1px solid #E2E8F0;
+    border-radius: 7px;
+    font-size: 13px;
+    color: #334155;
+    background: #F8FAFC;
+    outline: none;
+}
+.toolbar select:focus, .toolbar input:focus {
+    border-color: #94A3B8;
+    background: white;
+}
+.toolbar input { width: 220px; }
+.result-count { margin-left: auto; font-size: 12px; color: #64748B; }
+
+/* ── 表格 ── */
+.table-wrap { border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+table { width: 100%; border-collapse: collapse; background: white; }
+thead tr { background: #1E293B; }
+th {
+    padding: 11px 10px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+}
+th:hover { color: white; }
+th .sort-icon { opacity: 0.4; margin-left: 3px; font-size: 10px; }
+th.sorted .sort-icon { opacity: 1; }
+
+tbody tr {
+    border-bottom: 1px solid #F1F5F9;
+    transition: filter 0.1s;
+}
+tbody tr:hover { filter: brightness(0.97); }
+td { padding: 9px 10px; font-size: 12px; vertical-align: top; }
+
+.td-region { white-space: nowrap; font-weight: 600; color: #475569; font-size: 11px; }
+.td-cat { white-space: nowrap; }
+.td-sub { color: #64748B; font-size: 11px; min-width: 90px; }
+.td-title { min-width: 200px; max-width: 320px; font-weight: 500; line-height: 1.5; }
+.td-title a { color: #1D4ED8; text-decoration: none; }
+.td-title a:hover { text-decoration: underline; color: #1E40AF; }
+.td-source { font-size: 10px; color: #94A3B8; margin-top: 2px; display: block; }
+.td-date {
+    white-space: nowrap;
+    font-size: 12px;
+    color: #475569;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+.td-status { white-space: nowrap; }
+.td-summary { max-width: 320px; color: #475569; line-height: 1.5; font-size: 11px; }
+
+.cat-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.status-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ── 影响评分点 ── */
+.impact-dots {
+    font-size: 11px;
+    letter-spacing: -1px;
+    margin-right: 3px;
+    vertical-align: middle;
+    cursor: default;
+    font-family: monospace;
+}
+.impact-3 { color: #DC2626; }
+.impact-2 { color: #D97706; }
+.impact-1 { color: #94A3B8; }
+
+/* ── 信源层级标签 ── */
+.tier-badge {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* ── 无数据提示 ── */
+.no-data {
+    text-align: center;
+    padding: 48px;
+    color: #94A3B8;
+    font-size: 14px;
+    display: none;
+}
+
+/* ── 响应式 ── */
+@media (max-width: 900px) {
+    .td-summary { display: none; }
+    .td-sub { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 头部 -->
+  <div class="header">
+    <div>
+      <h1>全球游戏行业立法动态监控报告</h1>
+      <div class="meta">生成时间：2026-02-27 09:22&nbsp;&nbsp;|&nbsp;&nbsp;共 19 条动态</div>
+    </div>
+  </div>
+
+  <!-- 本周重点 -->
+  <div class="highlights-label">本周重点</div>
+  <div class="highlights">
+        <div class="hl-card" style="border-left:4px solid #6EE7B7;">
+          <div class="hl-meta">
+            <span class="hl-region">北美</span>
+            <span class="cat-badge" style="background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;">未成年人保护</span>
+            <span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span>
+            <span class="hl-date">2026-02-25</span>
+          </div>
+          <div class="hl-title"><a href="https://www.ftc.gov/news-events/news/press-releases/2026/02/ftc-issues-coppa-policy-statement-incentivize-use-age-verification-technologies-protect-children" target="_blank" rel="noopener">FTC Issues COPPA Policy Statement to Incentivize the Use of Age Verification Technologies to Protect Children Online</a></div>
+          <div class="hl-summary">FTC 发布 COPPA 政策声明，鼓励使用年龄验证技术来保护在线儿童。联邦贸易委员会今天发布了一份政策声明，宣布委员会不会根据《儿童在线隐私保护规则》（COPPA 规则）对某些网站和在线服务运营商采取强制措施，这些网站和在线服务运营商收…</div>
+        </div>
+        <div class="hl-card" style="border-left:4px solid #C4B5FD;">
+          <div class="hl-meta">
+            <span class="hl-region">北美</span>
+            <span class="cat-badge" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;">玩法合规</span>
+            <span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span>
+            <span class="hl-date">2026-02-26</span>
+          </div>
+          <div class="hl-title"><a href="https://news.google.com/rss/articles/CBMi2gFBVV95cUxPYWpqZXY2RHpiQnExQVRKd1pxT1p2RTFvYnlHa0M0aTBYaUgwMFJNblFrSEtBa040cWlidExWWkNkMzZONVNNNVdCM0NNT3lpRW9WSktTbHBUaUo4cjBSWEJRem1yR0NJZkRKNTdMNjdEcXhvQ0piWnBWYjc4V0ZFQk5teElabnA3eEkxS1A3dU94RlVpV2ZWbFFqeDB5akRacnkzQ3ZjSkV4WVZzWk1YTEMwYkJPbDRUMWs3cHVGZ0Zzc1ktbUJOZ1NpWDh2NVQwZ1N5VXFqdXJPdw?oc=5" target="_blank" rel="noopener">NY Attorney General Takes Legal Action Against Gaming Company Over ‘Loot Box’ Features</a></div>
+          <div class="hl-summary">纽约总检察长就“战利品盒”功能对游戏公司采取法律行动</div>
+        </div>
+        <div class="hl-card" style="border-left:4px solid #C4B5FD;">
+          <div class="hl-meta">
+            <span class="hl-region">欧洲</span>
+            <span class="cat-badge" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;">玩法合规</span>
+            <span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span>
+            <span class="hl-date">2026-02-26</span>
+          </div>
+          <div class="hl-title"><a href="https://news.google.com/rss/articles/CBMiuAFBVV95cUxQeHZqMmUwaEY3VVBub0lxdnRhUTdPdDRJbDZxaXI5dWZIMTJXaUJCZnhvQU5fc1JUNVFaTm9USjQzUE1JSUMtNDF4OU9WZjdQOG9kWUowTnI3NUJNa2NNTkVGYVA3ZlNSMHR2Nnl3WlZZdVp3V21pVVp5eFdEUkdBQ3UtUUZTNWVkelI4ZWtYUDMwTzlJN3RBNFlFMjZURl9XYXVnMlFtdHRwa1dNWTBiMGtLM3RZQjRh?oc=5" target="_blank" rel="noopener">UK&#x27;s ASA issues enforcement notice on loot box transparency in ads and app store listings</a></div>
+          <div class="hl-summary">英国 ASA 发布关于广告和应用程序商店列表中战利品盒透明度的执法通知</div>
+        </div>
+        <div class="hl-card" style="border-left:4px solid #6EE7B7;">
+          <div class="hl-meta">
+            <span class="hl-region">北美</span>
+            <span class="cat-badge" style="background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;">未成年人保护</span>
+            <span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span>
+            <span class="hl-date">2026-02-26</span>
+          </div>
+          <div class="hl-title"><a href="https://news.google.com/rss/articles/CBMixgFBVV95cUxON1pidGpJRXAwUVdyWVV0dVpmcURlekgxZXBPX0lubC1nVE01Zl9ISkNONF9MZDdNVm1ZQ3QzQnlFWjA5SDNuWWRaT2gzUXJtTThRZDJpU0ZoYjc0VHBfeEFzdURuQjBGUllLakx2cTBIYWU1ZnlKWjV1T3BQQUFHcDFKWDBWQWFieGg0bldubnQ5NTYxcncxNUphQmprZmx2TkRCcERzUzNRbERPZ2FsdUQ5ZU5sYmd0dC1wMkpSeHJRaU1QeUE?oc=5" target="_blank" rel="noopener">FTC Softens Enforcement of Rule Protecting Children Online, Ostensibly to Protect Children Online</a></div>
+          <div class="hl-summary">联邦贸易委员会放松了保护在线儿童规则的执行力度，表面上是为了保护在线儿童</div>
+        </div>
+        <div class="hl-card" style="border-left:4px solid #C4B5FD;">
+          <div class="hl-meta">
+            <span class="hl-region">北美</span>
+            <span class="cat-badge" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;">玩法合规</span>
+            <span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span>
+            <span class="hl-date">2026-02-26</span>
+          </div>
+          <div class="hl-title"><a href="https://www.gamesindustry.biz/new-york-sues-valve-over-loot-boxes-alleges-gambling-law-violations" target="_blank" rel="noopener">New York sues Valve over loot boxes, alleges gambling law violations</a></div>
+          <div class="hl-summary">纽约州起诉 Valve 战利品箱，指控其违反赌博法。纽约州总检察长 Letitia James 对 Valve 提起诉讼，指控《反恐精英 2》、《军团要塞 2》和《Dota 2》中的战利品箱非法鼓励未成年人赌博。阅读更多</div>
+        </div>
+      </div>
+
+  <!-- 分类颜色图例 -->
+  <div class="legend"><span class="legend-item" style="background:#DBEAFE;color:#1E40AF;border:1px solid #93C5FD;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500;">数据隐私</span><span class="legend-item" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500;">玩法合规</span><span class="legend-item" style="background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500;">未成年人保护</span><span class="legend-item" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500;">广告营销合规</span><span class="legend-item" style="background:#CCFBF1;color:#134E4A;border:1px solid #5EEAD4;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500;">消费者保护</span><span class="legend-item" style="background:#FFEDD5;color:#9A3412;border:1px solid #FCA369;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500;">经营合规</span><span class="legend-item" style="background:#FFE4E6;color:#9F1239;border:1px solid #FDA4AF;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500;">平台政策</span><span class="legend-item" style="background:#E2E8F0;color:#334155;border:1px solid #94A3B8;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500;">内容监管</span></div>
+
+  <!-- 筛选栏 -->
+  <div class="toolbar">
+    <label>区域</label>
+    <select id="fRegion" onchange="applyFilters()">
+      <option value="">全部</option>
+    </select>
+    <label>分类</label>
+    <select id="fCat" onchange="applyFilters()">
+      <option value="">全部</option>
+    </select>
+    <label>状态</label>
+    <select id="fStatus" onchange="applyFilters()">
+      <option value="">全部</option>
+    </select>
+    <input type="search" id="fKeyword" placeholder="🔍 关键词搜索..." oninput="applyFilters()">
+    <span class="result-count" id="resultCount"></span>
+  </div>
+
+  <!-- 表格 -->
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)">区域 <span class="sort-icon">⇅</span></th>
+          <th onclick="sortTable(1)">类别 <span class="sort-icon">⇅</span></th>
+          <th onclick="sortTable(2)">标题 <span class="sort-icon">⇅</span></th>
+          <th onclick="sortTable(3)">发布时间 <span class="sort-icon">⇅</span></th>
+          <th onclick="sortTable(4)">状态 <span class="sort-icon">⇅</span></th>
+          <th>摘要(中文)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-date="2026-02-26" data-cat="内容监管" data-region="韩国" data-impact="3" style="border-left:3px solid #94A3B8;"><td class="td-region">韩国</td><td class="td-cat"><span class="cat-badge" style="background:#E2E8F0;color:#334155;border:1px solid #94A3B8;">内容监管</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMiYEFVX3lxTE9veU9tdFZQejFFc1RLTl9kMnRHNWtoWHgwNkpaa0UtSmdGZGZOLWxJbFVzbHJJYkFwSHdFT3lpZ0pjTm13cmlEUHRsZWhqOW03eXJ5NWRwQTltaE1nYi1nTg?oc=5" target="_blank" rel="noopener" title="韩国游戏政策自治组织“游戏产业法全面修改专家论坛”启动">한국게임정책자율기구 &#x27;게임산업법 전부개정안 전문가 포럼&#x27; 발족</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> 게임포커스</span></td><td class="td-date">2026-02-26</td><td class="td-status"><span class="status-badge" style="background:#FEF3C7;color:#92400E;">已修订</span></td><td class="td-summary">韩国游戏政策自治组织“游戏产业法全面修改专家论坛”启动</td></tr>
+        <tr data-date="2026-02-26" data-cat="内容监管" data-region="韩国" data-impact="3" style="border-left:3px solid #94A3B8;"><td class="td-region">韩国</td><td class="td-cat"><span class="cat-badge" style="background:#E2E8F0;color:#334155;border:1px solid #94A3B8;">内容监管</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMiTkFVX3lxTE1DU0plTkNXdjRhR3dMbWFmc3ZySW9tWmhyaE5JZzBqMUUtTjlzSlRiQWNSak9DRE9Xdjlva184V3RCbXh0YldOV0hybEgwdw?oc=5" target="_blank" rel="noopener" title="韩国游戏政策自治组织启动“游戏产业法修订专家论坛”...立法支持">한국게임정책자율기구, &#x27;게임산업법 전부개정안 전문가 포럼&#x27; 발족... 입법 지원</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> 전자신문</span></td><td class="td-date">2026-02-26</td><td class="td-status"><span class="status-badge" style="background:#FEF3C7;color:#92400E;">已修订</span></td><td class="td-summary">韩国游戏政策自治组织启动“游戏产业法修订专家论坛”...立法支持</td></tr>
+        <tr data-date="2026-02-25" data-cat="内容监管" data-region="韩国" data-impact="3" style="border-left:3px solid #94A3B8;"><td class="td-region">韩国</td><td class="td-cat"><span class="cat-badge" style="background:#E2E8F0;color:#334155;border:1px solid #94A3B8;">内容监管</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMi0wFBVV95cUxNTmxwNjdORUktNWpDTlpobzV3RnlULWFyaUhCU09oNDFYUFEzLW1SVTcyNVEtdE01N3doT001bzdDZWxyWXRzWW0zTjlQc0NxcVY3ODZZdzQxaDZ5VjZZWDBYWGREbTdBTmhpZnBfUWQ5N0FBdjRQQUpBdWNBcGxjbG1fRTZxMzJDdGFvRWo4TFlLd1Q5S2s2QmVyd3dLWkpvTEJ2R0VwdlR3Z0ZrZzBaYW9Lb0ZmZl84bkdnOW03T3Bya0lZQy1VTjdVM0xsQ21kOE1F?oc=5" target="_blank" rel="noopener" title="韩国游戏产业协会反对游戏产业法修正案中强制披露人工智能">Korea Game Industry Association Opposes Mandatory AI Disclosure in Game Industry Act Amendment</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> Inven Global</span></td><td class="td-date">2026-02-25</td><td class="td-status"><span class="status-badge" style="background:#FEF3C7;color:#92400E;">已修订</span></td><td class="td-summary">韩国游戏产业协会反对游戏产业法修正案中强制披露人工智能</td></tr>
+        <tr data-date="2026-02-25" data-cat="未成年人保护" data-region="北美" data-impact="3" style="border-left:3px solid #6EE7B7;"><td class="td-region">北美</td><td class="td-cat"><span class="cat-badge" style="background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;">未成年人保护</span></td><td class="td-title"><a href="https://www.ftc.gov/news-events/news/press-releases/2026/02/ftc-issues-coppa-policy-statement-incentivize-use-age-verification-technologies-protect-children" target="_blank" rel="noopener" title="FTC 发布 COPPA 政策声明，鼓励使用年龄验证技术来保护在线儿童。联邦贸易委员会今天发布了一份政策声明，宣布委员会不会根据《儿童在线隐私保护规则》（COPPA 规则）对某些网站和在线服务运营商采取强制措施，这些网站和在线服务运营商收集、使用和披露个人信息的唯一目的是通过年龄验证技术确定用户的年龄。">FTC Issues COPPA Policy Statement to Incentivize the Use of Age Verification Technologies to Protect Children Online</a><br><span class=td-source><span class="tier-badge" style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;">官方</span> FTC News</span></td><td class="td-date">2026-02-25</td><td class="td-status"><span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span></td><td class="td-summary">FTC 发布 COPPA 政策声明，鼓励使用年龄验证技术来保护在线儿童。联邦贸易委员会今天发布了一份政策声明，宣布委员会不会根据《儿童在线隐私保护规则》（COPPA 规则）对某些网站和在线服务运营商采取强制措施，这些网站和在线服务运营商收集、使用和披露个人信息的唯一目的是通过年龄验证技术确定用户的年龄。</td></tr>
+        <tr data-date="2026-02-23" data-cat="内容监管" data-region="韩国" data-impact="3" style="border-left:3px solid #94A3B8;"><td class="td-region">韩国</td><td class="td-cat"><span class="cat-badge" style="background:#E2E8F0;color:#334155;border:1px solid #94A3B8;">内容监管</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMiTkFVX3lxTFBWMW10MklKQTRPb0J4VnlhWThwaHNtbkJ3NXd3NG1FMWtEN2dOcXlIaElPZlBPOHNtZHFFNUZvekVIVktnMjdVdHNTcEJjdw?oc=5" target="_blank" rel="noopener" title="【内容专栏】游戏产业法全面修改，10%不足">[콘텐츠칼럼]게임산업법 전면개정안, 10%가 부족하다</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> 전자신문</span></td><td class="td-date">2026-02-23</td><td class="td-status"><span class="status-badge" style="background:#FEF3C7;color:#92400E;">已修订</span></td><td class="td-summary">【内容专栏】游戏产业法全面修改，10%不足</td></tr>
+        <tr data-date="2026-02-26" data-cat="玩法合规" data-region="欧洲" data-impact="2" style="border-left:3px solid #C4B5FD;"><td class="td-region">欧洲</td><td class="td-cat"><span class="cat-badge" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;">玩法合规</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMiywFBVV95cUxOUWhNNWU0ZGR2ZUhxVXk1LTNZV3RTNDU4WG1kMEJVVUFnV2l1VjRwV0tjZGtTcjV1cXlLY29zdmtkNXRrWG9ZaGxUbXlCTC1Pb0lhX3hFUnpLWGhSYmwxTkpZMWlEaXFUdHI0d1ZJMlJNRHhOMFlTU3MzM3ROQTAzeGRBQW9qZTg2dFY5SUxHcVZmRnRONGM4UEtGRDg2N2FxdjNmUlFjVGlOb0pkbHhZdGtuUmREa2JsQzE3dzZ5ZzdWY0dEcVNyd2t6ONIBWkFVX3lxTFBuODRkRi00akl2U00tZlRjNnpuNVN4bUtvTF9QY0lVczdSVU41TTUyY2tYaGRGU3FvZ24xUnhYODIyVUliNzRhajlHTEZrQW93TVFFSVctaTZEQQ?oc=5" target="_blank" rel="noopener" title="在苹果、谷歌应用商店、英国广告监管机构命令中明确披露“战利品盒”">Disclose ‘loot box’ clearly on Apple, Google app stores, UK ad regulator orders</a><br><span class=td-source><span class="tier-badge" style="background:#F0FDF4;color:#166534;border:1px solid #BBF7D0;">法律</span> Law360</span></td><td class="td-date">2026-02-26</td><td class="td-status"><span class="status-badge" style="background:#F1F5F9;color:#475569;">政策信号</span></td><td class="td-summary">在苹果、谷歌应用商店、英国广告监管机构命令中明确披露“战利品盒”</td></tr>
+        <tr data-date="2026-02-26" data-cat="玩法合规" data-region="北美" data-impact="2" style="border-left:3px solid #C4B5FD;"><td class="td-region">北美</td><td class="td-cat"><span class="cat-badge" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;">玩法合规</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMi2gFBVV95cUxPYWpqZXY2RHpiQnExQVRKd1pxT1p2RTFvYnlHa0M0aTBYaUgwMFJNblFrSEtBa040cWlidExWWkNkMzZONVNNNVdCM0NNT3lpRW9WSktTbHBUaUo4cjBSWEJRem1yR0NJZkRKNTdMNjdEcXhvQ0piWnBWYjc4V0ZFQk5teElabnA3eEkxS1A3dU94RlVpV2ZWbFFqeDB5akRacnkzQ3ZjSkV4WVZzWk1YTEMwYkJPbDRUMWs3cHVGZ0Zzc1ktbUJOZ1NpWDh2NVQwZ1N5VXFqdXJPdw?oc=5" target="_blank" rel="noopener" title="纽约总检察长就“战利品盒”功能对游戏公司采取法律行动">NY Attorney General Takes Legal Action Against Gaming Company Over ‘Loot Box’ Features</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> Fine Day 102.3</span></td><td class="td-date">2026-02-26</td><td class="td-status"><span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span></td><td class="td-summary">纽约总检察长就“战利品盒”功能对游戏公司采取法律行动</td></tr>
+        <tr data-date="2026-02-26" data-cat="玩法合规" data-region="欧洲" data-impact="2" style="border-left:3px solid #C4B5FD;"><td class="td-region">欧洲</td><td class="td-cat"><span class="cat-badge" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;">玩法合规</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMiuAFBVV95cUxQeHZqMmUwaEY3VVBub0lxdnRhUTdPdDRJbDZxaXI5dWZIMTJXaUJCZnhvQU5fc1JUNVFaTm9USjQzUE1JSUMtNDF4OU9WZjdQOG9kWUowTnI3NUJNa2NNTkVGYVA3ZlNSMHR2Nnl3WlZZdVp3V21pVVp5eFdEUkdBQ3UtUUZTNWVkelI4ZWtYUDMwTzlJN3RBNFlFMjZURl9XYXVnMlFtdHRwa1dNWTBiMGtLM3RZQjRh?oc=5" target="_blank" rel="noopener" title="英国 ASA 发布关于广告和应用程序商店列表中战利品盒透明度的执法通知">UK&#x27;s ASA issues enforcement notice on loot box transparency in ads and app store listings</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> Pocket Gamer.biz</span></td><td class="td-date">2026-02-26</td><td class="td-status"><span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span></td><td class="td-summary">英国 ASA 发布关于广告和应用程序商店列表中战利品盒透明度的执法通知</td></tr>
+        <tr data-date="2026-02-26" data-cat="未成年人保护" data-region="北美" data-impact="2" style="border-left:3px solid #6EE7B7;"><td class="td-region">北美</td><td class="td-cat"><span class="cat-badge" style="background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;">未成年人保护</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMixgFBVV95cUxON1pidGpJRXAwUVdyWVV0dVpmcURlekgxZXBPX0lubC1nVE01Zl9ISkNONF9MZDdNVm1ZQ3QzQnlFWjA5SDNuWWRaT2gzUXJtTThRZDJpU0ZoYjc0VHBfeEFzdURuQjBGUllLakx2cTBIYWU1ZnlKWjV1T3BQQUFHcDFKWDBWQWFieGg0bldubnQ5NTYxcncxNUphQmprZmx2TkRCcERzUzNRbERPZ2FsdUQ5ZU5sYmd0dC1wMkpSeHJRaU1QeUE?oc=5" target="_blank" rel="noopener" title="联邦贸易委员会放松了保护在线儿童规则的执行力度，表面上是为了保护在线儿童">FTC Softens Enforcement of Rule Protecting Children Online, Ostensibly to Protect Children Online</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> Gizmodo</span></td><td class="td-date">2026-02-26</td><td class="td-status"><span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span></td><td class="td-summary">联邦贸易委员会放松了保护在线儿童规则的执行力度，表面上是为了保护在线儿童</td></tr>
+        <tr data-date="2026-02-26" data-cat="玩法合规" data-region="北美" data-impact="2" style="border-left:3px solid #C4B5FD;"><td class="td-region">北美</td><td class="td-cat"><span class="cat-badge" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;">玩法合规</span></td><td class="td-title"><a href="https://www.gamesindustry.biz/new-york-sues-valve-over-loot-boxes-alleges-gambling-law-violations" target="_blank" rel="noopener" title="纽约州起诉 Valve 战利品箱，指控其违反赌博法。纽约州总检察长 Letitia James 对 Valve 提起诉讼，指控《反恐精英 2》、《军团要塞 2》和《Dota 2》中的战利品箱非法鼓励未成年人赌博。阅读更多">New York sues Valve over loot boxes, alleges gambling law violations</a><br><span class=td-source><span class="tier-badge" style="background:#FFF7ED;color:#9A3412;border:1px solid #FED7AA;">行业</span> GamesIndustry.biz</span></td><td class="td-date">2026-02-26</td><td class="td-status"><span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span></td><td class="td-summary">纽约州起诉 Valve 战利品箱，指控其违反赌博法。纽约州总检察长 Letitia James 对 Valve 提起诉讼，指控《反恐精英 2》、《军团要塞 2》和《Dota 2》中的战利品箱非法鼓励未成年人赌博。阅读更多</td></tr>
+        <tr data-date="2026-02-24" data-cat="数据隐私" data-region="欧洲" data-impact="2" style="border-left:3px solid #93C5FD;"><td class="td-region">欧洲</td><td class="td-cat"><span class="cat-badge" style="background:#DBEAFE;color:#1E40AF;border:1px solid #93C5FD;">数据隐私</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMinwJBVV95cUxPRWJnUkdOTHh3dWtCemlNRnliX29zUWtNSmhqN24tSUowZlVValNVczZLRE42cWp4RUhYNkxtZDlJa3Z3LU4xVm81LV9rSTlQSzBhbm9vSENsVnpHYW9JcHMyaUZiTF82WERwTDl4Qk00alRkTmxjcjBBN3F6NnJKaXdEdFRGbWFROVlXRUt6N3hGYmxTS1YycHRGeVVSMFM0dXBnWkY2bHZUMHB6RXpLRnRla3QxMlRlcGx0cnp3cUhXd1JwUHN6bkxNc2hRUXhHck1UdVFBdlowQ0pMc0pOUS1XX2NianZpQ01IdkZCNGF0S3ZvbWR1M0NlWVowU2F3eGpwMzE2VG1BT1dweVJ2SEZBT1hyMW9LdDR2eF84MA?oc=5" target="_blank" rel="noopener" title="Reddit 因“非法使用儿童数据，可能使他们接触不适当和有害的内容”而被英国在线隐私监管机构罚款近 2000 万美元">Reddit fined nearly $20 million by UK online privacy regulator for &#x27;using children’s data unlawfully, potentially exposing them to inappropriate and harmful content&#x27;</a><br><span class=td-source><span class="tier-badge" style="background:#FFF7ED;color:#9A3412;border:1px solid #FED7AA;">行业</span> PC Gamer</span></td><td class="td-date">2026-02-24</td><td class="td-status"><span class="status-badge" style="background:#FEE2E2;color:#991B1B;">执法动态</span></td><td class="td-summary">Reddit 因“非法使用儿童数据，可能使他们接触不适当和有害的内容”而被英国在线隐私监管机构罚款近 2000 万美元</td></tr>
+        <tr data-date="2026-02-27" data-cat="内容监管" data-region="大洋洲" data-impact="1" style="border-left:3px solid #94A3B8;"><td class="td-region">大洋洲</td><td class="td-cat"><span class="cat-badge" style="background:#E2E8F0;color:#334155;border:1px solid #94A3B8;">内容监管</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMitwFBVV95cUxQcC1mbDNSRTZ6R0V6NkhNakx2bXdwLUFfd0dmRThBYlpuWHVhM3IyYVMwenFoV2ZWQkVlMjhzWmp2TVZBSGFkejFDVk1LaDZ1Q0g2STBmTEI1V21KMjc3QXk0eDV5TjExaS0wQ3ZVX2dVOGpqT0thSk9zTFNhUTdkMXBZWnpUYTRmOHlYdVRnSjVoTXUxNlk1aUh2TVRyU3p3YVhRblpJNklRUTFoTWZURmR2MmFlT0U?oc=5" target="_blank" rel="noopener" title="游戏：澳大利亚希望监管 Roblox。如何、为何以及下一步该去哪里？">GAMING: Australia wants to regulate Roblox. How, why and where to next?</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> Startup Daily</span></td><td class="td-date">2026-02-27</td><td class="td-status"><span class="status-badge" style="background:#F1F5F9;color:#475569;">政策信号</span></td><td class="td-summary">游戏：澳大利亚希望监管 Roblox。如何、为何以及下一步该去哪里？</td></tr>
+        <tr data-date="2026-02-26" data-cat="未成年人保护" data-region="其他" data-impact="1" style="border-left:3px solid #6EE7B7;"><td class="td-region">其他</td><td class="td-cat"><span class="cat-badge" style="background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;">未成年人保护</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMiQkFVX3lxTE5aQXJnSi1sb2FnYjg2U0l2d2VpN0xLVXItdWhMMC1USHpmRC13dzRkV0ppVENvYlJ3NHpWaGJGM2JjZw?oc=5" target="_blank" rel="noopener" title="App Store 收紧年龄验证，苹果顺应全球监管浪潮">App Store Tightens Age Verification, Apple Submits to Global Regulatory Wave</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> VOI.id</span></td><td class="td-date">2026-02-26</td><td class="td-status"><span class="status-badge" style="background:#F1F5F9;color:#475569;">政策信号</span></td><td class="td-summary">App Store 收紧年龄验证，苹果顺应全球监管浪潮</td></tr>
+        <tr data-date="2026-02-25" data-cat="玩法合规" data-region="其他" data-impact="1" style="border-left:3px solid #C4B5FD;"><td class="td-region">其他</td><td class="td-cat"><span class="cat-badge" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;">玩法合规</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMiogFBVV95cUxNWkJNS01URzFYMGlPUFI0U09zbmFKSGZJT3hxWmNUdkpEcF9mUmtlOUdWcVdNbVJhc3o0eFQ4QlZUME9SVVlMZ0xUa3FMR2duRWd0dUQtdHl1ZTdmNTUwSGM5LWg3d2FSR3BpdlY3MnI2NFg4eEVlV2N3S1JESlFrZWNtM3BlZTZsdGNkTU1OaldEcS1GTk5IQ2VRYWY5YWZ6ZGc?oc=5" target="_blank" rel="noopener" title="AG：视频游戏中的“战利品盒”功能违反了赌博法">AG: ‘Loot Box’ Feature in Video Games Violates Gambling Law</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> Long Island Life &amp; Politics</span></td><td class="td-date">2026-02-25</td><td class="td-status"><span class="status-badge" style="background:#F1F5F9;color:#475569;">政策信号</span></td><td class="td-summary">AG：视频游戏中的“战利品盒”功能违反了赌博法</td></tr>
+        <tr data-date="2026-02-25" data-cat="未成年人保护" data-region="其他" data-impact="1" style="border-left:3px solid #6EE7B7;"><td class="td-region">其他</td><td class="td-cat"><span class="cat-badge" style="background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;">未成年人保护</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMilAFBVV95cUxQTXpzTFRCTW92NkNhbnNNNmZfYkFidldRNWdpWkNtelBsQWIyWXZZZ0F2UFFIV0JWQ2pNZHl6MlZjSi1QODY4Y29pSnBOaFZLck5NblJqQkx5M3ZmajVobnB6UndMRmVER3RaaEVDOEpIQkhSWHZEZGpTRnVGWTF2Wlg3UlZkY01zcVFMR2VNSlBBZ3c2?oc=5" target="_blank" rel="noopener" title="Apple 扩展全球年龄验证系统以确保 App Store 合规性">Apple Expands Global Age Verification System for App Store Compliance</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> MLQ.ai</span></td><td class="td-date">2026-02-25</td><td class="td-status"><span class="status-badge" style="background:#F1F5F9;color:#475569;">政策信号</span></td><td class="td-summary">Apple 扩展全球年龄验证系统以确保 App Store 合规性</td></tr>
+        <tr data-date="2026-02-25" data-cat="未成年人保护" data-region="其他" data-impact="1" style="border-left:3px solid #6EE7B7;"><td class="td-region">其他</td><td class="td-cat"><span class="cat-badge" style="background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;">未成年人保护</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMi7gFBVV95cUxQX1BzQllyeUJmT1RVQ0RnNmlfXzJ6WWZxYVZISUxUaHV3YjJFYlBpdmtMNlNmOUcyd2x1alpFNFR4MXZOUDVrdzFOTUVTMVE2d1I4UWxpQi02ejU1eGtKSFNnOC12cHBIWnBCcmNoWURUSmVfbHpGeldKY082UGJ6c0llYm05SVRpc3A3Q1ZJelFlTmJ3RW9rX19xSTNSQ0dKanY5SUJ4NDFYX0RiYU02ME9UbjBzXzRFQ3IxWFZTZjhkbmUyMWlnYjg2WWgzZDlqQWFoX19oLUxEbXdYcElWV1ZMNFdzQW9xSWlvX1RR0gHzAUFVX3lxTFBlZjFTclhiQ3hFbktpTFBHUkx2SkQzb0dVR0VqcTVuZWZLdFdtMklleFBnSVJVbGJmVHVhTTJ6ODRERVVBUFN1RWxEU2YxV0dlMVpmdE9pNXF4Q3FaZGJwcHRHQy1BTU9GNnByajNNR2tnQ0IteFF2SzN3cTNUS0ZlalE1VTZWemZCSWhYY2t3MXU1c2s5Z2pFdzVndGRVMnd2QUZwRXMzakNHMW9YQ2FjYXItRUxnUWNlOWd5Y3BmMmpFNm5DR2Yxd1J0ZERRa0tRNmF5WXNISnZMNkRsdVdwT2d1a2VVT2IzYTJUVUN0d2VhWQ?oc=5" target="_blank" rel="noopener" title="苹果因儿童安全法收紧全球应用商店规则">Apple tightens App Store rules worldwide amid child safety laws</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> Techlusive</span></td><td class="td-date">2026-02-25</td><td class="td-status"><span class="status-badge" style="background:#F1F5F9;color:#475569;">政策信号</span></td><td class="td-summary">苹果因儿童安全法收紧全球应用商店规则</td></tr>
+        <tr data-date="2026-02-25" data-cat="玩法合规" data-region="韩国" data-impact="1" style="border-left:3px solid #C4B5FD;"><td class="td-region">韩国</td><td class="td-cat"><span class="cat-badge" style="background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD;">玩法合规</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMizAFBVV95cUxOYTk5eURwWUVjbWVmLTRwb0V5MmowelhnaVhIUmxJVjBRNGFqQjl2b04tajhxak1oaDU1TFpDU3d4THVGeTlPZDh1emhvS29JN1J2MmI1ajZaSmhwUXh5UUFRYmRDQlBLT29zbnhkQjl3eURDcEdHMWVCZnc4em5PUUlMcjYwMzJhS3RoUENDOHRQanlKckZSY25hclJWYmJhWHQ1Zi1qMjVUZEI3Q1hCT19QRWppWVhRMm8zNnBQb29oRl9FR2FuUXh2WUU?oc=5" target="_blank" rel="noopener" title="战利品箱镇压？韩国考虑对概率披露违规行为处以收入处罚">Loot Box Crackdown? South Korea Eyes Revenue Penalties for Probability Disclosure Breaches</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> Inven Global</span></td><td class="td-date">2026-02-25</td><td class="td-status"><span class="status-badge" style="background:#F1F5F9;color:#475569;">政策信号</span></td><td class="td-summary">战利品箱镇压？韩国考虑对概率披露违规行为处以收入处罚</td></tr>
+        <tr data-date="2026-02-25" data-cat="内容监管" data-region="其他" data-impact="1" style="border-left:3px solid #94A3B8;"><td class="td-region">其他</td><td class="td-cat"><span class="cat-badge" style="background:#E2E8F0;color:#334155;border:1px solid #94A3B8;">内容监管</span></td><td class="td-title"><a href="https://www.gamesindustry.biz/how-recent-laws-impact-game-design-from-in-game-chat-to-notifications" target="_blank" rel="noopener" title="最近的法律如何影响游戏设计，从游戏内聊天到通知。2026 年已经被证明是视频游戏监管现实对行业产生影响的一年。阅读更多">How recent laws impact game design, from in-game chat to notifications</a><br><span class=td-source><span class="tier-badge" style="background:#FFF7ED;color:#9A3412;border:1px solid #FED7AA;">行业</span> GamesIndustry.biz</span></td><td class="td-date">2026-02-25</td><td class="td-status"><span class="status-badge" style="background:#F1F5F9;color:#475569;">政策信号</span></td><td class="td-summary">最近的法律如何影响游戏设计，从游戏内聊天到通知。2026 年已经被证明是视频游戏监管现实对行业产生影响的一年。阅读更多</td></tr>
+        <tr data-date="2026-02-23" data-cat="内容监管" data-region="南亚" data-impact="1" style="border-left:3px solid #94A3B8;"><td class="td-region">南亚</td><td class="td-cat"><span class="cat-badge" style="background:#E2E8F0;color:#334155;border:1px solid #94A3B8;">内容监管</span></td><td class="td-title"><a href="https://news.google.com/rss/articles/CBMi7gFBVV95cUxNZG1oM21BWlVNb3p1Z2VLZGdvT3JXQW40eGdsNHZnOU1IaS1yZGlKdWdTNnlHQlhvcFJOQ0VnaFRtWlVxT0tzb2F2MzRlLUJtOWFBX1g1ZnFsbjJpNHVnRXJ2RTg2c053aUNjd3o3dHlXbnB3cUxVelNzeXNpVWt4NWdhXzd5a2ZlSzFCVEUtWEE3U0ZWQ2NfWGxMVzBkcjV1eWx3YTRHdS0wN0lHejRYOWJCU1FFRFc2aDB6aW01TXNnX3RITkxIamxoQlFxZ3FvWnFsb2pyNnRucHR0RVRTN2NLdzlTV3ppbjVCam9R?oc=5" target="_blank" rel="noopener" title="Deepfake 监管、3 小时取缔和游戏合规性重塑印度数字治理框架：IT 规则（2026 年更新）">Deepfake Regulation, 3-Hour Takedowns &amp; Gaming Compliance Reshape India’s Digital Governance Framework: IT Rules (Updated 2026)</a><br><span class=td-source><span class="tier-badge" style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;">媒体</span> Lawyer E News</span></td><td class="td-date">2026-02-23</td><td class="td-status"><span class="status-badge" style="background:#F1F5F9;color:#475569;">政策信号</span></td><td class="td-summary">Deepfake 监管、3 小时取缔和游戏合规性重塑印度数字治理框架：IT 规则（2026 年更新）</td></tr>
+      </tbody>
+    </table>
+    <div class="no-data" id="noData">暂无匹配数据</div>
+  </div>
+
+</div>
+<script>
+(function() {
+  // 初始化下拉筛选选项
+  const rows = document.querySelectorAll('#mainTable tbody tr');
+  const regions = new Set(), cats = new Set(), statuses = new Set();
+  rows.forEach(r => {
+    regions.add(r.dataset.region);
+    cats.add(r.dataset.cat);
+    const badge = r.querySelector('.status-badge');
+    if (badge) statuses.add(badge.textContent.trim());
+  });
+  const fill = (sel, vals) => {
+    [...vals].filter(Boolean).sort().forEach(v => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v; sel.appendChild(o);
+    });
+  };
+  fill(document.getElementById('fRegion'), regions);
+  fill(document.getElementById('fCat'), cats);
+  fill(document.getElementById('fStatus'), statuses);
+  updateCount();
+})();
+
+function applyFilters() {
+  const region = document.getElementById('fRegion').value;
+  const cat    = document.getElementById('fCat').value;
+  const status = document.getElementById('fStatus').value;
+  const kw     = document.getElementById('fKeyword').value.toLowerCase();
+
+  const rows = document.querySelectorAll('#mainTable tbody tr');
+  let visible = 0;
+  rows.forEach(r => {
+    let show = true;
+    if (show && region && r.dataset.region !== region) show = false;
+    if (show && cat    && r.dataset.cat    !== cat)    show = false;
+    if (show && status) {
+      const badge = r.querySelector('.status-badge');
+      if (!badge || badge.textContent.trim() !== status) show = false;
+    }
+    if (show && kw && !r.textContent.toLowerCase().includes(kw)) show = false;
+    r.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  updateCount(visible);
+}
+
+function updateCount(n) {
+  const total = document.querySelectorAll('#mainTable tbody tr').length;
+  const cnt = (n === undefined) ? total : n;
+  document.getElementById('resultCount').textContent = `显示 ${cnt} / ${total} 条`;
+  document.getElementById('noData').style.display = cnt === 0 ? 'block' : 'none';
+}
+
+let _sortDir = {};
+function sortTable(col) {
+  const tbody = document.querySelector('#mainTable tbody');
+  const rows  = [...tbody.querySelectorAll('tr')];
+  _sortDir[col] = !_sortDir[col];
+
+  // 更新排序图标
+  document.querySelectorAll('th').forEach((th, i) => {
+    th.classList.toggle('sorted', i === col);
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = (i === col) ? (_sortDir[col] ? '↑' : '↓') : '⇅';
+  });
+
+  rows.sort((a, b) => {
+    let va = a.cells[col]?.textContent.trim() ?? '';
+    let vb = b.cells[col]?.textContent.trim() ?? '';
+    // 日期列数字排序 (col 3 = 发布时间)
+    if (col === 3) return _sortDir[col]
+      ? va.localeCompare(vb)
+      : vb.localeCompare(va);
+    return _sortDir[col]
+      ? va.localeCompare(vb, 'zh')
+      : vb.localeCompare(va, 'zh');
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+</body>
+</html>
