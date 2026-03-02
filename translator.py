@@ -138,27 +138,68 @@ def _ai_process(title: str, summary: str, body_snippet: str = "") -> Optional[di
         text = resp.choices[0].message.content.strip()
         logger.info(f"[AI raw] {text[:200]}")   # 打印返回内容，方便排查
 
-        # 兼容三种输出格式：纯 JSON / ```json...``` / 含前缀文字
+        # 兼容多种输出格式，含截断修复
         # 1. 先尝试剥离 markdown 代码块
         code_block = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
         json_str = code_block.group(1) if code_block else None
-        # 2. 没有代码块则直接找 {...}
+        # 2. 完整 {...}
         if not json_str:
             plain = re.search(r"\{.*\}", text, re.DOTALL)
             json_str = plain.group() if plain else None
+        # 3. 截断修复：找到以 { 开头但没有结尾 } 的片段，补上
+        if not json_str:
+            partial = re.search(r"\{.*", text, re.DOTALL)
+            if partial:
+                json_str = partial.group().rstrip() + "}"
 
         if json_str:
-            data = json.loads(json_str)
-            title_zh  = (data.get("title_zh")  or "").strip()
+            try:
+                data = json.loads(json_str)
+            except json.JSONDecodeError:
+                data = {}
+            title_zh   = (data.get("title_zh")  or "").strip()
             summary_zh = (data.get("summary_zh") or "").strip()
+            # 4. JSON 解析失败兜底：直接用正则从原文提取字段值
+            if not title_zh or not summary_zh:
+                tm = re.search(r'"title_zh"\s*:\s*"([^"]{2,})"', text)
+                sm = re.search(r'"summary_zh"\s*:\s*"([^"]{2,})"', text)
+                if tm:
+                    title_zh = tm.group(1).strip()
+                if sm:
+                    summary_zh = sm.group(1).strip()
             if title_zh and summary_zh:
                 return {"title_zh": title_zh, "summary_zh": summary_zh}
-            logger.warning(f"[AI] JSON 解析成功但字段为空: {json_str[:100]}")
+            logger.warning(f"[AI] JSON 字段为空: {json_str[:100]}")
         else:
             logger.warning(f"[AI] 返回内容中未找到 JSON: {text[:200]}")
 
     except Exception as e:
-        logger.warning(f"[AI] 调用异常: {type(e).__name__}: {e}")
+        err_msg = str(e)
+        # 速率限制：提取建议等待时间，休眠后重试一次
+        retry_m = re.search(r'try again in (\d+\.?\d*)s', err_msg, re.IGNORECASE)
+        if retry_m:
+            wait_sec = min(float(retry_m.group(1)) + 1.5, 35.0)
+            logger.warning(f"[AI] 速率限制，等待 {wait_sec:.1f}s 后重试")
+            time.sleep(wait_sec)
+            try:
+                resp2 = _AI_CLIENT.chat.completions.create(
+                    model=_LLM_MODEL,
+                    max_tokens=300,
+                    messages=[
+                        {"role": "system", "content": _AI_SYSTEM},
+                        {"role": "user",   "content": user_msg},
+                    ],
+                )
+                text2 = resp2.choices[0].message.content.strip()
+                logger.info(f"[AI raw retry] {text2[:200]}")
+                tm = re.search(r'"title_zh"\s*:\s*"([^"]{2,})"', text2)
+                sm = re.search(r'"summary_zh"\s*:\s*"([^"]{2,})"', text2)
+                if tm and sm:
+                    return {"title_zh": tm.group(1).strip(), "summary_zh": sm.group(1).strip()}
+            except Exception as e2:
+                logger.warning(f"[AI] 重试失败: {type(e2).__name__}: {e2}")
+        else:
+            logger.warning(f"[AI] 调用异常: {type(e).__name__}: {e}")
     return None
 
 
@@ -252,11 +293,17 @@ def _check_ai_reachable() -> bool:
         logger.info("[AI] 连通性预检通过，将使用 LLM 处理")
         _ai_reachable = True
     except Exception as e:
-        logger.warning(
-            f"[AI] 连通性预检失败，本次批量翻译全部使用 Google Translate 回退。"
-            f"原因：{type(e).__name__}: {e}"
-        )
-        _ai_reachable = False
+        err_str = str(e)
+        # 429 表示 API 可达但触发速率限制，仍视为可用
+        if "429" in err_str or "rate_limit" in err_str.lower():
+            logger.info("[AI] 连通性预检触发速率限制，但 API 可达，将使用 LLM 处理")
+            _ai_reachable = True
+        else:
+            logger.warning(
+                f"[AI] 连通性预检失败，本次批量翻译全部使用 Google Translate 回退。"
+                f"原因：{type(e).__name__}: {e}"
+            )
+            _ai_reachable = False
     return _ai_reachable
 
 
@@ -278,7 +325,7 @@ def translate_item_fields(item_dict: dict) -> dict:
         if result:
             item_dict["title_zh"] = result["title_zh"]
             item_dict["summary_zh"] = result["summary_zh"]
-            time.sleep(0.1)   # 控制 API 速率
+            time.sleep(4)   # Groq 免费层 6000 TPM，每条约300 token，4s间隔确保不超限
             return item_dict
         logger.warning(f"AI 处理未返回有效结果，回退到 Google Translate: {title[:50]}")
 
