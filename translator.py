@@ -323,11 +323,19 @@ def _ai_process(title: str, summary: str, body_snippet: str = "") -> Optional[di
 
     except Exception as e:
         err_msg = str(e)
-        # 速率限制：提取建议等待时间，休眠后重试一次
+        # 429 速率限制：提取建议等待时间
         retry_m = re.search(r'try again in (\d+\.?\d*)s', err_msg, re.IGNORECASE)
-        if retry_m:
-            wait_sec = min(float(retry_m.group(1)) + 1.5, 35.0)
-            logger.warning(f"[AI] 速率限制，等待 {wait_sec:.1f}s 后重试")
+        # 500 服务端瞬时故障（硅基流动 50507 等）：固定等待 6s 后重试
+        is_server_error = ('500' in err_msg or '50507' in err_msg or
+                           'InternalServerError' in err_msg or 'unknown error' in err_msg.lower())
+
+        if retry_m or is_server_error:
+            if retry_m:
+                wait_sec = min(float(retry_m.group(1)) + 1.5, 35.0)
+                logger.warning(f"[AI] 速率限制，等待 {wait_sec:.1f}s 后重试")
+            else:
+                wait_sec = 6.0
+                logger.warning(f"[AI] 服务端 500 错误，等待 {wait_sec:.1f}s 后重试一次")
             time.sleep(wait_sec)
             try:
                 resp2 = _AI_CLIENT.chat.completions.create(
