@@ -98,10 +98,13 @@ class Database:
     def upsert_item(self, item: LegislationItem) -> bool:
         try:
             self.conn.execute("""
-                INSERT OR IGNORE INTO legislation
+                INSERT INTO legislation
                     (region, category_l1, category_l2, title, date, status, summary,
                      source_name, source_url, lang, title_zh, summary_zh, impact_score)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(title, source_url) DO UPDATE SET
+                    title_zh   = CASE WHEN excluded.title_zh   != '' THEN excluded.title_zh   ELSE legislation.title_zh   END,
+                    summary_zh = CASE WHEN excluded.summary_zh != '' THEN excluded.summary_zh ELSE legislation.summary_zh END
             """, (
                 item.region, item.category_l1, item.category_l2,
                 item.title, item.date, item.status, item.summary,
