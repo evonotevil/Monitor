@@ -59,39 +59,80 @@ def _is_mostly_chinese(text: str) -> bool:
 
 def _build_source_text(item_dict: dict) -> str:
     """
-    构建用于翻译的文本。
-    Google News 的 description 通常就是标题 + 来源名，所以优先用标题。
-    若摘要比标题长且内容不同，则拼接标题+摘要以获得更丰富的中文概括。
+    构建用于翻译的文本，尽量提供充足上下文。
+    - 清除 RSS 常见的尾部省略号（表示文本被截断）
+    - 当摘要有实质内容时，拼接标题+摘要以获得更完整的中文概括
     """
     title = (item_dict.get("title") or "").strip()
     summary = (item_dict.get("summary") or "").strip()
 
-    # 若摘要基本等于标题（Google News 常见情况），只翻译标题
-    title_norm = re.sub(r"\s+", " ", title.lower())
-    summary_norm = re.sub(r"\s+", " ", summary.lower())
-    if not summary or summary_norm.startswith(title_norm[:40]):
+    # 清理 RSS 截断标记（"... [+1234 chars]" / "…" 结尾等）
+    summary = re.sub(r"\s*[\[【][\+\d].*?[\]】]\s*$", "", summary).strip()
+    summary = re.sub(r"\s*\.{2,}\s*$", "", summary).strip()
+    summary = re.sub(r"\s*…\s*$", "", summary).strip()
+
+    if not summary or len(summary) < 20:
         return title
 
-    # 摘要有额外信息时，拼接翻译
-    combined = f"{title}。{summary}" if title else summary
+    # 判断摘要是否只是在重复标题
+    title_norm = re.sub(r"\s+", " ", title.lower())
+    summary_norm = re.sub(r"\s+", " ", summary.lower())
+    title_prefix = title_norm[:50]
+
+    if summary_norm.startswith(title_prefix):
+        # 摘要以标题开头：取标题 + 摘要中标题之后的部分
+        extra = summary[len(title_prefix):].strip(" .-")
+        if len(extra) > 20:
+            combined = f"{title}. {extra}"
+        else:
+            combined = title
+    else:
+        # 摘要有独立内容：完整拼接
+        sep = "。" if title.endswith(("。", "！", "？")) else ". "
+        combined = f"{title}{sep}{summary}"
+
     return combined[:500]
+
+
+def _ensure_complete_sentence(text: str) -> str:
+    """
+    确保翻译结果以完整句子结尾。
+    若文本在句中截断，则回退到最后一个句末标点处。
+    """
+    if not text:
+        return text
+    # 已是完整句子
+    if text[-1] in "。！？.!?":
+        return text
+    # 找最后一个句末标点，保留至少一半内容
+    for sep in ["。", "！", "？", ".", "!", "?"]:
+        idx = text.rfind(sep)
+        if idx > len(text) * 0.4:
+            return text[:idx + 1]
+    return text
 
 
 def translate_item_fields(item_dict: dict) -> dict:
     """
-    生成中文摘要概括（summary_zh），标题保留原文。
-    - summary_zh: 综合标题+摘要翻译为简明中文概括（必须有）
-    - title_zh: 不生成（保留原文标题）
+    生成中文摘要（summary_zh）和中文标题（title_zh）。
+    - title_zh:  单独翻译标题，质量更稳定，供 HTML/飞书优先展示
+    - summary_zh: 综合标题+摘要翻译，确保完整句子
     """
-    source_text = _build_source_text(item_dict)
+    # 1. 翻译标题 → title_zh
+    title = (item_dict.get("title") or "").strip()
+    if title and not _is_mostly_chinese(title):
+        item_dict["title_zh"] = translate_to_zh(title[:200])
+        time.sleep(0.15)
+    else:
+        item_dict["title_zh"] = title
 
+    # 2. 翻译摘要 → summary_zh
+    source_text = _build_source_text(item_dict)
     if _is_mostly_chinese(source_text):
         item_dict["summary_zh"] = source_text
     else:
-        item_dict["summary_zh"] = translate_to_zh(source_text)
-        time.sleep(0.2)  # 控制请求速率
-
-    # title_zh 不翻译，reporter 直接展示原文
-    item_dict["title_zh"] = ""
+        raw = translate_to_zh(source_text)
+        item_dict["summary_zh"] = _ensure_complete_sentence(raw)
+        time.sleep(0.2)
 
     return item_dict

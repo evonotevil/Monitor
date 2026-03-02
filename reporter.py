@@ -348,18 +348,26 @@ def generate_html(items: List[dict], title: str = "全球游戏行业立法动�
             tier_cfg = TIER_CONFIG.get(tier, TIER_CONFIG["news"])
 
             title_orig = html_mod.escape(item.get("title", ""))
-            summary_zh_full = html_mod.escape(_get_summary_zh(item))
-            summary_zh = html_mod.escape(_truncate(_get_summary_zh(item), 200))
+            summary_zh_raw = _get_summary_zh(item)
+            summary_zh_full = html_mod.escape(summary_zh_raw)
+            summary_zh = html_mod.escape(_truncate(summary_zh_raw, 200))
             url = item.get("source_url", "")
             item_date = item.get("date", "")
             region = html_mod.escape(item.get("region", ""))
             source_name = html_mod.escape(source_raw)
 
+            # 中文主标题：优先 title_zh，回退到 summary_zh 前 80 字
+            title_zh_raw = (item.get("title_zh") or "").strip()
+            zh_headline = html_mod.escape(
+                title_zh_raw if title_zh_raw else _truncate(summary_zh_raw, 80)
+            )
+
+            # 英文原标题作为次要链接
             if url:
-                title_link = (f'<a href="{html_mod.escape(url)}" target="_blank" '
-                              f'rel="noopener" title="{summary_zh_full}">{title_orig}</a>')
+                orig_link = (f'<a href="{html_mod.escape(url)}" target="_blank" '
+                             f'rel="noopener" title="{summary_zh_full}">{title_orig}</a>')
             else:
-                title_link = f'<span title="{summary_zh_full}">{title_orig}</span>'
+                orig_link = f'<span title="{summary_zh_full}">{title_orig}</span>'
 
             cat_badge = (
                 f'<span class="cat-badge" style="background:{style["bg"]};'
@@ -385,7 +393,8 @@ def generate_html(items: List[dict], title: str = "全球游戏行业立法动�
                 f'<td class="td-region">{region}</td>'
                 f'<td class="td-cat">{cat_badge}</td>'
                 f'<td class="td-title">'
-                f'{title_link}'
+                f'<span class="td-title-zh">{zh_headline}</span>'
+                f'<span class="td-title-orig">{orig_link}</span>'
                 f'{"<br><span class=td-source>" + tier_badge + " " + source_name + "</span>" if source_name else ""}'
                 f'</td>'
                 f'<td class="td-date">{html_mod.escape(item_date)}</td>'
@@ -592,9 +601,23 @@ td {{ padding: 9px 12px; font-size: 12px; vertical-align: top; }}
     font-size: 11px;
 }}
 .td-cat {{ white-space: nowrap; }}
-.td-title {{ min-width: 200px; max-width: 320px; font-weight: 500; line-height: 1.55; }}
-.td-title a {{ color: #0066CC; text-decoration: none; }}
-.td-title a:hover {{ text-decoration: underline; color: #004499; }}
+.td-title {{ min-width: 200px; max-width: 340px; line-height: 1.55; }}
+.td-title-zh {{
+    display: block;
+    font-weight: 600;
+    color: #1D1D1F;
+    font-size: 12.5px;
+    line-height: 1.6;
+    margin-bottom: 4px;
+}}
+.td-title-orig {{
+    display: block;
+    font-size: 10.5px;
+    color: #AEAEB2;
+    margin-top: 1px;
+}}
+.td-title-orig a {{ color: #AEAEB2; text-decoration: none; }}
+.td-title-orig a:hover {{ text-decoration: underline; color: #636366; }}
 .td-source {{
     font-size: 10px;
     color: #AEAEB2;
