@@ -25,7 +25,7 @@ from datetime import datetime
 from models import Database
 from fetcher import fetch_and_process
 from translator import translate_item_fields
-from reporter import print_table, save_markdown, save_html, generate_markdown
+from reporter import print_table, save_markdown, save_html, generate_markdown, _get_region_group
 from config import PERIOD_DAYS
 
 # ─── 日志配置 ─────────────────────────────────────────────────────────
@@ -61,9 +61,13 @@ def _title_bigram_sim(a: str, b: str) -> float:
 
 def _deduplicate_items(items):
     """
-    在同一地区且日期相差 ≤2 天的文章中，找出英文标题 bigram 相似度 >65%
+    在同一「显示分组」且日期相差 ≤2 天的文章中，找出英文标题 bigram 相似度 >65%
     的文章对，只保留 impact_score 最高的那篇（相同则保留最早抓到的）。
     其余视为重复，丢弃前在摘要末尾追加多来源提示。
+
+    注意：按显示分组（东南亚/欧洲/北美/其他…）而非原始 region 字段去重，
+    这样来自不同子 region（如"全球"/"澳大利亚"/"英国"）但属同一显示组的
+    同主题文章也能被合并。
     """
     from models import LegislationItem
     keep: list[LegislationItem] = []
@@ -72,11 +76,13 @@ def _deduplicate_items(items):
     for i, item_i in enumerate(items):
         if i in dropped:
             continue
+        group_i = _get_region_group(item_i.region)
         duplicates = []   # (j, sim)
         for j, item_j in enumerate(items):
             if j <= i or j in dropped:
                 continue
-            if item_i.region != item_j.region:
+            # 按显示分组比较，而非原始 region 字段
+            if group_i != _get_region_group(item_j.region):
                 continue
             # 日期差 ≤2 天
             try:
@@ -267,6 +273,55 @@ def cmd_stats(args):
         db.close()
 
 
+# ─── 命令: retranslate ───────────────────────────────────────────────
+
+def cmd_retranslate(args):
+    """
+    清空含脏词/格式问题的历史翻译字段，然后立即重新翻译。
+    用途：当 translator.py 中的 _TERM_CORRECTIONS 或 prompt 更新后，
+    让旧数据库条目也能享受最新翻译质量。
+    """
+    from translator import _TERM_CORRECTIONS, translate_item_fields
+
+    db = Database()
+    try:
+        # ── 阶段 1：清空含脏词的翻译字段 ──────────────────────────────
+        dirty_terms = list(_TERM_CORRECTIONS.keys())
+        # 同时清理常见格式问题：【xxx】栏目前缀、问句标题（以"？"结尾）
+        extra_patterns = ["【"]
+        cleared = db.clear_stale_translations(dirty_terms + extra_patterns)
+        logger.info(f"[重译] 已清空 {cleared} 条含脏词翻译的条目")
+
+        force = getattr(args, "force", False)
+        if cleared == 0 and not force:
+            logger.info("[重译] 无需重译条目，数据库已是最新。若想强制全量重译请加 --force")
+            return
+
+        # ── 阶段 2：查询所有 title_zh 为空的条目并重译 ─────────────────
+        limit = getattr(args, "limit", 100)
+        items_dicts = db.query_items_untranslated(limit=limit)
+        if not items_dicts:
+            logger.info("[重译] 没有待翻译条目，完成。")
+            return
+
+        logger.info(f"[重译] 开始重译 {len(items_dicts)} 条条目（限额 {limit}）…")
+        updated = 0
+        for item_dict in items_dicts:
+            translated = translate_item_fields(item_dict)
+            if translated.get("title_zh"):
+                db.update_translation(
+                    item_dict["id"],
+                    translated["title_zh"],
+                    translated.get("summary_zh", ""),
+                )
+                updated += 1
+                logger.info(f"  ✓ [{item_dict.get('region','')}] {translated['title_zh'][:40]}")
+
+        logger.info(f"[重译] 完成，共更新 {updated} 条。")
+    finally:
+        db.close()
+
+
 # ─── 命令: schedule ──────────────────────────────────────────────────
 
 def cmd_schedule(args):
@@ -338,6 +393,21 @@ def main():
     # stats
     p_stats = subparsers.add_parser("stats", help="查看数据库统计")
     p_stats.set_defaults(func=cmd_stats)
+
+    # retranslate
+    p_retrans = subparsers.add_parser(
+        "retranslate",
+        help="清空含脏词/格式问题的历史翻译并重新生成（prompt 更新后用）",
+    )
+    p_retrans.add_argument(
+        "--force", action="store_true",
+        help="即使没有检测到脏词也强制重译全部 title_zh 为空的条目",
+    )
+    p_retrans.add_argument(
+        "--limit", type=int, default=100,
+        help="单次最多重译条数（默认 100，避免超 Groq 配额）",
+    )
+    p_retrans.set_defaults(func=cmd_retranslate)
 
     # schedule
     p_schedule = subparsers.add_parser("schedule", help="定时自动执行")
