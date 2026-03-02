@@ -41,6 +41,8 @@ jobs:
 
       # ── 3. 抓取最新数据 & 生成 HTML 报告 ──────────────────────────
       - name: Fetch data & generate HTML
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           python monitor.py run --period week
           python monitor.py report --format html --period week
