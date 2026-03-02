@@ -2,13 +2,17 @@
 报告生成器 - 支持终端表格、Markdown、HTML 输出
 HTML 报告支持:
   - 一级分类颜色区分
-  - 周报（近7天）/ 月报（近30天）/ 全部 切换
+  - 区域分组展示（东南亚/南亚/中东/欧洲/北美/南美/日韩台/其他）
   - 时间列展示立法动态发布时间
+  - Lilith Legal 品牌标识
 """
 
+import base64
 import os
 import html as html_mod
+from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 
 from config import OUTPUT_DIR, REGION_DISPLAY_ORDER
@@ -38,9 +42,73 @@ def _get_summary_zh(item: dict) -> str:
     return item.get("summary_zh") or item.get("summary", "")
 
 
+# ─── 区域分组配置 ────────────────────────────────────────────────────
+
+_REGION_GROUP_MAP = {
+    # 东南亚
+    "东南亚": "东南亚", "越南": "东南亚", "印度尼西亚": "东南亚",
+    "泰国": "东南亚", "菲律宾": "东南亚", "马来西亚": "东南亚", "新加坡": "东南亚",
+    "缅甸": "东南亚", "柬埔寨": "东南亚",
+    # 南亚
+    "南亚": "南亚", "印度": "南亚", "巴基斯坦": "南亚",
+    "孟加拉国": "南亚", "斯里兰卡": "南亚",
+    # 中东
+    "中东/非洲": "中东", "中东": "中东", "沙特": "中东",
+    "阿联酋": "中东", "土耳其": "中东", "以色列": "中东", "非洲": "中东",
+    # 欧洲
+    "欧洲": "欧洲", "欧盟": "欧洲", "英国": "欧洲", "德国": "欧洲",
+    "法国": "欧洲", "荷兰": "欧洲", "比利时": "欧洲", "意大利": "欧洲",
+    "西班牙": "欧洲", "波兰": "欧洲", "瑞典": "欧洲", "挪威": "欧洲",
+    # 北美
+    "北美": "北美", "美国": "北美", "加拿大": "北美",
+    # 南美
+    "南美": "南美", "巴西": "南美", "阿根廷": "南美", "墨西哥": "南美",
+    "智利": "南美", "哥伦比亚": "南美",
+    # 日韩台
+    "日本": "日韩台", "韩国": "日韩台", "港澳台": "日韩台",
+    "台湾": "日韩台", "香港": "日韩台", "澳门": "日韩台",
+    # 其他
+    "大洋洲": "其他", "澳大利亚": "其他", "新西兰": "其他",
+    "全球": "其他", "其他": "其他",
+}
+
+_GROUP_ORDER = ["东南亚", "南亚", "中东", "欧洲", "北美", "南美", "日韩台", "其他"]
+
+_GROUP_EMOJI = {
+    "东南亚": "🌏", "南亚": "🌏", "中东": "🕌",
+    "欧洲": "🌍", "北美": "🌎", "南美": "🌎",
+    "日韩台": "🌸", "其他": "🌐",
+}
+
+
+def _get_region_group(region: str) -> str:
+    if region in _REGION_GROUP_MAP:
+        return _REGION_GROUP_MAP[region]
+    # 模糊匹配
+    for key, group in _REGION_GROUP_MAP.items():
+        if key in region or region in key:
+            return group
+    return "其他"
+
+
+# ─── Lilith Legal Logo 嵌入 ─────────────────────────────────────────
+
+_LOGO_PATH = Path(__file__).parent / "assets" / "lilith-logo.png"
+
+
+def _get_logo_html() -> str:
+    """返回 base64 内联 logo img 标签；文件不存在时返回空字符串"""
+    if _LOGO_PATH.exists():
+        with open(_LOGO_PATH, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        suffix = _LOGO_PATH.suffix.lower().lstrip(".")
+        mime = "image/png" if suffix == "png" else f"image/{suffix}"
+        return f'<img src="data:{mime};base64,{b64}" alt="Lilith Games" class="header-logo">'
+    return ""
+
+
 # ─── 分类颜色配置（舒适色系） ──────────────────────────────────────────
 
-# 每个一级分类对应：行背景色、标签背景色、标签文字色、左侧边框色
 CATEGORY_STYLE = {
     "数据隐私":    {"row": "#F0F4FF", "bg": "#DBEAFE", "text": "#1E40AF", "border": "#93C5FD"},
     "玩法合规":    {"row": "#F5F0FF", "bg": "#EDE9FE", "text": "#5B21B6", "border": "#C4B5FD"},
@@ -66,14 +134,12 @@ STATUS_CSS = {
     "政策信号":    "background:#F1F5F9;color:#475569;",
 }
 
-# 影响评分配置 (1=低 / 2=中 / 3=高)
 IMPACT_CONFIG = {
     3: {"dots": "●●●", "label": "高优先",  "color": "#DC2626", "title": "高优先：已生效/即将生效/官方执法"},
     2: {"dots": "●●○", "label": "中优先",  "color": "#D97706", "title": "中优先：草案/立法中/执法动态"},
     1: {"dots": "●○○", "label": "低优先",  "color": "#16A34A", "title": "低优先：政策信号/背景信息"},
 }
 
-# 信源层级展示
 TIER_CONFIG = {
     "official": {"label": "官方",  "bg": "#EFF6FF", "text": "#1D4ED8", "border": "#BFDBFE"},
     "legal":    {"label": "法律",  "bg": "#F0FDF4", "text": "#166534", "border": "#BBF7D0"},
@@ -232,7 +298,7 @@ def _build_legend_html() -> str:
     items_html = ""
     for cat, style in CATEGORY_STYLE.items():
         if cat == "市场准入":
-            continue  # 与经营合规合并
+            continue
         items_html += (
             f'<span class="legend-item" style="background:{style["bg"]};'
             f'color:{style["text"]};border:1px solid {style["border"]};'
@@ -242,125 +308,93 @@ def _build_legend_html() -> str:
     return f'<div class="legend">{items_html}</div>'
 
 
-_STATUS_PRIORITY = {
-    "执法动态": 0, "已生效": 1, "即将生效": 2,
-    "草案/征求意见": 3, "立法进行中": 4, "已提案": 5,
-    "已修订": 6, "已废止": 7, "政策信号": 8,
-}
-
-
-def _build_highlights_html(items: List[dict]) -> str:
-    """生成本周重点卡片区（执法动态/已生效/即将生效优先，最多5条）"""
-    if not items:
-        return ""
-    ranked = sorted(
-        items,
-        key=lambda x: (
-            _STATUS_PRIORITY.get(x.get("status", "政策信号"), 9),
-            -int(x.get("impact_score", 1)),
-        ),
-    )[:5]
-
-    cards = ""
-    for item in ranked:
-        cat = item.get("category_l1", "")
-        style = CATEGORY_STYLE.get(cat, DEFAULT_STYLE)
-        status = item.get("status", "")
-        status_css = STATUS_CSS.get(status, "background:#F1F5F9;color:#475569;")
-        title_orig = html_mod.escape(item.get("title", ""))
-        summary_zh = html_mod.escape(_truncate(_get_summary_zh(item), 120))
-        region = html_mod.escape(item.get("region", ""))
-        url = item.get("source_url", "")
-        item_date = html_mod.escape(item.get("date", ""))
-
-        title_link = (
-            f'<a href="{html_mod.escape(url)}" target="_blank" rel="noopener">{title_orig}</a>'
-            if url else title_orig
-        )
-        cards += f"""
-        <div class="hl-card" style="border-left:4px solid {style['border']};">
-          <div class="hl-meta">
-            <span class="hl-region">{region}</span>
-            <span class="cat-badge" style="background:{style['bg']};color:{style['text']};border:1px solid {style['border']};">{html_mod.escape(cat)}</span>
-            <span class="status-badge" style="{status_css}">{html_mod.escape(status)}</span>
-            <span class="hl-date">{item_date}</span>
-          </div>
-          <div class="hl-title">{title_link}</div>
-          <div class="hl-summary">{summary_zh}</div>
-        </div>"""
-    return f'<div class="highlights">{cards}\n      </div>'
-
-
 def generate_html(items: List[dict], title: str = "全球游戏行业立法动态监控报告",
                   period_label: str = "") -> str:
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    logo_html = _get_logo_html()
 
-    rows_html = ""
+    # ── 按区域分组 ────────────────────────────────────────────────
+    grouped: dict = defaultdict(list)
     for item in items:
-        cat = item.get("category_l1", "")
-        style = CATEGORY_STYLE.get(cat, DEFAULT_STYLE)
-        status = item.get("status", "")
-        status_css = STATUS_CSS.get(status, "background:#F1F5F9;color:#475569;")
-        impact = int(item.get("impact_score", 1))
-        imp_cfg = IMPACT_CONFIG.get(impact, IMPACT_CONFIG[1])
+        group = _get_region_group(item.get("region", "其他"))
+        grouped[group].append(item)
 
-        # 信源层级
-        from classifier import get_source_tier
-        source_raw = item.get("source_name", "")
-        tier = get_source_tier(source_raw)
-        tier_cfg = TIER_CONFIG.get(tier, TIER_CONFIG["news"])
-
-        # 标题：显示原文，中文摘要作为 tooltip
-        title_orig = html_mod.escape(item.get("title", ""))
-        summary_zh_full = html_mod.escape(_get_summary_zh(item))
-        summary_zh = html_mod.escape(_truncate(_get_summary_zh(item), 200))
-        url = item.get("source_url", "")
-        item_date = item.get("date", "")
-        region = html_mod.escape(item.get("region", ""))
-        source_name = html_mod.escape(source_raw)
-
-        if url:
-            title_link = (f'<a href="{html_mod.escape(url)}" target="_blank" '
-                          f'rel="noopener" title="{summary_zh_full}">{title_orig}</a>')
-        else:
-            title_link = f'<span title="{summary_zh_full}">{title_orig}</span>'
-
-        cat_badge = (
-            f'<span class="cat-badge" style="background:{style["bg"]};'
-            f'color:{style["text"]};border:1px solid {style["border"]};">'
-            f'{html_mod.escape(cat)}</span>'
-        )
-        # 状态标签（仅保留状态，不显示优先级点）
-        status_badge = (
-            f'<span class="status-badge" style="{status_css}">'
-            f'{html_mod.escape(status)}</span>'
-        )
-        # 信源层级标签（显示在来源名旁边）
-        tier_badge = (
-            f'<span class="tier-badge" style="background:{tier_cfg["bg"]};'
-            f'color:{tier_cfg["text"]};border:1px solid {tier_cfg["border"]};">'
-            f'{tier_cfg["label"]}</span>'
-        )
-
+    # ── 生成表格行（含分组 header）────────────────────────────────
+    rows_html = ""
+    for group in _GROUP_ORDER:
+        group_items = grouped.get(group, [])
+        if not group_items:
+            continue
+        emoji = _GROUP_EMOJI.get(group, "🌐")
+        # 分组 header 行
         rows_html += (
-            f'\n        <tr data-date="{html_mod.escape(item_date)}" '
-            f'data-cat="{html_mod.escape(cat)}" data-region="{region}" '
-            f'data-impact="{impact}" '
-            f'style="border-left:3px solid {style["border"]};">'
-            f'<td class="td-region">{region}</td>'
-            f'<td class="td-cat">{cat_badge}</td>'
-            f'<td class="td-title">'
-            f'{title_link}'
-            f'{"<br><span class=td-source>" + tier_badge + " " + source_name + "</span>" if source_name else ""}'
-            f'</td>'
-            f'<td class="td-date">{html_mod.escape(item_date)}</td>'
-            f'<td class="td-status">{status_badge}</td>'
-            f'<td class="td-summary">{summary_zh}</td>'
-            f'</tr>'
+            f'\n        <tr class="group-row" data-group="{html_mod.escape(group)}">'
+            f'<td colspan="6" class="group-header">'
+            f'{emoji} {html_mod.escape(group)}'
+            f'<span class="group-count">{len(group_items)} 条</span>'
+            f'</td></tr>'
         )
+        # 条目行（按日期倒序）
+        for item in sorted(group_items, key=lambda x: x.get("date", ""), reverse=True):
+            cat = item.get("category_l1", "")
+            style = CATEGORY_STYLE.get(cat, DEFAULT_STYLE)
+            status = item.get("status", "")
+            status_css = STATUS_CSS.get(status, "background:#F1F5F9;color:#475569;")
+            impact = int(item.get("impact_score", 1))
+
+            from classifier import get_source_tier
+            source_raw = item.get("source_name", "")
+            tier = get_source_tier(source_raw)
+            tier_cfg = TIER_CONFIG.get(tier, TIER_CONFIG["news"])
+
+            title_orig = html_mod.escape(item.get("title", ""))
+            summary_zh_full = html_mod.escape(_get_summary_zh(item))
+            summary_zh = html_mod.escape(_truncate(_get_summary_zh(item), 200))
+            url = item.get("source_url", "")
+            item_date = item.get("date", "")
+            region = html_mod.escape(item.get("region", ""))
+            source_name = html_mod.escape(source_raw)
+
+            if url:
+                title_link = (f'<a href="{html_mod.escape(url)}" target="_blank" '
+                              f'rel="noopener" title="{summary_zh_full}">{title_orig}</a>')
+            else:
+                title_link = f'<span title="{summary_zh_full}">{title_orig}</span>'
+
+            cat_badge = (
+                f'<span class="cat-badge" style="background:{style["bg"]};'
+                f'color:{style["text"]};border:1px solid {style["border"]};">'
+                f'{html_mod.escape(cat)}</span>'
+            )
+            status_badge = (
+                f'<span class="status-badge" style="{status_css}">'
+                f'{html_mod.escape(status)}</span>'
+            )
+            tier_badge = (
+                f'<span class="tier-badge" style="background:{tier_cfg["bg"]};'
+                f'color:{tier_cfg["text"]};border:1px solid {tier_cfg["border"]};">'
+                f'{tier_cfg["label"]}</span>'
+            )
+
+            rows_html += (
+                f'\n        <tr data-date="{html_mod.escape(item_date)}" '
+                f'data-cat="{html_mod.escape(cat)}" data-region="{region}" '
+                f'data-group="{html_mod.escape(group)}" '
+                f'data-impact="{impact}" '
+                f'style="border-left:3px solid {style["border"]};">'
+                f'<td class="td-region">{region}</td>'
+                f'<td class="td-cat">{cat_badge}</td>'
+                f'<td class="td-title">'
+                f'{title_link}'
+                f'{"<br><span class=td-source>" + tier_badge + " " + source_name + "</span>" if source_name else ""}'
+                f'</td>'
+                f'<td class="td-date">{html_mod.escape(item_date)}</td>'
+                f'<td class="td-status">{status_badge}</td>'
+                f'<td class="td-summary">{summary_zh}</td>'
+                f'</tr>'
+            )
 
     legend_html = _build_legend_html()
-    highlights_html = _build_highlights_html(items)
 
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -381,7 +415,7 @@ body {{
 
 /* ── 头部 ── */
 .header {{
-    background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+    background: linear-gradient(135deg, #1A1A2E 0%, #16213E 50%, #0F3460 100%);
     color: white;
     border-radius: 12px;
     padding: 20px 24px;
@@ -392,66 +426,30 @@ body {{
     flex-wrap: wrap;
     gap: 12px;
 }}
-.header h1 {{ font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }}
-.header .meta {{ font-size: 12px; color: #94A3B8; margin-top: 4px; }}
-
-/* ── 本周重点卡片 ── */
-.highlights {{
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
-}}
-.hl-card {{
-    background: white;
-    border-radius: 10px;
-    padding: 14px 16px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+.header-left h1 {{ font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }}
+.header-left .meta {{ font-size: 12px; color: #94A3B8; margin-top: 4px; }}
+.header-brand {{
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-}}
-.hl-meta {{
-    display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 5px;
+    gap: 10px;
+    flex-shrink: 0;
 }}
-.hl-region {{
-    font-size: 11px;
+.header-logo {{
+    height: 36px;
+    width: auto;
+    object-fit: contain;
+    filter: brightness(0) invert(1);
+    opacity: 0.9;
+}}
+.brand-name {{
+    font-size: 14px;
     font-weight: 700;
-    color: #64748B;
-    background: #F1F5F9;
-    padding: 2px 7px;
-    border-radius: 8px;
-    white-space: nowrap;
-}}
-.hl-date {{
-    font-size: 11px;
-    color: #94A3B8;
-    margin-left: auto;
-    white-space: nowrap;
-}}
-.hl-title {{
-    font-size: 13px;
-    font-weight: 600;
-    color: #1E293B;
-    line-height: 1.45;
-}}
-.hl-title a {{ color: #1D4ED8; text-decoration: none; }}
-.hl-title a:hover {{ text-decoration: underline; }}
-.hl-summary {{
-    font-size: 12px;
-    color: #475569;
-    line-height: 1.5;
-}}
-.highlights-label {{
-    font-size: 11px;
-    font-weight: 700;
-    color: #64748B;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 1.5px;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-bottom: 6px;
+    border-left: 1px solid rgba(255,255,255,0.25);
+    padding-left: 10px;
+    white-space: nowrap;
 }}
 
 /* ── 颜色图例 ── */
@@ -532,11 +530,32 @@ th:hover {{ color: white; }}
 th .sort-icon {{ opacity: 0.4; margin-left: 3px; font-size: 10px; }}
 th.sorted .sort-icon {{ opacity: 1; }}
 
-tbody tr {{
+/* ── 分组 header 行 ── */
+.group-row td.group-header {{
+    background: linear-gradient(90deg, #1E293B 0%, #334155 100%);
+    color: #E2E8F0;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 14px;
+    letter-spacing: 0.5px;
+}}
+.group-count {{
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    color: #CBD5E1;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 8px;
+    margin-left: 8px;
+    vertical-align: middle;
+}}
+
+tbody tr:not(.group-row) {{
     border-bottom: 1px solid #F1F5F9;
     transition: filter 0.1s;
 }}
-tbody tr:hover {{ filter: brightness(0.97); }}
+tbody tr:not(.group-row):hover {{ filter: brightness(0.97); }}
 td {{ padding: 9px 10px; font-size: 12px; vertical-align: top; }}
 
 .td-region {{ white-space: nowrap; font-weight: 600; color: #475569; font-size: 11px; }}
@@ -572,21 +591,6 @@ td {{ padding: 9px 10px; font-size: 12px; vertical-align: top; }}
     font-weight: 600;
     white-space: nowrap;
 }}
-
-/* ── 影响评分点 ── */
-.impact-dots {{
-    font-size: 11px;
-    letter-spacing: -1px;
-    margin-right: 3px;
-    vertical-align: middle;
-    cursor: default;
-    font-family: monospace;
-}}
-.impact-3 {{ color: #DC2626; }}
-.impact-2 {{ color: #D97706; }}
-.impact-1 {{ color: #94A3B8; }}
-
-/* ── 信源层级标签 ── */
 .tier-badge {{
     display: inline-block;
     padding: 1px 5px;
@@ -606,6 +610,15 @@ td {{ padding: 9px 10px; font-size: 12px; vertical-align: top; }}
     display: none;
 }}
 
+/* ── 页脚 ── */
+.footer {{
+    margin-top: 20px;
+    text-align: center;
+    font-size: 11px;
+    color: #94A3B8;
+    padding-bottom: 12px;
+}}
+
 /* ── 响应式 ── */
 @media (max-width: 900px) {{
     .td-summary {{ display: none; }}
@@ -618,24 +631,24 @@ td {{ padding: 9px 10px; font-size: 12px; vertical-align: top; }}
 
   <!-- 头部 -->
   <div class="header">
-    <div>
+    <div class="header-left">
       <h1>{html_mod.escape(title)}</h1>
       <div class="meta">生成时间：{now}&nbsp;&nbsp;|&nbsp;&nbsp;共 {len(items)} 条动态</div>
     </div>
+    <div class="header-brand">
+      {logo_html}
+      <span class="brand-name">Lilith Legal</span>
+    </div>
   </div>
-
-  <!-- 本周重点 -->
-  <div class="highlights-label">本周重点</div>
-  {highlights_html}
 
   <!-- 分类颜色图例 -->
   {legend_html}
 
   <!-- 筛选栏 -->
   <div class="toolbar">
-    <label>区域</label>
-    <select id="fRegion" onchange="applyFilters()">
-      <option value="">全部</option>
+    <label>地区</label>
+    <select id="fGroup" onchange="applyFilters()">
+      <option value="">全部地区</option>
     </select>
     <label>分类</label>
     <select id="fCat" onchange="applyFilters()">
@@ -668,55 +681,76 @@ td {{ padding: 9px 10px; font-size: 12px; vertical-align: top; }}
     <div class="no-data" id="noData">暂无匹配数据</div>
   </div>
 
+  <!-- 页脚 -->
+  <div class="footer">Lilith Legal &nbsp;·&nbsp; 全球游戏合规监控 &nbsp;·&nbsp; 仅供内部参考</div>
+
 </div>
 <script>
 (function() {{
-  // 初始化下拉筛选选项
-  const rows = document.querySelectorAll('#mainTable tbody tr');
-  const regions = new Set(), cats = new Set(), statuses = new Set();
+  // 初始化地区分组下拉
+  const rows = document.querySelectorAll('#mainTable tbody tr:not(.group-row)');
+  const groups = new Set(), cats = new Set(), statuses = new Set();
   rows.forEach(r => {{
-    regions.add(r.dataset.region);
-    cats.add(r.dataset.cat);
+    if (r.dataset.group) groups.add(r.dataset.group);
+    if (r.dataset.cat)   cats.add(r.dataset.cat);
     const badge = r.querySelector('.status-badge');
     if (badge) statuses.add(badge.textContent.trim());
   }});
+
+  // 按预设顺序填充地区下拉
+  const groupOrder = ["东南亚","南亚","中东","欧洲","北美","南美","日韩台","其他"];
+  const fGroup = document.getElementById('fGroup');
+  groupOrder.forEach(g => {{
+    if (groups.has(g)) {{
+      const o = document.createElement('option');
+      o.value = g; o.textContent = g; fGroup.appendChild(o);
+    }}
+  }});
+
   const fill = (sel, vals) => {{
     [...vals].filter(Boolean).sort().forEach(v => {{
       const o = document.createElement('option');
       o.value = v; o.textContent = v; sel.appendChild(o);
     }});
   }};
-  fill(document.getElementById('fRegion'), regions);
   fill(document.getElementById('fCat'), cats);
   fill(document.getElementById('fStatus'), statuses);
   updateCount();
 }})();
 
 function applyFilters() {{
-  const region = document.getElementById('fRegion').value;
+  const group  = document.getElementById('fGroup').value;
   const cat    = document.getElementById('fCat').value;
   const status = document.getElementById('fStatus').value;
   const kw     = document.getElementById('fKeyword').value.toLowerCase();
 
-  const rows = document.querySelectorAll('#mainTable tbody tr');
+  const rows = document.querySelectorAll('#mainTable tbody tr:not(.group-row)');
+  const groupVisible = {{}};
   let visible = 0;
+
   rows.forEach(r => {{
     let show = true;
-    if (show && region && r.dataset.region !== region) show = false;
-    if (show && cat    && r.dataset.cat    !== cat)    show = false;
+    if (show && group  && r.dataset.group !== group) show = false;
+    if (show && cat    && r.dataset.cat   !== cat)   show = false;
     if (show && status) {{
       const badge = r.querySelector('.status-badge');
       if (!badge || badge.textContent.trim() !== status) show = false;
     }}
     if (show && kw && !r.textContent.toLowerCase().includes(kw)) show = false;
     r.style.display = show ? '' : 'none';
-    if (show) visible++;
+    if (show) {{ visible++; groupVisible[r.dataset.group] = true; }}
   }});
+
+  // 控制分组 header 显隐
+  document.querySelectorAll('.group-row').forEach(r => {{
+    r.style.display = groupVisible[r.dataset.group] ? '' : 'none';
+  }});
+
   updateCount(visible);
 }}
 
 function updateCount(n) {{
-  const total = document.querySelectorAll('#mainTable tbody tr').length;
+  const total = document.querySelectorAll('#mainTable tbody tr:not(.group-row)').length;
   const cnt = (n === undefined) ? total : n;
   document.getElementById('resultCount').textContent = `显示 ${{cnt}} / ${{total}} 条`;
   document.getElementById('noData').style.display = cnt === 0 ? 'block' : 'none';
@@ -725,28 +759,36 @@ function updateCount(n) {{
 let _sortDir = {{}};
 function sortTable(col) {{
   const tbody = document.querySelector('#mainTable tbody');
-  const rows  = [...tbody.querySelectorAll('tr')];
+  const dataRows = [...tbody.querySelectorAll('tr:not(.group-row)')];
   _sortDir[col] = !_sortDir[col];
 
-  // 更新排序图标
   document.querySelectorAll('th').forEach((th, i) => {{
     th.classList.toggle('sorted', i === col);
     const icon = th.querySelector('.sort-icon');
     if (icon) icon.textContent = (i === col) ? (_sortDir[col] ? '↑' : '↓') : '⇅';
   }});
 
-  rows.sort((a, b) => {{
+  // 按列排序（忽略分组 header，排序后重新按分组插入）
+  dataRows.sort((a, b) => {{
     let va = a.cells[col]?.textContent.trim() ?? '';
     let vb = b.cells[col]?.textContent.trim() ?? '';
-    // 日期列数字排序 (col 3 = 发布时间)
-    if (col === 3) return _sortDir[col]
-      ? va.localeCompare(vb)
-      : vb.localeCompare(va);
-    return _sortDir[col]
-      ? va.localeCompare(vb, 'zh')
-      : vb.localeCompare(va, 'zh');
+    if (col === 3) return _sortDir[col] ? va.localeCompare(vb) : vb.localeCompare(va);
+    return _sortDir[col] ? va.localeCompare(vb, 'zh') : vb.localeCompare(va, 'zh');
   }});
-  rows.forEach(r => tbody.appendChild(r));
+
+  // 把分组 header 和对应数据行重新排列
+  const groupRows = [...tbody.querySelectorAll('.group-row')];
+  const groupOrder = ["东南亚","南亚","中东","欧洲","北美","南美","日韩台","其他"];
+  tbody.innerHTML = '';
+
+  groupOrder.forEach(grp => {{
+    const hdr = groupRows.find(r => r.dataset.group === grp);
+    if (!hdr) return;
+    const grpDataRows = dataRows.filter(r => r.dataset.group === grp);
+    if (grpDataRows.length === 0) return;
+    tbody.appendChild(hdr);
+    grpDataRows.forEach(r => tbody.appendChild(r));
+  }});
 }}
 </script>
 </body>

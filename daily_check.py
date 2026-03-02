@@ -1,22 +1,16 @@
 #!/usr/bin/env python3
 """
-飞书机器人通知 - 每周合规简报卡片
-发送内容: 本周统计 + 区域分布 + HTML/PDF 链接按钮
+每日合规动态检查 - 检查过去 24 小时内新增的立法监管动态
+有新增条目则通过飞书机器人推送；无新增则静默退出。
 
 必需环境变量:
     FEISHU_WEBHOOK_URL   飞书自定义机器人的 Webhook 地址
 
-可选环境变量:
-    REPORT_HTML_URL      HTML 简报的公开访问 URL
-    REPORT_PDF_URL       PDF 报告的公开访问/下载 URL
-
 本地调试:
     FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx \
-    REPORT_HTML_URL=https://... \
-    python feishu_notify.py
+    python daily_check.py
 """
 
-import json
 import os
 import sqlite3
 import sys
@@ -27,7 +21,7 @@ import requests
 
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
-# ── 区域分组配置（与 reporter.py 保持一致）────────────────────────────
+# ── 区域分组（与 reporter.py / feishu_notify.py 保持一致）────────────
 
 _REGION_GROUP_MAP = {
     "东南亚": "东南亚", "越南": "东南亚", "印度尼西亚": "东南亚",
@@ -49,18 +43,6 @@ _GROUP_EMOJI = {
     "欧洲": "🌍", "北美": "🌎", "南美": "🌎",
     "日韩台": "🌸", "其他": "🌐",
 }
-
-
-def _get_region_group(region: str) -> str:
-    if region in _REGION_GROUP_MAP:
-        return _REGION_GROUP_MAP[region]
-    for key, group in _REGION_GROUP_MAP.items():
-        if key in region or region in key:
-            return group
-    return "其他"
-
-
-# ── 状态 / 分类 emoji ────────────────────────────────────────────────
 
 STATUS_EMOJI = {
     "执法动态":     "🔴",
@@ -86,109 +68,121 @@ CAT_EMOJI = {
 }
 
 
+def _get_region_group(region: str) -> str:
+    if region in _REGION_GROUP_MAP:
+        return _REGION_GROUP_MAP[region]
+    for key, group in _REGION_GROUP_MAP.items():
+        if key in region or region in key:
+            return group
+    return "其他"
+
+
 # ── 数据库查询 ────────────────────────────────────────────────────────
 
-def get_weekly_data():
+def get_daily_items() -> list:
+    """查询过去 24 小时内新写入 DB 的条目（按 created_at 判断）"""
     if not DB_PATH.exists():
         print(f"⚠️  数据库不存在: {DB_PATH}")
-        return 0, [], {}
+        return []
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
 
-    total = conn.execute(
-        "SELECT COUNT(*) FROM legislation WHERE date >= ?", (week_ago,)
-    ).fetchone()[0]
-
-    by_cat = conn.execute(
-        """SELECT category_l1, COUNT(*) AS cnt
-           FROM legislation WHERE date >= ?
-           GROUP BY category_l1 ORDER BY cnt DESC""",
-        (week_ago,),
-    ).fetchall()
-
-    # 按实际区域统计，再汇总到分组
-    by_region_raw = conn.execute(
-        """SELECT region, COUNT(*) AS cnt
-           FROM legislation WHERE date >= ?
-           GROUP BY region ORDER BY cnt DESC""",
-        (week_ago,),
+    rows = conn.execute(
+        """
+        SELECT title, summary_zh, summary, region, status, category_l1,
+               source_url, date, created_at
+        FROM legislation
+        WHERE created_at >= datetime('now', '-1 day')
+        ORDER BY
+          CASE status
+            WHEN '执法动态'      THEN 0
+            WHEN '已生效'        THEN 1
+            WHEN '即将生效'      THEN 2
+            WHEN '草案/征求意见'  THEN 3
+            WHEN '立法进行中'    THEN 4
+            ELSE 5 END,
+          impact_score DESC,
+          date DESC
+        """
     ).fetchall()
 
     conn.close()
-
-    # 汇总到 8 大分组
-    by_region_group: dict = {}
-    for row in by_region_raw:
-        group = _get_region_group(row["region"])
-        by_region_group[group] = by_region_group.get(group, 0) + row["cnt"]
-
-    return total, [dict(r) for r in by_cat], by_region_group
+    return [dict(r) for r in rows]
 
 
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
 
-def build_card(total, by_cat, by_region_group, html_url, pdf_url):
-    today    = datetime.now()
-    week_ago = today - timedelta(days=7)
-    date_range = f"{week_ago.strftime('%Y/%m/%d')} – {today.strftime('%m/%d')}"
+def build_daily_card(items: list) -> dict:
+    today = datetime.now()
+    yesterday = today - timedelta(days=1)
+    date_label = f"{yesterday.strftime('%m/%d')} – {today.strftime('%m/%d %H:%M')}"
 
-    # 分类统计行
-    cat_parts = [
-        f"{CAT_EMOJI.get(r['category_l1'], '•')} {r['category_l1']} **{r['cnt']}**"
-        for r in by_cat
-    ]
-    cat_line = "　".join(cat_parts)
+    # 按区域分组统计
+    group_counts: dict = {}
+    for item in items:
+        group = _get_region_group(item.get("region", "其他"))
+        group_counts[group] = group_counts.get(group, 0) + 1
 
-    # 区域分组统计行
     region_parts = []
     for group in _GROUP_ORDER:
-        cnt = by_region_group.get(group, 0)
+        cnt = group_counts.get(group, 0)
         if cnt > 0:
             emoji = _GROUP_EMOJI.get(group, "•")
             region_parts.append(f"{emoji} {group} **{cnt}**")
-    region_line = "　".join(region_parts) if region_parts else "暂无数据"
+    region_line = "　".join(region_parts)
 
-    # 组装 elements
+    # 条目详情（最多展示 8 条，避免卡片过长）
+    display_items = items[:8]
+    item_elements = []
+    for item in display_items:
+        emoji = STATUS_EMOJI.get(item["status"], "•")
+        cat_emoji = CAT_EMOJI.get(item["category_l1"], "")
+        summary = (item.get("summary_zh") or item.get("summary") or "")[:80]
+        if len(summary) >= 80:
+            summary += "…"
+        title_text = item["title"][:70] + ("…" if len(item["title"]) > 70 else "")
+        url = item.get("source_url", "")
+        title_md = f"[{title_text}]({url})" if url else title_text
+
+        item_elements.append({
+            "tag": "markdown",
+            "content": (
+                f"{emoji} **[{item['region']}]** {item['status']} "
+                f"· {cat_emoji} {item['category_l1']}\n"
+                f"{title_md}\n"
+                f"_{summary}_"
+            ),
+        })
+
+    # 超出条目提示
+    extra_note = []
+    if len(items) > 8:
+        extra_note.append({
+            "tag": "markdown",
+            "content": f"_… 另有 {len(items) - 8} 条动态，请查看完整 HTML 简报_",
+        })
+
     elements = [
         {
             "tag": "markdown",
             "content": (
-                f"本周共监测到 **{total}** 条立法 / 执法动态\n\n"
-                f"**📂 按分类**\n{cat_line}\n\n"
-                f"**🗺️ 按地区**\n{region_line}"
+                f"昨日新增 **{len(items)}** 条立法 / 执法动态\n"
+                f"{region_line}"
             ),
         },
         {"tag": "hr"},
+        *item_elements,
+        *extra_note,
     ]
-
-    # 操作按钮
-    actions = []
-    if html_url:
-        actions.append({
-            "tag": "button",
-            "text": {"tag": "plain_text", "content": "🌐 查看 HTML 简报"},
-            "type": "primary",
-            "url": html_url,
-        })
-    if pdf_url:
-        actions.append({
-            "tag": "button",
-            "text": {"tag": "plain_text", "content": "📄 下载 PDF 报告"},
-            "type": "default",
-            "url": pdf_url,
-        })
-    if actions:
-        elements.append({"tag": "action", "actions": actions})
 
     return {
         "config": {"wide_screen_mode": True},
         "header": {
-            "template": "blue",
+            "template": "orange",
             "title": {
                 "tag": "plain_text",
-                "content": f"🌍 Lilith Legal 全球游戏合规周报 · {date_range}",
+                "content": f"📡 Lilith Legal 每日合规动态 · {date_label}",
             },
         },
         "elements": elements,
@@ -205,7 +199,7 @@ def send_card(webhook_url: str, card: dict) -> None:
         result = resp.json()
         code = result.get("code", result.get("StatusCode", -1))
         if code == 0:
-            print("✅ 飞书通知发送成功")
+            print("✅ 飞书每日通知发送成功")
         else:
             print(f"⚠️  飞书返回异常: {result}")
     except Exception as e:
@@ -217,17 +211,17 @@ def send_card(webhook_url: str, card: dict) -> None:
 
 def main():
     webhook_url = os.environ.get("FEISHU_WEBHOOK_URL", "")
-    html_url    = os.environ.get("REPORT_HTML_URL", "")
-    pdf_url     = os.environ.get("REPORT_PDF_URL", "")
-
     if not webhook_url:
         print("❌ 未设置 FEISHU_WEBHOOK_URL 环境变量")
         sys.exit(1)
 
-    total, by_cat, by_region_group = get_weekly_data()
-    print(f"本周数据: {total} 条，区域分布: {by_region_group}")
+    items = get_daily_items()
+    if not items:
+        print("✅ 过去 24 小时内无新增立法监管动态，无需推送")
+        sys.exit(0)
 
-    card = build_card(total, by_cat, by_region_group, html_url, pdf_url)
+    print(f"📡 发现 {len(items)} 条新增动态，发送飞书通知...")
+    card = build_daily_card(items)
     send_card(webhook_url, card)
 
 
