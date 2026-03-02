@@ -180,12 +180,20 @@ def build_card(total, by_cat, by_region_group, highlights, html_url, pdf_url):
         url = item.get("source_url", "")
         title_md = f"[{title_text}]({url})" if url else title_text
 
+        # 日期格式「DD-MM-YY」
+        raw_date = item.get("date", "")
+        try:
+            from datetime import datetime as _dt
+            date_tag = f"「{_dt.strptime(raw_date, '%Y-%m-%d').strftime('%d-%m-%y')}」"
+        except Exception:
+            date_tag = f"「{raw_date}」" if raw_date else ""
+
         hl_elements.append({
             "tag": "markdown",
             "content": (
                 f"{emoji} **[{item['region']}]** {item['status']} "
                 f"· {cat_em} {item['category_l1']}\n"
-                f"{title_md}\n"
+                f"{date_tag} {title_md}\n"
                 f"_{summary}_"
             ),
         })

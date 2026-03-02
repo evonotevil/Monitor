@@ -165,12 +165,19 @@ def build_daily_card(items: list) -> dict:
         url = item.get("source_url", "")
         title_md = f"[{title_text}]({url})" if url else title_text
 
+        # 日期格式「DD-MM-YY」
+        raw_date = item.get("date", "")
+        try:
+            date_tag = f"「{datetime.strptime(raw_date, '%Y-%m-%d').strftime('%d-%m-%y')}」"
+        except Exception:
+            date_tag = f"「{raw_date}」" if raw_date else ""
+
         item_elements.append({
             "tag": "markdown",
             "content": (
                 f"{emoji} **[{item['region']}]** {item['status']} "
                 f"· {cat_emoji} {item['category_l1']}\n"
-                f"{title_md}\n"
+                f"{date_tag} {title_md}\n"
                 f"_{summary}_"
             ),
         })
