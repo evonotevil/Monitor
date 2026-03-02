@@ -424,33 +424,9 @@ RSS_FEEDS = [
     },
 
     # ── 更多官方来源 (Official tier) ──────────────────────────────────
-    {
-        # 欧盟委员会 - 数字政策（官方新闻搜索 Atom，dae/rss.cfm 已 404）
-        "name": "EU Digital Strategy",
-        "url": "https://digital-strategy.ec.europa.eu/en/news/rss",
-        "lang": "en",
-        "type": "rss",
-        "region": "欧洲",
-        "tier": "official",
-    },
-    {
-        # 澳大利亚 eSafety Commissioner
-        "name": "Australian eSafety Commissioner",
-        "url": "https://www.esafety.gov.au/newsroom/rss.xml",
-        "lang": "en",
-        "type": "rss",
-        "region": "大洋洲",
-        "tier": "official",
-    },
-    {
-        # 加拿大竞争局
-        "name": "Canada Competition Bureau",
-        "url": "https://www.canada.ca/en/competition-bureau/news.atom",
-        "lang": "en",
-        "type": "rss",
-        "region": "北美",
-        "tier": "official",
-    },
+    # EU Digital Strategy RSS (digital-strategy.ec.europa.eu) — malformed XML，已移除
+    # Australian eSafety Commissioner RSS — timeout，已移除
+    # Canada Competition Bureau RSS — timeout，已移除
     # 新加坡 IMDA — 官方 RSS 已下线，由 Google News en_SG 关键词搜索替代
 
     # ── 更多行业媒体 (Industry tier) ──────────────────────────────────
@@ -471,15 +447,7 @@ RSS_FEEDS = [
         "region": "全球",
         "tier": "industry",
     },
-    {
-        # IAPP 隐私协会每日要闻（/news/rss/ 已失效）
-        "name": "IAPP",
-        "url": "https://iapp.org/rss/daily-dashboard",
-        "lang": "en",
-        "type": "rss",
-        "region": "全球",
-        "tier": "legal",
-    },
+    # IAPP RSS (iapp.org/rss/daily-dashboard) — 返回 0 条，已移除
 ]
 
 # ─── Google News 搜索 ────────────────────────────────────────────────
@@ -526,8 +494,6 @@ SOURCE_TIER_MAP = {
     "ICO News (UK)":                  "official",
     "UK Gov (Ofcom/Gaming)":          "official",
     "UK Gov (Children Online Safety)":"official",
-    "Australian eSafety Commissioner":"official",
-    "EU Digital Strategy":            "official",
     "CNIL":                           "official",
     "Korean MOLEG":                   "official",
     "GRAC":                           "official",
