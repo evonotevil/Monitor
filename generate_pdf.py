@@ -18,6 +18,7 @@ import asyncio
 import os
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 REPORTS_DIR = Path(__file__).parent / "reports"
@@ -76,7 +77,9 @@ def main():
     args = parser.parse_args()
 
     html_path = args.input or find_latest_html()
-    pdf_path  = args.output or html_path.with_suffix(".pdf")
+    today = datetime.now()
+    pdf_name = f"Lilith-Legal-Compliance-Report-{today.strftime('%d-%m-%Y')}.pdf"
+    pdf_path  = args.output or (REPORTS_DIR / pdf_name)
 
     asyncio.run(html_to_pdf(html_path, pdf_path))
 
