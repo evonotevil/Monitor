@@ -45,7 +45,7 @@ jobs:
           python monitor.py run --period week
           python monitor.py report --format html --period week
 
-      # ── 4. 生成 PDF（同时写 latest.html / latest.pdf）─────────────
+      # ── 4. 生成 PDF（同时写 latest.html / latest.pdf 和带日期文件名）
       - name: Generate PDF report
         run: python generate_pdf.py
 
@@ -55,9 +55,13 @@ jobs:
           REPO="${{ github.repository }}"
           BRANCH="main"
           BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}/reports"
+          # 带日期的 PDF 文件名（与 generate_pdf.py 保持一致）
+          PDF_DATE=$(python -c "from datetime import datetime; print(datetime.now().strftime('%d-%m-%Y'))")
+          PDF_FILENAME="Lilith-Legal-Compliance-Report-${PDF_DATE}.pdf"
           # htmlpreview.github.io 可以在线渲染 GitHub raw HTML，无需开 Pages
           echo "HTML_URL=https://htmlpreview.github.io/?${BASE}/latest.html" >> $GITHUB_ENV
-          echo "PDF_URL=${BASE}/latest.pdf" >> $GITHUB_ENV
+          echo "PDF_URL=${BASE}/${PDF_FILENAME}" >> $GITHUB_ENV
+          echo "PDF_FILENAME=${PDF_FILENAME}" >> $GITHUB_ENV
 
       # ── 6. 发送飞书卡片通知 ────────────────────────────────────────
       - name: Send Feishu notification
@@ -67,12 +71,18 @@ jobs:
           REPORT_PDF_URL:     ${{ env.PDF_URL }}
         run: python feishu_notify.py
 
-      # ── 7. 将更新后的 DB + latest 报告提交回仓库 ───────────────────
+      # ── 7. 将更新后的 DB + latest 报告 + 带日期 PDF 提交回仓库 ─────
       - name: Commit reports back to repo
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 清理上周的带日期 PDF（只保留本周的）
+          git ls-files "reports/Lilith-Legal-Compliance-Report-*.pdf" \
+            | grep -v "${{ env.PDF_FILENAME }}" \
+            | xargs -r git rm --cached
           git add reports/latest.html reports/latest.pdf data/monitor.db
+          # 添加本周带日期的 PDF（如果存在）
+          [ -f "reports/${{ env.PDF_FILENAME }}" ] && git add "reports/${{ env.PDF_FILENAME }}" || true
           # 如果没有变化就跳过 commit（避免空提交报错）
           git diff --staged --quiet || \
             git commit -m "📊 周报 $(date -u +%Y-%m-%d) [skip ci]"

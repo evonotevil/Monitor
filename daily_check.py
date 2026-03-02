@@ -14,8 +14,11 @@
 import os
 import sqlite3
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+# 北京/新加坡时间 UTC+8
+_TZ_CST = timezone(timedelta(hours=8))
 
 import requests
 
@@ -80,10 +83,25 @@ def _get_region_group(region: str) -> str:
 # ── 数据库查询 ────────────────────────────────────────────────────────
 
 def get_daily_items() -> list:
-    """查询过去 24 小时内新写入 DB 的条目（按 created_at 判断）"""
+    """
+    查询昨日（北京时间）发布、且在过去 26 小时内新写入 DB 的条目。
+    双重过滤确保：
+      1. 文章发布日期是昨天或今天（北京时间）
+      2. 是本次抓取才新入库的，不是历史旧数据
+    """
     if not DB_PATH.exists():
         print(f"⚠️  数据库不存在: {DB_PATH}")
         return []
+
+    now_cst = datetime.now(_TZ_CST)
+    yesterday_str = (now_cst - timedelta(days=1)).strftime("%Y-%m-%d")
+    today_str = now_cst.strftime("%Y-%m-%d")
+
+    # created_at 存储的是 UTC 时间；26 小时确保覆盖时区偏差
+    from datetime import timezone as _tz
+    cutoff_utc = (datetime.now(_tz.utc) - timedelta(hours=26)).strftime("%Y-%m-%d %H:%M:%S")
+
+    print(f"📅 日报筛选：date IN [{yesterday_str}, {today_str}]，created_at >= {cutoff_utc} (UTC)")
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -93,7 +111,8 @@ def get_daily_items() -> list:
         SELECT title, summary_zh, summary, region, status, category_l1,
                source_url, date, created_at
         FROM legislation
-        WHERE created_at >= datetime('now', '-1 day')
+        WHERE date IN (?, ?)
+          AND created_at >= ?
         ORDER BY
           CASE status
             WHEN '执法动态'      THEN 0
@@ -104,7 +123,8 @@ def get_daily_items() -> list:
             ELSE 5 END,
           impact_score DESC,
           date DESC
-        """
+        """,
+        (yesterday_str, today_str, cutoff_utc),
     ).fetchall()
 
     conn.close()
@@ -114,9 +134,9 @@ def get_daily_items() -> list:
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
 
 def build_daily_card(items: list) -> dict:
-    today = datetime.now()
+    today = datetime.now(_TZ_CST)
     yesterday = today - timedelta(days=1)
-    date_label = f"{yesterday.strftime('%m/%d')} – {today.strftime('%m/%d %H:%M')}"
+    date_label = f"{yesterday.strftime('%m/%d')} – {today.strftime('%m/%d %H:%M')} CST"
 
     # 按区域分组统计
     group_counts: dict = {}
