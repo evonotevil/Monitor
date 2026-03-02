@@ -58,20 +58,11 @@ jobs:
           # 带日期的 PDF 文件名（与 generate_pdf.py 保持一致）
           PDF_DATE=$(python -c "from datetime import datetime; print(datetime.now().strftime('%d-%m-%Y'))")
           PDF_FILENAME="Lilith-Legal-Compliance-Report-${PDF_DATE}.pdf"
-          # htmlpreview.github.io 可以在线渲染 GitHub raw HTML，无需开 Pages
           echo "HTML_URL=https://htmlpreview.github.io/?${BASE}/latest.html" >> $GITHUB_ENV
           echo "PDF_URL=${BASE}/${PDF_FILENAME}" >> $GITHUB_ENV
           echo "PDF_FILENAME=${PDF_FILENAME}" >> $GITHUB_ENV
 
-      # ── 6. 发送飞书卡片通知 ────────────────────────────────────────
-      - name: Send Feishu notification
-        env:
-          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
-          REPORT_HTML_URL:    ${{ env.HTML_URL }}
-          REPORT_PDF_URL:     ${{ env.PDF_URL }}
-        run: python feishu_notify.py
-
-      # ── 7. 将更新后的 DB + latest 报告 + 带日期 PDF 提交回仓库 ─────
+      # ── 6. 先提交并推送报告，再发飞书（确保文件已在仓库中）─────────
       - name: Commit reports back to repo
         run: |
           git config user.name  "github-actions[bot]"
@@ -87,3 +78,11 @@ jobs:
           git diff --staged --quiet || \
             git commit -m "📊 周报 $(date -u +%Y-%m-%d) [skip ci]"
           git push
+
+      # ── 7. 发送飞书卡片通知（文件已在仓库，链接可访问）──────────────
+      - name: Send Feishu notification
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          REPORT_HTML_URL:    ${{ env.HTML_URL }}
+          REPORT_PDF_URL:     ${{ env.PDF_URL }}
+        run: python feishu_notify.py
