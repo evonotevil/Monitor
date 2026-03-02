@@ -116,6 +116,24 @@ def get_weekly_data():
         (week_ago,),
     ).fetchall()
 
+    # 重点条目：执法/已生效优先，最多 5 条
+    highlights = conn.execute(
+        """SELECT title, summary_zh, summary, region, status, category_l1,
+                  source_url, date
+           FROM legislation WHERE date >= ?
+           ORDER BY
+             CASE status
+               WHEN '执法动态'      THEN 0
+               WHEN '已生效'        THEN 1
+               WHEN '即将生效'      THEN 2
+               WHEN '草案/征求意见'  THEN 3
+               WHEN '立法进行中'    THEN 4
+               ELSE 5 END,
+             impact_score DESC
+           LIMIT 5""",
+        (week_ago,),
+    ).fetchall()
+
     conn.close()
 
     # 汇总到 8 大分组
@@ -124,12 +142,12 @@ def get_weekly_data():
         group = _get_region_group(row["region"])
         by_region_group[group] = by_region_group.get(group, 0) + row["cnt"]
 
-    return total, [dict(r) for r in by_cat], by_region_group
+    return total, [dict(r) for r in by_cat], by_region_group, [dict(r) for r in highlights]
 
 
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
 
-def build_card(total, by_cat, by_region_group, html_url, pdf_url):
+def build_card(total, by_cat, by_region_group, highlights, html_url, pdf_url):
     today    = datetime.now()
     week_ago = today - timedelta(days=7)
     date_range = f"{week_ago.strftime('%Y/%m/%d')} – {today.strftime('%m/%d')}"
@@ -139,7 +157,7 @@ def build_card(total, by_cat, by_region_group, html_url, pdf_url):
         f"{CAT_EMOJI.get(r['category_l1'], '•')} {r['category_l1']} **{r['cnt']}**"
         for r in by_cat
     ]
-    cat_line = "　".join(cat_parts)
+    cat_line = "　".join(cat_parts) if cat_parts else "暂无数据"
 
     # 区域分组统计行
     region_parts = []
@@ -149,6 +167,28 @@ def build_card(total, by_cat, by_region_group, html_url, pdf_url):
             emoji = _GROUP_EMOJI.get(group, "•")
             region_parts.append(f"{emoji} {group} **{cnt}**")
     region_line = "　".join(region_parts) if region_parts else "暂无数据"
+
+    # 重点条目 elements
+    hl_elements = []
+    for item in highlights:
+        emoji   = STATUS_EMOJI.get(item["status"], "•")
+        cat_em  = CAT_EMOJI.get(item["category_l1"], "")
+        summary = (item.get("summary_zh") or item.get("summary") or "")[:80]
+        if len(summary) >= 80:
+            summary += "…"
+        title_text = item["title"][:65] + ("…" if len(item["title"]) > 65 else "")
+        url = item.get("source_url", "")
+        title_md = f"[{title_text}]({url})" if url else title_text
+
+        hl_elements.append({
+            "tag": "markdown",
+            "content": (
+                f"{emoji} **[{item['region']}]** {item['status']} "
+                f"· {cat_em} {item['category_l1']}\n"
+                f"{title_md}\n"
+                f"_{summary}_"
+            ),
+        })
 
     # 组装 elements
     elements = [
@@ -160,8 +200,16 @@ def build_card(total, by_cat, by_region_group, html_url, pdf_url):
                 f"**🗺️ 按地区**\n{region_line}"
             ),
         },
-        {"tag": "hr"},
     ]
+
+    if hl_elements:
+        elements += [
+            {"tag": "hr"},
+            {"tag": "markdown", "content": "**📌 本周重点关注**"},
+            *hl_elements,
+        ]
+
+    elements.append({"tag": "hr"})
 
     # 操作按钮
     actions = []
@@ -224,10 +272,10 @@ def main():
         print("❌ 未设置 FEISHU_WEBHOOK_URL 环境变量")
         sys.exit(1)
 
-    total, by_cat, by_region_group = get_weekly_data()
-    print(f"本周数据: {total} 条，区域分布: {by_region_group}")
+    total, by_cat, by_region_group, highlights = get_weekly_data()
+    print(f"本周数据: {total} 条，区域分布: {by_region_group}，重点: {len(highlights)} 条")
 
-    card = build_card(total, by_cat, by_region_group, html_url, pdf_url)
+    card = build_card(total, by_cat, by_region_group, highlights, html_url, pdf_url)
     send_card(webhook_url, card)
 
 

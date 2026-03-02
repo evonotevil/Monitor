@@ -23,10 +23,11 @@ reports/report_*.pdf
 reports/weekly_*.html
 reports/weekly_*.pdf
 
-# 但始终保留 latest 文件
+# 但始终保留 latest 文件和带日期的 Lilith 正式报告
 !reports/latest.html
 !reports/latest.pdf
 !reports/.gitkeep
+!reports/Lilith-Legal-Compliance-Report-*.pdf
 
 # macOS
 .DS_Store

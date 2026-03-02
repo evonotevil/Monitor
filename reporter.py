@@ -438,8 +438,6 @@ body {{
     height: 36px;
     width: auto;
     object-fit: contain;
-    filter: brightness(0) invert(1);
-    opacity: 0.9;
 }}
 .brand-name {{
     font-size: 14px;
