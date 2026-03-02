@@ -25,7 +25,7 @@ _LLM_MODEL    = os.environ.get("LLM_MODEL", "gpt-4o-mini")   # 可通过环境�
 
 try:
     from openai import OpenAI as _OpenAI
-    _AI_CLIENT = _OpenAI(api_key=_LLM_API_KEY, base_url=_LLM_BASE_URL, timeout=25.0) if _LLM_API_KEY else None
+    _AI_CLIENT = _OpenAI(api_key=_LLM_API_KEY, base_url=_LLM_BASE_URL, timeout=25.0, max_retries=0) if _LLM_API_KEY else None
     _HAS_AI = bool(_LLM_API_KEY)
     if not _HAS_AI:
         logger.info("LLM_API_KEY 未设置，将使用 Google Translate 回退")
