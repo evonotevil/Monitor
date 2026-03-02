@@ -403,77 +403,97 @@ def generate_html(items: List[dict], title: str = "全球游戏行业立法动�
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{html_mod.escape(title)}</title>
 <style>
+/* ── 基础 Reset ── */
 * {{ margin:0; padding:0; box-sizing:border-box; }}
+
+/* ── 全局：Instagram 风清爽配色 ── */
 body {{
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "PingFang SC", sans-serif;
-    background: #F1F5F9;
-    color: #1E293B;
-    padding: 24px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Noto Sans SC", "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #F5F5F7;
+    color: #1D1D1F;
+    padding: 28px 24px;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
 }}
 .container {{ max-width: 1700px; margin: 0 auto; }}
 
-/* ── 头部 ── */
+/* ── 头部（白底，logo 原色显示） ── */
 .header {{
-    background: linear-gradient(135deg, #1A1A2E 0%, #16213E 50%, #0F3460 100%);
-    color: white;
-    border-radius: 12px;
-    padding: 20px 24px;
-    margin-bottom: 16px;
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 18px 24px;
+    margin-bottom: 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
+    box-shadow: 0 1px 0 #E8E8ED, 0 2px 8px rgba(0,0,0,0.04);
 }}
-.header-left h1 {{ font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }}
-.header-left .meta {{ font-size: 12px; color: #94A3B8; margin-top: 4px; }}
+.header-left h1 {{
+    font-size: 19px;
+    font-weight: 700;
+    color: #1D1D1F;
+    letter-spacing: -0.2px;
+}}
+.header-left .meta {{
+    font-size: 12px;
+    color: #86868B;
+    margin-top: 3px;
+    letter-spacing: 0.1px;
+}}
 .header-brand {{
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     flex-shrink: 0;
 }}
 .header-logo {{
-    height: 36px;
+    height: 34px;
     width: auto;
     object-fit: contain;
 }}
 .brand-name {{
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 700;
-    color: rgba(255,255,255,0.85);
-    letter-spacing: 1.5px;
+    color: #86868B;
+    letter-spacing: 2px;
     text-transform: uppercase;
-    border-left: 1px solid rgba(255,255,255,0.25);
-    padding-left: 10px;
+    border-left: 1px solid #E8E8ED;
+    padding-left: 12px;
     white-space: nowrap;
 }}
 
-/* ── 颜色图例 ── */
-.legend {{
-    background: white;
-    border-radius: 10px;
-    padding: 12px 16px;
+/* ── 卡片通用 ── */
+.card {{
+    background: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0 1px 0 #E8E8ED, 0 2px 6px rgba(0,0,0,0.03);
     margin-bottom: 12px;
+}}
+
+/* ── 分类颜色图例 ── */
+.legend {{
+    padding: 12px 18px;
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 7px;
     align-items: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }}
 .legend::before {{
-    content: "分类色标：";
+    content: "分类";
     font-size: 11px;
-    color: #64748B;
+    color: #86868B;
     font-weight: 600;
     white-space: nowrap;
+    margin-right: 4px;
 }}
 .legend-item {{
     display: inline-flex;
     align-items: center;
     padding: 3px 10px;
-    border-radius: 12px;
+    border-radius: 20px;
     font-size: 11px;
     font-weight: 500;
     white-space: nowrap;
@@ -481,110 +501,129 @@ body {{
 
 /* ── 筛选栏 ── */
 .toolbar {{
-    background: white;
-    border-radius: 10px;
-    padding: 12px 16px;
-    margin-bottom: 12px;
+    padding: 12px 18px;
     display: flex;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
     align-items: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }}
-.toolbar label {{ font-size: 12px; color: #64748B; font-weight: 600; }}
+.toolbar label {{
+    font-size: 11px;
+    color: #86868B;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}}
 .toolbar select, .toolbar input {{
     padding: 6px 10px;
-    border: 1px solid #E2E8F0;
-    border-radius: 7px;
-    font-size: 13px;
-    color: #334155;
-    background: #F8FAFC;
+    border: 1px solid #E8E8ED;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #1D1D1F;
+    background: #F5F5F7;
     outline: none;
+    transition: border-color 0.15s, background 0.15s;
 }}
 .toolbar select:focus, .toolbar input:focus {{
-    border-color: #94A3B8;
-    background: white;
+    border-color: #6E6EF7;
+    background: #FFFFFF;
+    box-shadow: 0 0 0 3px rgba(110,110,247,0.08);
 }}
-.toolbar input {{ width: 220px; }}
-.result-count {{ margin-left: auto; font-size: 12px; color: #64748B; }}
+.toolbar input {{ width: 210px; }}
+.result-count {{ margin-left: auto; font-size: 11px; color: #86868B; }}
 
 /* ── 表格 ── */
-.table-wrap {{ border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }}
+.table-wrap {{
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 0 #E8E8ED, 0 2px 6px rgba(0,0,0,0.03);
+}}
 table {{ width: 100%; border-collapse: collapse; background: white; }}
-thead tr {{ background: #1E293B; }}
+thead tr {{ background: #F5F5F7; border-bottom: 1px solid #E8E8ED; }}
 th {{
-    padding: 11px 10px;
+    padding: 10px 12px;
     text-align: left;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
-    color: #94A3B8;
+    color: #86868B;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.7px;
     cursor: pointer;
     white-space: nowrap;
     user-select: none;
 }}
-th:hover {{ color: white; }}
-th .sort-icon {{ opacity: 0.4; margin-left: 3px; font-size: 10px; }}
-th.sorted .sort-icon {{ opacity: 1; }}
+th:hover {{ color: #1D1D1F; }}
+th .sort-icon {{ opacity: 0.35; margin-left: 3px; font-size: 9px; }}
+th.sorted .sort-icon {{ opacity: 0.9; color: #6E6EF7; }}
 
-/* ── 分组 header 行 ── */
+/* ── 分组 header 行（柔和紫蓝） ── */
 .group-row td.group-header {{
-    background: linear-gradient(90deg, #1E293B 0%, #334155 100%);
-    color: #E2E8F0;
-    font-size: 12px;
+    background: #F0F0FF;
+    color: #3D3D9E;
+    font-size: 11.5px;
     font-weight: 700;
     padding: 8px 14px;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
+    border-left: 3px solid #6E6EF7;
 }}
 .group-count {{
     display: inline-block;
-    background: rgba(255,255,255,0.15);
-    color: #CBD5E1;
+    background: rgba(110,110,247,0.12);
+    color: #5757D9;
     font-size: 10px;
     font-weight: 600;
-    padding: 1px 7px;
-    border-radius: 8px;
+    padding: 1px 8px;
+    border-radius: 10px;
     margin-left: 8px;
     vertical-align: middle;
 }}
 
+/* ── 数据行 ── */
 tbody tr:not(.group-row) {{
-    border-bottom: 1px solid #F1F5F9;
-    transition: filter 0.1s;
+    border-bottom: 1px solid #F5F5F7;
+    transition: background 0.12s;
 }}
-tbody tr:not(.group-row):hover {{ filter: brightness(0.97); }}
-td {{ padding: 9px 10px; font-size: 12px; vertical-align: top; }}
+tbody tr:not(.group-row):hover {{ background: #FAFAFF; }}
+td {{ padding: 9px 12px; font-size: 12px; vertical-align: top; }}
 
-.td-region {{ white-space: nowrap; font-weight: 600; color: #475569; font-size: 11px; }}
+.td-region {{
+    white-space: nowrap;
+    font-weight: 600;
+    color: #6E6EF7;
+    font-size: 11px;
+}}
 .td-cat {{ white-space: nowrap; }}
-.td-sub {{ color: #64748B; font-size: 11px; min-width: 90px; }}
-.td-title {{ min-width: 200px; max-width: 320px; font-weight: 500; line-height: 1.5; }}
-.td-title a {{ color: #1D4ED8; text-decoration: none; }}
-.td-title a:hover {{ text-decoration: underline; color: #1E40AF; }}
-.td-source {{ font-size: 10px; color: #94A3B8; margin-top: 2px; display: block; }}
+.td-title {{ min-width: 200px; max-width: 320px; font-weight: 500; line-height: 1.55; }}
+.td-title a {{ color: #0066CC; text-decoration: none; }}
+.td-title a:hover {{ text-decoration: underline; color: #004499; }}
+.td-source {{
+    font-size: 10px;
+    color: #AEAEB2;
+    margin-top: 3px;
+    display: block;
+}}
 .td-date {{
     white-space: nowrap;
-    font-size: 12px;
-    color: #475569;
+    font-size: 11.5px;
+    color: #636366;
     font-variant-numeric: tabular-nums;
     font-weight: 500;
 }}
 .td-status {{ white-space: nowrap; }}
-.td-summary {{ max-width: 320px; color: #475569; line-height: 1.5; font-size: 11px; }}
+.td-summary {{ max-width: 320px; color: #636366; line-height: 1.55; font-size: 11px; }}
 
+/* ── 标签 badges ── */
 .cat-badge {{
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
+    padding: 2px 9px;
+    border-radius: 20px;
     font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
 }}
 .status-badge {{
     display: inline-block;
-    padding: 2px 7px;
-    border-radius: 5px;
+    padding: 2px 8px;
+    border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
@@ -602,25 +641,25 @@ td {{ padding: 9px 10px; font-size: 12px; vertical-align: top; }}
 /* ── 无数据提示 ── */
 .no-data {{
     text-align: center;
-    padding: 48px;
-    color: #94A3B8;
-    font-size: 14px;
+    padding: 56px;
+    color: #AEAEB2;
+    font-size: 13px;
     display: none;
 }}
 
 /* ── 页脚 ── */
 .footer {{
-    margin-top: 20px;
+    margin-top: 24px;
     text-align: center;
     font-size: 11px;
-    color: #94A3B8;
-    padding-bottom: 12px;
+    color: #AEAEB2;
+    padding-bottom: 8px;
+    letter-spacing: 0.3px;
 }}
 
 /* ── 响应式 ── */
 @media (max-width: 900px) {{
     .td-summary {{ display: none; }}
-    .td-sub {{ display: none; }}
 }}
 </style>
 </head>
@@ -631,7 +670,7 @@ td {{ padding: 9px 10px; font-size: 12px; vertical-align: top; }}
   <div class="header">
     <div class="header-left">
       <h1>{html_mod.escape(title)}</h1>
-      <div class="meta">生成时间：{now}&nbsp;&nbsp;|&nbsp;&nbsp;共 {len(items)} 条动态</div>
+      <div class="meta">生成时间：{now}&nbsp;&nbsp;·&nbsp;&nbsp;共 {len(items)} 条动态</div>
     </div>
     <div class="header-brand">
       {logo_html}
@@ -640,9 +679,10 @@ td {{ padding: 9px 10px; font-size: 12px; vertical-align: top; }}
   </div>
 
   <!-- 分类颜色图例 -->
-  {legend_html}
+  <div class="card">{legend_html}</div>
 
   <!-- 筛选栏 -->
+  <div class="card">
   <div class="toolbar">
     <label>地区</label>
     <select id="fGroup" onchange="applyFilters()">
@@ -658,6 +698,7 @@ td {{ padding: 9px 10px; font-size: 12px; vertical-align: top; }}
     </select>
     <input type="search" id="fKeyword" placeholder="🔍 关键词搜索..." oninput="applyFilters()">
     <span class="result-count" id="resultCount"></span>
+  </div>
   </div>
 
   <!-- 表格 -->
