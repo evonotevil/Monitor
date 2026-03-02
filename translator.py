@@ -1,7 +1,7 @@
 """
 翻译/摘要模块
 
-优先路径：公司内部大模型（OpenAI 兼容 API）
+优先路径：Google Gemini API（OpenAI 兼容格式）
   - 标题重塑："[地区/机构]+[动作]+[事件核心]" 纯中文结构
   - 摘要生成：监管对象 + 核心义务 + 违规后果，≤50 字，不重复标题
 
@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 # ── 内部大模型客户端（OpenAI 兼容） ──────────────────────────────────
 
-_LLM_BASE_URL = "https://llm-proxy.lilithgames.com/v1"
+_LLM_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 _LLM_API_KEY  = os.environ.get("LLM_API_KEY", "")
-_LLM_MODEL    = os.environ.get("LLM_MODEL", "claude-haiku-4-5@20251001")   # 可通过环境变量覆盖
+_LLM_MODEL    = os.environ.get("LLM_MODEL", "gemini-2.0-flash")   # 可通过环境变量覆盖
 
 try:
     from openai import OpenAI as _OpenAI
