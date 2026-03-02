@@ -678,9 +678,6 @@ td {{ padding: 9px 12px; font-size: 12px; vertical-align: top; }}
     </div>
   </div>
 
-  <!-- 分类颜色图例 -->
-  <div class="card">{legend_html}</div>
-
   <!-- 筛选栏 -->
   <div class="card">
   <div class="toolbar">
@@ -710,7 +707,7 @@ td {{ padding: 9px 12px; font-size: 12px; vertical-align: top; }}
           <th onclick="sortTable(1)">类别 <span class="sort-icon">⇅</span></th>
           <th onclick="sortTable(2)">标题 <span class="sort-icon">⇅</span></th>
           <th onclick="sortTable(3)">发布时间 <span class="sort-icon">⇅</span></th>
-          <th onclick="sortTable(4)">状态 <span class="sort-icon">⇅</span></th>
+          <th onclick="sortTable(4)">标签 <span class="sort-icon">⇅</span></th>
           <th>摘要(中文)</th>
         </tr>
       </thead>
