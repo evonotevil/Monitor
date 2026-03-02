@@ -1,7 +1,7 @@
 """
 翻译/摘要模块
 
-优先路径：Google Gemini API（OpenAI 兼容格式）
+优先路径：Groq API（OpenAI 兼容格式，免费）
   - 标题重塑："[地区/机构]+[动作]+[事件核心]" 纯中文结构
   - 摘要生成：监管对象 + 核心义务 + 违规后果，≤50 字，不重复标题
 
@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 # ── 内部大模型客户端（OpenAI 兼容） ──────────────────────────────────
 
-_LLM_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+_LLM_BASE_URL = "https://api.groq.com/openai/v1"
 _LLM_API_KEY  = os.environ.get("LLM_API_KEY", "")
-_LLM_MODEL    = os.environ.get("LLM_MODEL", "gemini-2.0-flash")   # 可通过环境变量覆盖
+_LLM_MODEL    = os.environ.get("LLM_MODEL", "llama-3.1-8b-instant")   # 可通过环境变量覆盖
 
 try:
     from openai import OpenAI as _OpenAI
