@@ -165,12 +165,9 @@ def build_daily_card(items: list) -> dict:
         url = item.get("source_url", "")
         title_md = f"[{title_text}]({url})" if url else title_text
 
-        # 日期格式「DD-MM-YY」
+        # 日期格式「YYYY-MM-DD」
         raw_date = item.get("date", "")
-        try:
-            date_tag = f"「{datetime.strptime(raw_date, '%Y-%m-%d').strftime('%d-%m-%y')}」"
-        except Exception:
-            date_tag = f"「{raw_date}」" if raw_date else ""
+        date_tag = f"「{raw_date}」" if raw_date else ""
 
         item_elements.append({
             "tag": "markdown",
