@@ -136,16 +136,29 @@ def _ai_process(title: str, summary: str, body_snippet: str = "") -> Optional[di
             ],
         )
         text = resp.choices[0].message.content.strip()
-        # 从输出中提取 JSON（防止模型输出多余文字）
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        if m:
-            data = json.loads(m.group())
-            title_zh = (data.get("title_zh") or "").strip()
+        logger.info(f"[AI raw] {text[:200]}")   # 打印返回内容，方便排查
+
+        # 兼容三种输出格式：纯 JSON / ```json...``` / 含前缀文字
+        # 1. 先尝试剥离 markdown 代码块
+        code_block = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+        json_str = code_block.group(1) if code_block else None
+        # 2. 没有代码块则直接找 {...}
+        if not json_str:
+            plain = re.search(r"\{.*\}", text, re.DOTALL)
+            json_str = plain.group() if plain else None
+
+        if json_str:
+            data = json.loads(json_str)
+            title_zh  = (data.get("title_zh")  or "").strip()
             summary_zh = (data.get("summary_zh") or "").strip()
             if title_zh and summary_zh:
                 return {"title_zh": title_zh, "summary_zh": summary_zh}
+            logger.warning(f"[AI] JSON 解析成功但字段为空: {json_str[:100]}")
+        else:
+            logger.warning(f"[AI] 返回内容中未找到 JSON: {text[:200]}")
+
     except Exception as e:
-        logger.debug(f"AI 处理失败: {e}")
+        logger.warning(f"[AI] 调用异常: {type(e).__name__}: {e}")
     return None
 
 
