@@ -25,7 +25,7 @@ _LLM_MODEL    = os.environ.get("LLM_MODEL", "gpt-4o-mini")   # 可通过环境�
 
 try:
     from openai import OpenAI as _OpenAI
-    _AI_CLIENT = _OpenAI(api_key=_LLM_API_KEY, base_url=_LLM_BASE_URL) if _LLM_API_KEY else None
+    _AI_CLIENT = _OpenAI(api_key=_LLM_API_KEY, base_url=_LLM_BASE_URL, timeout=25.0) if _LLM_API_KEY else None
     _HAS_AI = bool(_LLM_API_KEY)
     if not _HAS_AI:
         logger.info("LLM_API_KEY 未设置，将使用 Google Translate 回退")
@@ -241,10 +241,11 @@ def translate_item_fields(item_dict: dict) -> dict:
     summary = (item_dict.get("summary") or "").strip()
     url = (item_dict.get("source_url") or item_dict.get("url") or "").strip()
 
-    # ── 路径一：Claude AI ─────────────────────────────────────────────
+    # ── 路径一：LLM AI ────────────────────────────────────────────────
+    # 正文抓取已禁用：每条额外 HTTP 请求会在 CI 环境中累计大量超时
+    # LLM 基于标题+RSS摘要推导已可满足质量要求
     if _HAS_AI:
-        body_snippet = _fetch_article_body(url)
-        result = _ai_process(title, summary, body_snippet)
+        result = _ai_process(title, summary)
         if result:
             item_dict["title_zh"] = result["title_zh"]
             item_dict["summary_zh"] = result["summary_zh"]
