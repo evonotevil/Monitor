@@ -199,7 +199,7 @@ def build_card(total, by_cat, by_region_group, highlights, html_url, pdf_url):
         {
             "tag": "markdown",
             "content": (
-                f"本周共监测到 **{total}** 条立法 / 执法动态\n\n"
+                f"上周共监测到 **{total}** 条立法 / 执法动态\n\n"
                 f"**📂 按分类**\n{cat_line}\n\n"
                 f"**🗺️ 按地区**\n{region_line}"
             ),
