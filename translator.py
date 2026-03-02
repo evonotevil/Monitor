@@ -228,6 +228,38 @@ def _ensure_complete_sentence(text: str) -> str:
     return text
 
 
+# ── AI 连通性预检（模块级缓存，只检测一次）──────────────────────────
+
+_ai_reachable: Optional[bool] = None   # None=未检测, True=可用, False=不可用
+
+
+def _check_ai_reachable() -> bool:
+    """
+    发送一个极小请求测试 LLM 代理是否可达。
+    超时 10 秒即判定不可达，后续所有文章直接走 Google Translate，
+    避免逐条等待 25 秒超时造成 CI 任务大幅延误。
+    """
+    global _ai_reachable
+    if _ai_reachable is not None:
+        return _ai_reachable
+    try:
+        _AI_CLIENT.chat.completions.create(
+            model=_LLM_MODEL,
+            max_tokens=5,
+            timeout=10.0,
+            messages=[{"role": "user", "content": "hi"}],
+        )
+        logger.info("[AI] 连通性预检通过，将使用 LLM 处理")
+        _ai_reachable = True
+    except Exception as e:
+        logger.warning(
+            f"[AI] 连通性预检失败，本次批量翻译全部使用 Google Translate 回退。"
+            f"原因：{type(e).__name__}: {e}"
+        )
+        _ai_reachable = False
+    return _ai_reachable
+
+
 # ── 主入口 ────────────────────────────────────────────────────────────
 
 def translate_item_fields(item_dict: dict) -> dict:
@@ -239,12 +271,9 @@ def translate_item_fields(item_dict: dict) -> dict:
     """
     title = (item_dict.get("title") or "").strip()
     summary = (item_dict.get("summary") or "").strip()
-    url = (item_dict.get("source_url") or item_dict.get("url") or "").strip()
 
     # ── 路径一：LLM AI ────────────────────────────────────────────────
-    # 正文抓取已禁用：每条额外 HTTP 请求会在 CI 环境中累计大量超时
-    # LLM 基于标题+RSS摘要推导已可满足质量要求
-    if _HAS_AI:
+    if _HAS_AI and _check_ai_reachable():
         result = _ai_process(title, summary)
         if result:
             item_dict["title_zh"] = result["title_zh"]
