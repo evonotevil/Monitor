@@ -192,5 +192,43 @@ class Database:
             "latest_date": latest,
         }
 
+    def clear_stale_translations(self, dirty_terms: list) -> int:
+        """
+        将 title_zh 或 summary_zh 中包含脏词（音译错误、栏目前缀等）的条目
+        翻译字段清空，以便下次 run 时重新翻译。返回清空的条目数。
+        """
+        if not dirty_terms:
+            return 0
+        conditions = []
+        params = []
+        for term in dirty_terms:
+            conditions.append("title_zh LIKE ? OR summary_zh LIKE ?")
+            params.extend([f"%{term}%", f"%{term}%"])
+        where = " OR ".join(f"({c})" for c in conditions)
+        cur = self.conn.execute(
+            f"UPDATE legislation SET title_zh = '', summary_zh = '' WHERE {where}",
+            params,
+        )
+        self.conn.commit()
+        return cur.rowcount
+
+    def query_items_untranslated(self, limit: int = 200) -> List[dict]:
+        """查询尚未翻译（title_zh 为空）的条目，优先处理高 impact 的。"""
+        rows = self.conn.execute("""
+            SELECT * FROM legislation
+            WHERE title_zh = '' OR title_zh IS NULL
+            ORDER BY impact_score DESC, date DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        return [dict(row) for row in rows]
+
+    def update_translation(self, item_id: int, title_zh: str, summary_zh: str):
+        """直接按 id 更新翻译字段。"""
+        self.conn.execute(
+            "UPDATE legislation SET title_zh = ?, summary_zh = ? WHERE id = ?",
+            (title_zh, summary_zh, item_id),
+        )
+        self.conn.commit()
+
     def close(self):
         self.conn.close()
