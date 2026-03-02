@@ -1,11 +1,11 @@
 """
 翻译/摘要模块
 
-优先路径：Claude AI
+优先路径：公司内部大模型（OpenAI 兼容 API）
   - 标题重塑："[地区/机构]+[动作]+[事件核心]" 纯中文结构
   - 摘要生成：监管对象 + 核心义务 + 违规后果，≤50 字，不重复标题
 
-回退路径：Google Translate（ANTHROPIC_API_KEY 未配置时）
+回退路径：Google Translate（LLM_API_KEY 未配置时）
 """
 
 import json
@@ -17,19 +17,22 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# ── Anthropic Claude 客户端 ───────────────────────────────────────────
+# ── 内部大模型客户端（OpenAI 兼容） ──────────────────────────────────
+
+_LLM_BASE_URL = "https://llm-proxy.lilithgames.com/v1"
+_LLM_API_KEY  = os.environ.get("LLM_API_KEY", "")
+_LLM_MODEL    = os.environ.get("LLM_MODEL", "gpt-4o-mini")   # 可通过环境变量覆盖
 
 try:
-    import anthropic as _anthropic_module
-    _ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-    _AI_CLIENT = _anthropic_module.Anthropic(api_key=_ANTHROPIC_API_KEY) if _ANTHROPIC_API_KEY else None
-    _HAS_AI = bool(_ANTHROPIC_API_KEY)
+    from openai import OpenAI as _OpenAI
+    _AI_CLIENT = _OpenAI(api_key=_LLM_API_KEY, base_url=_LLM_BASE_URL) if _LLM_API_KEY else None
+    _HAS_AI = bool(_LLM_API_KEY)
     if not _HAS_AI:
-        logger.info("ANTHROPIC_API_KEY 未设置，将使用 Google Translate 回退")
+        logger.info("LLM_API_KEY 未设置，将使用 Google Translate 回退")
 except ImportError:
     _AI_CLIENT = None
     _HAS_AI = False
-    logger.warning("anthropic 未安装，将使用 Google Translate。运行: pip install anthropic")
+    logger.warning("openai 未安装，将使用 Google Translate。运行: pip install openai")
 
 # ── Google Translate 回退 ─────────────────────────────────────────────
 
@@ -43,8 +46,6 @@ except ImportError:
 _cache: dict = {}
 
 # ── AI Prompt ─────────────────────────────────────────────────────────
-
-_AI_MODEL = "claude-haiku-4-5-20251001"
 
 _AI_SYSTEM = """你是全球游戏行业合规法规分析师，负责将法规新闻转化为规范中文标题和摘要。
 
@@ -126,13 +127,15 @@ def _ai_process(title: str, summary: str, body_snippet: str = "") -> Optional[di
     )
 
     try:
-        resp = _AI_CLIENT.messages.create(
-            model=_AI_MODEL,
+        resp = _AI_CLIENT.chat.completions.create(
+            model=_LLM_MODEL,
             max_tokens=300,
-            system=_AI_SYSTEM,
-            messages=[{"role": "user", "content": user_msg}],
+            messages=[
+                {"role": "system", "content": _AI_SYSTEM},
+                {"role": "user",   "content": user_msg},
+            ],
         )
-        text = resp.content[0].text.strip()
+        text = resp.choices[0].message.content.strip()
         # 从输出中提取 JSON（防止模型输出多余文字）
         m = re.search(r"\{.*\}", text, re.DOTALL)
         if m:
