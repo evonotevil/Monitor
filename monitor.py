@@ -47,6 +47,72 @@ def _period_to_days(period: str) -> int:
     return PERIOD_DAYS.get(period, PERIOD_DAYS["all"])
 
 
+# ─── 语义去重（同地区/同日期窗口内高度相似的文章只保留一条）────────────
+
+def _title_bigram_sim(a: str, b: str) -> float:
+    """计算两个英文标题的 bigram 字符重叠率（0~1）。"""
+    a, b = a.lower(), b.lower()
+    if len(a) < 2 or len(b) < 2:
+        return 0.0
+    bg_a = {a[i:i + 2] for i in range(len(a) - 1)}
+    bg_b = {b[i:i + 2] for i in range(len(b) - 1)}
+    return len(bg_a & bg_b) / max(len(bg_a), len(bg_b))
+
+
+def _deduplicate_items(items):
+    """
+    在同一地区且日期相差 ≤2 天的文章中，找出英文标题 bigram 相似度 >65%
+    的文章对，只保留 impact_score 最高的那篇（相同则保留最早抓到的）。
+    其余视为重复，丢弃前在摘要末尾追加多来源提示。
+    """
+    from models import LegislationItem
+    keep: list[LegislationItem] = []
+    dropped: set[int] = set()   # 索引集合
+
+    for i, item_i in enumerate(items):
+        if i in dropped:
+            continue
+        duplicates = []   # (j, sim)
+        for j, item_j in enumerate(items):
+            if j <= i or j in dropped:
+                continue
+            if item_i.region != item_j.region:
+                continue
+            # 日期差 ≤2 天
+            try:
+                from datetime import date
+                d_i = date.fromisoformat(item_i.date)
+                d_j = date.fromisoformat(item_j.date)
+                if abs((d_i - d_j).days) > 2:
+                    continue
+            except ValueError:
+                continue
+            sim = _title_bigram_sim(item_i.title, item_j.title)
+            if sim > 0.65:
+                duplicates.append((j, sim))
+
+        if duplicates:
+            # 收集所有候选（包括 i 自身）
+            group = [(i, 0.0)] + duplicates
+            # 按 impact_score 降序排，分数相同则保留索引最小（先抓到的）
+            group.sort(key=lambda x: (-items[x[0]].impact_score, x[0]))
+            winner_idx = group[0][0]
+            loser_count = len(group) - 1
+            for idx, _ in group[1:]:
+                dropped.add(idx)
+            # 给保留项追加来源提示
+            if loser_count > 0 and items[winner_idx].summary:
+                items[winner_idx].summary += f" [另有 {loser_count} 篇同主题报道]"
+
+    result = [item for i, item in enumerate(items) if i not in dropped]
+    if len(items) != len(result):
+        logger.info(
+            f"[去重] 语义去重：{len(items)} 条 → {len(result)} 条"
+            f"（合并 {len(items) - len(result)} 条高度相似文章）"
+        )
+    return result
+
+
 def _period_label(period: str) -> str:
     labels = {"week": "周报（近7天）", "month": "月报（近30天）", "all": "全量报告"}
     return labels.get(period, "全量报告")
@@ -65,6 +131,9 @@ def cmd_run(args):
         items = fetch_and_process(max_days=days)
 
         if items:
+            # 语义去重：同地区同日期窗口内高度相似的文章合并为一条
+            items = _deduplicate_items(items)
+
             no_translate = getattr(args, 'no_translate', False)
             if no_translate:
                 logger.info("已跳过翻译 (--no-translate)")
