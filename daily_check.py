@@ -108,7 +108,7 @@ def get_daily_items() -> list:
 
     rows = conn.execute(
         """
-        SELECT title, summary_zh, summary, region, status, category_l1,
+        SELECT title, title_zh, summary_zh, summary, region, status, category_l1,
                source_url, date, created_at
         FROM legislation
         WHERE date IN (?, ?)
@@ -158,24 +158,34 @@ def build_daily_card(items: list) -> dict:
     for item in display_items:
         emoji = STATUS_EMOJI.get(item["status"], "•")
         cat_emoji = CAT_EMOJI.get(item["category_l1"], "")
-        summary = (item.get("summary_zh") or item.get("summary") or "")[:80]
-        if len(summary) >= 80:
-            summary += "…"
-        title_text = item["title"][:70] + ("…" if len(item["title"]) > 70 else "")
         url = item.get("source_url", "")
-        title_md = f"[{title_text}]({url})" if url else title_text
 
         # 日期格式「YYYY-MM-DD」
         raw_date = item.get("date", "")
         date_tag = f"「{raw_date}」" if raw_date else ""
+
+        # 中文主内容：优先 title_zh，回退到 summary_zh
+        title_zh = (item.get("title_zh") or "").strip()
+        summary_zh = (item.get("summary_zh") or item.get("summary") or "").strip()
+        zh_primary = title_zh if title_zh else summary_zh
+        zh_primary = zh_primary[:100] + ("…" if len(zh_primary) > 100 else "")
+
+        # 完整摘要（如 title_zh 是主内容，则在下面补充 summary_zh 作为说明）
+        detail = ""
+        if title_zh and summary_zh and summary_zh != title_zh:
+            detail_text = summary_zh[:80] + ("…" if len(summary_zh) > 80 else "")
+            detail = f"\n_{detail_text}_"
+
+        source_link = f"[查看原文]({url})" if url else ""
 
         item_elements.append({
             "tag": "markdown",
             "content": (
                 f"{emoji} **[{item['region']}]** {item['status']} "
                 f"· {cat_emoji} {item['category_l1']}\n"
-                f"{date_tag} {title_md}\n"
-                f"_{summary}_"
+                f"{date_tag} **{zh_primary}**"
+                f"{detail}\n"
+                f"_{source_link}_"
             ),
         })
 

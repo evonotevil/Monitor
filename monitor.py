@@ -73,8 +73,8 @@ def cmd_run(args):
                 for item in items:
                     item_dict = item.to_dict()
                     translated = translate_item_fields(item_dict)
-                    # 标题保留原文，只更新摘要中文翻译
                     item.summary_zh = translated.get("summary_zh", "")
+                    item.title_zh = translated.get("title_zh", "")
 
             new_count = db.bulk_upsert(items)
             logger.info(f"新增 {new_count} 条记录 (共处理 {len(items)} 条)")
