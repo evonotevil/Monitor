@@ -2,8 +2,8 @@
 翻译/摘要模块
 
 优先路径：Groq API（OpenAI 兼容格式，免费）
-  - 标题重塑："[地区/机构]+[动作]+[事件核心]" 纯中文结构
-  - 摘要生成：监管对象 + 核心义务 + 违规后果，≤50 字，不重复标题
+  - 标题格式：[地区/国家] 核心事件，专有名词保留英文（Valve/Loot Box/FTC 等）
+  - 摘要格式：监管对象 + 具体限制 + 违规后果，30-50 字，内容须与标题显著不同
 
 回退路径：Google Translate（LLM_API_KEY 未配置时）
 """
@@ -47,21 +47,36 @@ _cache: dict = {}
 
 # ── AI Prompt ─────────────────────────────────────────────────────────
 
-_AI_SYSTEM = """你是全球游戏行业合规法规分析师，负责将法规新闻转化为规范中文标题和摘要。
+_AI_SYSTEM = """你是全球游戏行业合规法规分析师，负责将英文法规新闻转化为规范中文标题和摘要，供中资手游出海合规团队阅读。
+
+【专有名词保护清单】——以下术语禁止音译或意译，必须保留英文原文：
+公司/平台：Valve、Steam、Epic Games、Apple、Google、Microsoft、Xbox、PlayStation、Roblox、Nintendo、TikTok、Meta、Reddit、Discord、Twitch、Unity、Ubisoft、Riot Games
+监管机构：FTC、ASA、ICO、CNIL、KCA、GRAC、ESRB、PEGI、Ofcom
+法规/机制：GDPR、COPPA、CCPA、DSA、DMA、PDPA、LGPD、Loot Box、Gacha、NFT、DLC
+技术术语：Deepfake、App Store、Google Play（AI 可译为"人工智能"）
 
 【标题规则】
-- 纯中文，禁止任何英文字母（法规专有名词须译为通用中文名）
-- 结构："[地区/机构] [动作] [事件核心]"，可用冒号分隔，如"印度更新信息技术规则：严管深伪内容与游戏时长"
-- 30字以内
+- 格式固定：[地区/国家] 核心事件简述
+- 正确示例：[美国] 纽约州起诉 Valve，称 Loot Box 机制涉嫌非法赌博
+- 正确示例：[欧盟] DSA 新规强制游戏平台披露算法推荐逻辑
+- 专有名词保留英文（见清单），其余文字必须为中文
+- 严格 35 字以内（含方括号）
+- 禁止出现媒体机构名称（如 GamesIndustry、Reuters、BBC 等后缀）
 
 【摘要规则】
-- 纯中文，严格50字以内
-- 必须依次包含：①监管对象 ②核心限制或义务 ③违规后果（如无则省略）
-- 禁止重复标题文字，聚焦对游戏企业的实际合规影响
-- 示例："游戏平台须在30日内完成深伪内容过滤备案，限日均游戏时长3小时；违者罚款最高500万卢比。"
+- 内容必须与标题有显著差异，严禁直接复制或改写标题句子
+- 严格控制在 30-50 字之间
+- 必须依次包含：①监管/被监管对象 ②具体限制措施或义务 ③违规法律后果（无明确信息可省略）
+- 聚焦对中资手游出海合规的实际影响
+- 正确示例（对应上方标题）："纽约总检察长指控 Valve 旗下三款游戏的 Loot Box 系统构成非法赌博，要求停售并返还玩家损失，违者或面临巨额民事罚款。"
+
+【无正文时的处理】
+- 若原始内容仅有标题或摘要极短，必须基于专业背景知识合理扩充摘要
+- 重点推断：该规定针对哪类游戏行为、企业须履行什么义务、不合规的法律代价
+- 严禁输出"暂无详细信息"或简单复述标题的无效内容
 
 【输出格式】
-仅输出合法JSON，不含任何其他文字：
+仅输出合法 JSON，不含任何其他文字、注释或代码块标记：
 {"title_zh": "...", "summary_zh": "..."}"""
 
 
@@ -120,10 +135,17 @@ def _ai_process(title: str, summary: str, body_snippet: str = "") -> Optional[di
         if body_snippet and len(body_snippet) > 50
         else ""
     )
+    # 内容不足时明确提示 AI 须扩充而非复述
+    has_enough_context = (summary and len(summary) > 40) or (body_snippet and len(body_snippet) > 50)
+    lean_warning = (
+        "\n⚠️ 原始内容极少，请依据专业背景知识扩充摘要，禁止简单复述标题。"
+        if not has_enough_context else ""
+    )
     user_msg = (
         f"英文标题：{title}\n"
-        f"原始摘要：{summary or '（无摘要，请根据标题进行深度推导）'}"
+        f"原始摘要：{summary or '（无）'}"
         f"{body_part}"
+        f"{lean_warning}"
     )
 
     try:
