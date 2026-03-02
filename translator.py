@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 _LLM_BASE_URL = "https://llm-proxy.lilithgames.com/v1"
 _LLM_API_KEY  = os.environ.get("LLM_API_KEY", "")
-_LLM_MODEL    = os.environ.get("LLM_MODEL", "gpt-4o-mini")   # 可通过环境变量覆盖
+_LLM_MODEL    = os.environ.get("LLM_MODEL", "claude-haiku-4-5@20251001")   # 可通过环境变量覆盖
 
 try:
     from openai import OpenAI as _OpenAI
