@@ -1,9 +1,9 @@
 name: 全球游戏合规周报
 
 on:
-  # 每周一 UTC 02:00 = 北京/新加坡时间 10:00
+  # 每周一 UTC 01:47 = 北京/新加坡时间 09:47
   schedule:
-    - cron: '0 2 * * 1'
+    - cron: '47 1 * * 1'
   # 支持手动触发（Settings → Actions → Run workflow）
   workflow_dispatch:
 
