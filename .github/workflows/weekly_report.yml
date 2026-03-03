@@ -69,16 +69,22 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # 清理上周的带日期 PDF（只保留本周的）
-          git ls-files "reports/Lilith-Legal-Compliance-Report-*.pdf" \
-            | grep -v "${{ env.PDF_FILENAME }}" \
-            | xargs -r git rm --cached
+
+          # 计算本周 ISO 周号（如 2026-W10），用于存档目录名
+          WEEK_ID=$(date -u +%Y-W%V)
+          ARCHIVE_DIR="reports/archive/${WEEK_ID}"
+          mkdir -p "${ARCHIVE_DIR}"
+
+          # 将本周 HTML 存入归档（HTML 约 70KB，适合文本分析；PDF 1.8MB 太大不归档）
+          cp reports/latest.html "${ARCHIVE_DIR}/weekly.html"
+
+          # 更新 latest 文件 + DB + 本周存档
           git add reports/latest.html reports/latest.pdf data/monitor.db
-          # 添加本周带日期的 PDF（如果存在）
-          [ -f "reports/${{ env.PDF_FILENAME }}" ] && git add "reports/${{ env.PDF_FILENAME }}" || true
+          git add "${ARCHIVE_DIR}/weekly.html"
+
           # 如果没有变化就跳过 commit（避免空提交报错）
           git diff --staged --quiet || \
-            git commit -m "📊 周报 $(date -u +%Y-%m-%d) [skip ci]"
+            git commit -m "📊 周报存档 ${WEEK_ID} $(date -u +%Y-%m-%d) [skip ci]"
           git push
 
       # ── 7. 发送飞书卡片通知（文件已在仓库，链接可访问）──────────────

@@ -16,18 +16,20 @@ data/*.db-shm
 # 日志（不入库，CI 产物查 Actions 日志即可）
 data/*.log
 
-# 时间戳版本的报告（由 CI 自动提交 latest.* 即可，历史版本按需保留）
-# 如果你想保留所有历史报告，删掉下面两行
+# 本地测试产生的时间戳报告——不入库，CI 产物用 latest.* 和 archive/ 代替
 reports/report_*.html
 reports/report_*.pdf
+reports/report_*.md
 reports/weekly_*.html
 reports/weekly_*.pdf
+reports/weekly_*.md
 
-# 但始终保留 latest 文件和带日期的 Lilith 正式报告
+# 始终保留 latest 文件 和 每周存档目录
 !reports/latest.html
 !reports/latest.pdf
 !reports/.gitkeep
-!reports/Lilith-Legal-Compliance-Report-*.pdf
+!reports/archive/
+!reports/archive/**
 
 # macOS
 .DS_Store
