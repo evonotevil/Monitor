@@ -620,13 +620,56 @@ def fetch_google_news_all() -> List[dict]:
     return all_items
 
 
+# ─── 语言-地区一致性过滤 ──────────────────────────────────────────────
+#
+# 各语言文章"合理覆盖"的地区集合。
+# 逻辑：北美/欧洲的监管动态原始信源是英文，
+# 若韩文/日文等非英语文章被分类到这些地区，通常是外媒转载，
+# 英文原始源已被收录，无需重复入库。
+# "全球"/"其他" 一律保留（多地区综述）。
+#
+_LANG_ACCEPTABLE_REGIONS = {
+    # key = lang 前缀, value = 该语言"一次信源"应覆盖的合理区域集合
+    "ko": {"韩国",                          "全球", "其他"},
+    "ja": {"日本",                          "全球", "其他"},
+    "vi": {"越南", "东南亚",                "全球", "其他"},
+    "id": {"印度尼西亚", "东南亚",          "全球", "其他"},
+    "th": {"泰国", "东南亚",               "全球", "其他"},
+    "zh": {"台湾", "香港", "澳门", "港澳台","全球", "其他"},
+    "de": {"德国", "奥地利", "欧盟", "欧洲","全球", "其他"},
+    "fr": {"法国", "比利时", "欧盟", "欧洲","全球", "其他"},
+    "nl": {"荷兰", "比利时", "欧盟", "欧洲","全球", "其他"},
+    "pt": {"巴西", "南美",                  "全球", "其他"},
+    "es": {"墨西哥", "西班牙", "阿根廷", "智利", "哥伦比亚", "南美", "全球", "其他"},
+    "ar": {"沙特", "阿联酋", "土耳其", "中东/非洲", "全球", "其他"},
+}
+
+
+def _is_foreign_commentary(lang: str, region: str) -> bool:
+    """
+    判断是否为"外语文章转载非本地区监管新闻"。
+
+    例：韩文(ko)文章被分类为北美 → 视为韩媒转载美国新闻，过滤。
+    例：韩文文章分类为韩国 → 本地一次信源，保留。
+    英文(en)文章全球通用，始终保留。
+    """
+    if not lang or lang == "en":
+        return False
+    lang_prefix = lang.split("-")[0].lower()
+    acceptable = _LANG_ACCEPTABLE_REGIONS.get(lang_prefix)
+    if acceptable is None:
+        return False   # 未配置的语言：保守策略，不过滤
+    return region not in acceptable
+
+
 def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS, translate: bool = True) -> List[LegislationItem]:
     """
     完整抓取 & 处理流水线:
     1. 抓取 RSS + Google News
     2. 严格过滤 (法规 + 游戏 + 排除中国大陆 + 排除噪音)
     3. 分类为 LegislationItem
-    4. 翻译标题和摘要
+    4. 语言-地区一致性过滤（外语转载非本地新闻）
+    5. 翻译标题和摘要
     """
     logger.info("=" * 60)
     logger.info("开始抓取数据...")
@@ -658,11 +701,22 @@ def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS, translate: bool = Tr
     # 4. 日期精准化（对来源日期不可信的文章抓取真实发布时间）
     relevant = enrich_article_dates(relevant)
 
-    # 5. 分类
+    # 5. 分类 + 语言-地区一致性过滤
     legislation_items = []
+    lang_filtered = 0
     for article in relevant:
         classified = classify_article(article)
+        lang = article.get("lang", "en")
+        if _is_foreign_commentary(lang, classified.region):
+            logger.debug(
+                f"[语言过滤] [{lang}] 文章报道非本地区 [{classified.region}]，跳过: "
+                f"{article.get('title', '')[:60]}"
+            )
+            lang_filtered += 1
+            continue
         legislation_items.append(classified)
 
+    if lang_filtered:
+        logger.info(f"[语言过滤] 过滤外语转载 {lang_filtered} 条（非本地区监管新闻）")
     logger.info(f"分类完成: {len(legislation_items)} 条立法动态")
     return legislation_items
