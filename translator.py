@@ -72,6 +72,11 @@ _TERM_CORRECTIONS: dict[str, str] = {
     "推趣": "Twitch",
     # Roblox（注意：罗布乐思是官方中文名，此处保留英文）
     "罗布乐思": "Roblox",
+    # 货币单位错误音译
+    "拉布尔": "卢布", "卢伯": "卢布", "鲁布": "卢布",   # ruble 误译
+    "里尔": "雷亚尔",                                   # real (巴西) 误译保护
+    # Battlestate Games（Escape from Tarkov 开发商）
+    "战争状态游戏": "Battlestate Games", "战斗状态": "Battlestate Games",
 }
 
 
