@@ -28,7 +28,7 @@ import requests
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
 # ── 区域分组配置（统一从 utils 导入，禁止在此重复定义）──────────────
-from utils import _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group
+from utils import _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status
 
 
 def _select_diverse_highlights(candidates: list, max_items: int = 5) -> list:
@@ -192,7 +192,7 @@ def build_card(total, by_cat, by_region_group, highlights, html_url, pdf_url):
     # 重点条目 elements
     hl_elements = []
     for item in highlights:
-        emoji   = STATUS_EMOJI.get(item["status"], "•")
+        emoji   = STATUS_EMOJI.get(normalize_status(item["status"]), "•")
         cat_em  = CAT_EMOJI.get(item["category_l1"], "")
         summary = (item.get("summary_zh") or item.get("summary") or "")[:80]
         if len(summary) >= 80:

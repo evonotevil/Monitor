@@ -18,7 +18,7 @@ from typing import List, Optional
 
 from config import OUTPUT_DIR, REGION_DISPLAY_ORDER
 from classifier import get_source_tier
-from utils import _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group
+from utils import _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status
 
 
 def ensure_output_dir():
@@ -483,7 +483,7 @@ def generate_html(items: List[dict], title: str = "全球游戏行业立法动�
         ):
             cat = item.get("category_l1", "")
             style = CATEGORY_STYLE.get(cat, DEFAULT_STYLE)
-            status = item.get("status", "")
+            status = normalize_status(item.get("status", ""))
             status_css = STATUS_CSS.get(status, "background:#F1F5F9;color:#475569;")
             impact = int(item.get("impact_score", 1))
 

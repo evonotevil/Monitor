@@ -50,6 +50,19 @@ _GROUP_EMOJI = {
 }
 
 
+# ── 状态标签历史值 → 当前展示名映射 ─────────────────────────────────────
+# DB 中老记录可能仍保存旧标签值，渲染时统一通过此表转换，无需重跑 retranslate。
+_STATUS_DISPLAY_MAP = {
+    "政策信号": "立法动态",   # 2026-03 更名
+    "已修订":   "修订变更",   # 2025 早期更名
+}
+
+
+def normalize_status(status: str) -> str:
+    """将 DB 中可能存在的历史状态值映射到当前展示标签，找不到则原样返回。"""
+    return _STATUS_DISPLAY_MAP.get(status, status)
+
+
 def _get_region_group(region: str) -> str:
     """将原始 region 字段值映射到 8 大显示分组，找不到时返回'其他'。"""
     if region in _REGION_GROUP_MAP:

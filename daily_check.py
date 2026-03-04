@@ -25,7 +25,7 @@ import requests
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
 # ── 区域分组配置（统一从 utils 导入，禁止在此重复定义）──────────────
-from utils import _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group
+from utils import _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status
 
 STATUS_EMOJI = {
     "执法动态":     "🔴",
@@ -127,7 +127,7 @@ def build_daily_card(items: list) -> dict:
     display_items = items[:8]
     item_elements = []
     for item in display_items:
-        emoji = STATUS_EMOJI.get(item["status"], "•")
+        emoji = STATUS_EMOJI.get(normalize_status(item["status"]), "•")
         cat_emoji = CAT_EMOJI.get(item["category_l1"], "")
         url = item.get("source_url", "")
 
