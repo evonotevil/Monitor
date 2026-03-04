@@ -24,7 +24,7 @@ from datetime import datetime
 
 from models import Database
 from fetcher import fetch_and_process
-from translator import translate_item_fields, translate_items_batch
+from translator import translate_items_batch
 from reporter import print_table, save_markdown, save_html, generate_markdown
 from utils import _get_region_group
 from config import PERIOD_DAYS

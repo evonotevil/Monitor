@@ -6,7 +6,14 @@
 """
 
 # ─── 重点监控区域（不含中国大陆）──────────────────────────────────────
-
+#
+# ⚠️  注意：MONITORED_REGIONS 和 REGION_DISPLAY_ORDER 是「纯文档字段」，
+#    不被任何功能代码读取，仅供人工参考。
+#    实际抓取覆盖范围由下方 KEYWORDS 字典决定（Google News 搜索词）。
+#    如需新增某个国家/地区的抓取，请在 KEYWORDS 里添加对应搜索词，
+#    而非修改 MONITORED_REGIONS。
+#    区域显示分组的配置在 utils.py（_REGION_GROUP_MAP / _GROUP_ORDER）。
+#
 MONITORED_REGIONS = {
     "欧洲": {
         "countries": ["欧盟", "英国", "德国", "法国", "荷兰", "比利时", "奥地利", "意大利", "西班牙", "波兰", "瑞典", "挪威"],
