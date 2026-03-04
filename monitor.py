@@ -144,12 +144,47 @@ def cmd_run(args):
             if no_translate:
                 logger.info("已跳过翻译 (--no-translate)")
             else:
-                logger.info(f"正在翻译摘要 ({len(items)} 条)...")
+                from classifier import score_impact
+                logger.info(f"正在翻译并分类 ({len(items)} 条)...")
+                kept_items = []
+                llm_filtered = 0
                 for item in items:
                     item_dict = item.to_dict()
                     translated = translate_item_fields(item_dict)
+
+                    # ── LLM 相关性过滤 ─────────────────────────────────
+                    if translated.get("_llm_is_relevant") is False:
+                        llm_filtered += 1
+                        continue
+
                     item.summary_zh = translated.get("summary_zh", "")
-                    item.title_zh = translated.get("title_zh", "")
+                    item.title_zh   = translated.get("title_zh", "")
+
+                    # ── 应用 LLM 分类结果（覆盖正则，空值保留正则原值）──
+                    llm_region   = translated.get("_llm_region", "")
+                    llm_category = translated.get("_llm_category_l1", "")
+                    llm_status   = translated.get("_llm_status", "")
+
+                    if llm_region:
+                        item.region = llm_region
+                    if llm_category:
+                        item.category_l1 = llm_category
+                    if llm_status and llm_status != item.status:
+                        logger.info(
+                            f"[LLM分类] 状态更新 '{item.status}' → '{llm_status}'"
+                            f" | {item.title[:50]}"
+                        )
+                        item.status = llm_status
+                        item.impact_score = score_impact(item.status, item.source_name)
+
+                    kept_items.append(item)
+
+                if llm_filtered:
+                    logger.info(
+                        f"[LLM过滤] 共过滤 {llm_filtered} 条不相关文章，"
+                        f"保留 {len(kept_items)} 条"
+                    )
+                items = kept_items
 
             new_count = db.bulk_upsert(items)
             logger.info(f"新增 {new_count} 条记录 (共处理 {len(items)} 条)")

@@ -101,40 +101,84 @@ def _bigram_similarity(a: str, b: str) -> float:
 
 # ── AI Prompt ─────────────────────────────────────────────────────────
 
-_AI_SYSTEM = """你是全球游戏行业合规法规分析师，负责将英文法规新闻转化为规范中文标题和摘要，供中资手游出海合规团队阅读。
+_AI_SYSTEM = """你是全球游戏行业合规法规分析师，处理游戏监管新闻，需完成四项任务并输出 JSON。
 
-【专有名词保护清单】——以下术语禁止音译或意译，必须保留英文原文：
+【任务一：相关性判断（is_relevant）】
+is_relevant = false 的情形——直接返回 {"is_relevant": false}，无需翻译：
+- 游戏评测 / 新作发布 / DLC / 赛季更新 / Patch Notes / 游戏攻略
+- 电竞赛事 / 赌场博彩 / 体育博彩 / 彩票
+- 纯技术工具更新（SDK / IDE / API 版本发布）
+- 公司财报 / 融资 / 裁员（无监管动作）
+- 排行榜 / 最佳游戏推荐 / 开发者大会活动
+is_relevant = true：涉及立法 / 监管 / 执法 / 政策草案 / 合规要求的游戏行业动态
+
+【任务二：地区识别（region）】
+从文章内容判断最相关地区，从以下选一个：
+欧盟 英国 德国 法国 荷兰 比利时 奥地利 意大利 西班牙 波兰 瑞典 挪威
+美国 加拿大 巴西 墨西哥 阿根廷 智利 哥伦比亚
+越南 印度尼西亚 泰国 菲律宾 马来西亚 新加坡
+印度 巴基斯坦 孟加拉国
+台湾 香港 澳门 日本 韩国
+澳大利亚 新西兰 沙特 阿联酋 土耳其 尼日利亚 南非
+全球 其他
+若参考地区已给出且合理，优先采用；若不准确则修正。
+
+【任务三：分类与状态】
+category_l1 选一个：数据隐私 玩法合规 未成年人保护 广告营销合规 消费者保护 经营合规 平台政策 内容监管
+status 选一个：已生效 即将生效 草案/征求意见 立法进行中 已提案 已修订 已废止 执法动态 政策信号
+
+【任务四：翻译与摘要（仅 is_relevant=true 时执行）】
+
+专有名词保护清单——以下术语禁止音译或意译，必须保留英文原文：
 公司/平台：Valve、Steam、Epic Games、Apple、Google、Microsoft、Xbox、PlayStation、Roblox、Nintendo、TikTok、Meta、Reddit、Discord、Twitch、Unity、Ubisoft、Riot Games
 监管机构：FTC、ASA、ICO、CNIL、KCA、GRAC、ESRB、PEGI、Ofcom
 法规/机制：GDPR、COPPA、CCPA、DSA、DMA、PDPA、LGPD、Loot Box、Gacha、NFT、DLC
 技术术语：Deepfake、App Store、Google Play（AI 可译为"人工智能"）
 
-【标题规则】
+标题规则：
 - 格式固定：[地区/国家] 核心事件简述
-- 正确示例：[美国] 纽约州起诉 Valve，称 Loot Box 机制涉嫌非法赌博
-- 正确示例：[欧盟] DSA 新规强制游戏平台披露算法推荐逻辑
-- 专有名词保留英文（见清单），其余文字必须为中文
+- 专有名词保留英文，其余文字必须为中文
 - 严格 35 字以内（含方括号）
-- 禁止出现媒体机构名称（如 GamesIndustry、Reuters、BBC 等后缀）
-- 禁止以【xxx】【专栏】【分析】等媒体栏目标记开头，一律去除后重新提炼事件核心
-- 禁止疑问句或问题形式标题（"如何…？""…是否…？"），一律改为陈述句
+- 禁止媒体机构名称后缀（GamesIndustry、Reuters、BBC 等）
+- 禁止【xxx】媒体栏目前缀，一律去除后重新提炼
+- 禁止疑问句，一律改为陈述句
 
-【摘要规则】
-- 内容必须与标题有显著差异，严禁直接复制或改写标题句子
-- 严格控制在 30-50 字之间
-- 必须严格遵循公式：[背景/起因] + [核心监管动作] + [具体后果（金额/期限/要求）]
-- 聚焦对中资手游出海合规的实际影响，落到具体义务或数字
-- 正确示例："纽约总检察长以非法赌博为由起诉 Valve，要求停售旗下三款游戏的 Loot Box 并退还玩家损失，违者面临民事罚款及禁止令。"
-- 错误示例（禁止）："纽约起诉 Valve，其 Loot Box 机制违法。"（信息量不足，仅复述标题）
+摘要规则：
+- 内容必须与标题显著不同，严禁复制或改写标题
+- 严格 30-50 字
+- 公式：[背景/起因] + [核心监管动作] + [具体后果（金额/期限/要求）]
+- 若原始内容极少，必须基于专业知识合理扩充，严禁简单复述标题
 
-【无正文时的处理】
-- 若原始内容仅有标题或摘要极短，必须基于专业背景知识合理扩充摘要
-- 重点推断：该规定针对哪类游戏行为、企业须履行什么义务、不合规的法律代价
-- 严禁输出"暂无详细信息"或简单复述标题的无效内容
+【输出格式】仅输出合法 JSON，不含任何其他文字：
+不相关时：{"is_relevant": false}
+相关时：{"is_relevant": true, "region": "...", "category_l1": "...", "status": "...", "title_zh": "...", "summary_zh": "..."}"""
 
-【输出格式】
-仅输出合法 JSON，不含任何其他文字、注释或代码块标记：
-{"title_zh": "...", "summary_zh": "..."}"""
+
+# ── LLM 分类结果合法值集合（用于校验，防止模型输出非法值）──────────────
+
+_VALID_REGIONS = {
+    "欧盟", "英国", "德国", "法国", "荷兰", "比利时", "奥地利", "意大利",
+    "西班牙", "波兰", "瑞典", "挪威", "欧洲",
+    "美国", "加拿大", "北美",
+    "巴西", "墨西哥", "阿根廷", "智利", "哥伦比亚", "南美",
+    "越南", "印度尼西亚", "泰国", "菲律宾", "马来西亚", "新加坡", "东南亚",
+    "印度", "巴基斯坦", "孟加拉国", "南亚",
+    "台湾", "香港", "澳门", "港澳台",
+    "日本", "韩国",
+    "澳大利亚", "新西兰", "大洋洲",
+    "沙特", "阿联酋", "土耳其", "尼日利亚", "南非", "中东/非洲",
+    "全球", "其他",
+}
+
+_VALID_CATEGORIES_L1 = {
+    "数据隐私", "玩法合规", "未成年人保护", "广告营销合规",
+    "消费者保护", "经营合规", "平台政策", "内容监管",
+}
+
+_VALID_STATUSES = {
+    "已生效", "即将生效", "草案/征求意见", "立法进行中",
+    "已提案", "已修订", "已废止", "执法动态", "政策信号",
+}
 
 
 # ── 文章正文抓取（最优先给 AI 提供上下文）────────────────────────────
@@ -179,10 +223,12 @@ def _fetch_article_body(url: str) -> str:
 
 # ── Claude AI 处理 ────────────────────────────────────────────────────
 
-def _ai_process(title: str, summary: str, body_snippet: str = "") -> Optional[dict]:
+def _ai_process(title: str, summary: str, body_snippet: str = "",
+                region_hint: str = "", category_hint: str = "", status_hint: str = "") -> Optional[dict]:
     """
-    调用 Claude AI 重塑标题、生成深度摘要。
-    返回 {"title_zh": ..., "summary_zh": ...} 或 None（调用失败时）。
+    调用 LLM 完成相关性判断 + 地区/分类/状态识别 + 中文标题摘要生成。
+    返回包含 is_relevant、region、category_l1、status、title_zh、summary_zh 的 dict，
+    或 None（调用失败时）。
     """
     if not _HAS_AI or not _AI_CLIENT:
         return None
@@ -191,6 +237,18 @@ def _ai_process(title: str, summary: str, body_snippet: str = "") -> Optional[di
         f"\n文章正文片段（前500字）：{body_snippet}"
         if body_snippet and len(body_snippet) > 50
         else ""
+    )
+    # 将正则预分类结果作为参考提示传给 LLM
+    hint_parts = []
+    if region_hint:
+        hint_parts.append(f"地区={region_hint}")
+    if category_hint:
+        hint_parts.append(f"分类={category_hint}")
+    if status_hint:
+        hint_parts.append(f"状态={status_hint}")
+    hint_line = (
+        f"\n初步分类参考（来自规则系统，可修正）：{'、'.join(hint_parts)}"
+        if hint_parts else ""
     )
     # 内容不足时明确提示 AI 须扩充而非复述
     has_enough_context = (summary and len(summary) > 40) or (body_snippet and len(body_snippet) > 50)
@@ -202,6 +260,7 @@ def _ai_process(title: str, summary: str, body_snippet: str = "") -> Optional[di
         f"英文标题：{title}\n"
         f"原始摘要：{summary or '（无）'}"
         f"{body_part}"
+        f"{hint_line}"
         f"{lean_warning}"
     )
 
@@ -236,9 +295,35 @@ def _ai_process(title: str, summary: str, body_snippet: str = "") -> Optional[di
                 data = json.loads(json_str)
             except json.JSONDecodeError:
                 data = {}
+
+            # ── 步骤 4a：相关性判断 ────────────────────────────────────
+            # LLM 明确返回 false 时直接过滤，省去后续翻译 token
+            is_relevant = data.get("is_relevant")
+            if is_relevant is False:
+                logger.info(f"[AI过滤] 判定不相关: {title[:60]}")
+                return {"is_relevant": False}
+
+            # ── 步骤 4b：提取分类字段（校验合法性，非法值留空由正则兜底）─
+            llm_region = (data.get("region") or "").strip()
+            llm_category_l1 = (data.get("category_l1") or "").strip()
+            llm_status = (data.get("status") or "").strip()
+
+            if llm_region not in _VALID_REGIONS:
+                if llm_region:
+                    logger.debug(f"[AI] region 非法值 '{llm_region}'，回退正则")
+                llm_region = ""
+            if llm_category_l1 not in _VALID_CATEGORIES_L1:
+                if llm_category_l1:
+                    logger.debug(f"[AI] category_l1 非法值 '{llm_category_l1}'，回退正则")
+                llm_category_l1 = ""
+            if llm_status not in _VALID_STATUSES:
+                if llm_status:
+                    logger.debug(f"[AI] status 非法值 '{llm_status}'，回退正则")
+                llm_status = ""
+
             title_zh   = (data.get("title_zh")  or "").strip()
             summary_zh = (data.get("summary_zh") or "").strip()
-            # 4. JSON 解析失败兜底：直接用正则从原文提取字段值
+            # 4c. JSON 解析失败兜底：直接用正则从原文提取字段值
             if not title_zh or not summary_zh:
                 tm = re.search(r'"title_zh"\s*:\s*"([^"]{2,})"', text)
                 sm = re.search(r'"summary_zh"\s*:\s*"([^"]{2,})"', text)
@@ -316,7 +401,14 @@ def _ai_process(title: str, summary: str, body_snippet: str = "") -> Optional[di
                     except Exception as e3:
                         logger.warning(f"[AI] 相似度重试失败: {e3}")
 
-                return {"title_zh": title_zh, "summary_zh": summary_zh}
+                return {
+                    "is_relevant":   True,
+                    "title_zh":      title_zh,
+                    "summary_zh":    summary_zh,
+                    "region":        llm_region,
+                    "category_l1":   llm_category_l1,
+                    "status":        llm_status,
+                }
             logger.warning(f"[AI] JSON 字段为空: {json_str[:100]}")
         else:
             logger.warning(f"[AI] 返回内容中未找到 JSON: {text[:200]}")
@@ -467,21 +559,44 @@ def _check_ai_reachable() -> bool:
 
 def translate_item_fields(item_dict: dict) -> dict:
     """
-    生成 title_zh 和 summary_zh。
+    生成 title_zh、summary_zh，同时通过 LLM 完成相关性判断和分类优化。
 
-    优先：Claude AI（规范中文重塑 + 深度摘要）
-    回退：Google Translate（字面翻译）
+    LLM 路径新增返回字段（存储在 item_dict 中，前缀 _llm_）：
+      _llm_is_relevant  : bool  — False 表示 LLM 判定不相关，monitor.py 据此过滤
+      _llm_region       : str   — LLM 识别的地区（空串表示回退正则）
+      _llm_category_l1  : str   — LLM 识别的一级分类
+      _llm_status       : str   — LLM 识别的状态
+
+    优先：LLM AI（相关性过滤 + 分类识别 + 规范中文重塑 + 深度摘要）
+    回退：Google Translate（字面翻译，跳过相关性判断）
     """
     title = (item_dict.get("title") or "").strip()
     summary = (item_dict.get("summary") or "").strip()
 
     # ── 路径一：LLM AI ────────────────────────────────────────────────
     if _HAS_AI and _check_ai_reachable():
-        result = _ai_process(title, summary)
+        # 将正则预分类结果作为参考传给 LLM
+        region_hint   = (item_dict.get("region")      or "").strip()
+        category_hint = (item_dict.get("category_l1") or "").strip()
+        status_hint   = (item_dict.get("status")      or "").strip()
+
+        result = _ai_process(title, summary,
+                             region_hint=region_hint,
+                             category_hint=category_hint,
+                             status_hint=status_hint)
         if result:
-            item_dict["title_zh"] = result["title_zh"]
-            item_dict["summary_zh"] = result["summary_zh"]
-            time.sleep(4)   # Groq 免费层 6000 TPM，每条约300 token，4s间隔确保不超限
+            # LLM 判定不相关：打标记后直接返回，不填充翻译字段
+            if result.get("is_relevant") is False:
+                item_dict["_llm_is_relevant"] = False
+                return item_dict
+
+            item_dict["title_zh"]         = result.get("title_zh", "")
+            item_dict["summary_zh"]       = result.get("summary_zh", "")
+            item_dict["_llm_is_relevant"] = True
+            item_dict["_llm_region"]      = result.get("region", "")
+            item_dict["_llm_category_l1"] = result.get("category_l1", "")
+            item_dict["_llm_status"]      = result.get("status", "")
+            time.sleep(4)   # 硅基流动免费层限速，4s 间隔确保不超限
             return item_dict
         logger.warning(f"AI 处理未返回有效结果，回退到 Google Translate: {title[:50]}")
 
