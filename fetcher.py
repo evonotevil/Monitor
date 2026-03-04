@@ -27,7 +27,6 @@ from config import (
 )
 from models import LegislationItem
 from classifier import classify_article, is_china_mainland
-from translator import translate_item_fields
 
 logger = logging.getLogger(__name__)
 
@@ -662,7 +661,7 @@ def _is_foreign_commentary(lang: str, region: str) -> bool:
     return region not in acceptable
 
 
-def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS, translate: bool = True) -> List[LegislationItem]:
+def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS) -> List[LegislationItem]:
     """
     完整抓取 & 处理流水线:
     1. 抓取 RSS + Google News
