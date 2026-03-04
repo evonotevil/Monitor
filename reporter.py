@@ -261,16 +261,16 @@ STATUS_CSS = {
     "草案/征求意见": "background:#DBEAFE;color:#1E40AF;",
     "立法进行中":   "background:#E0E7FF;color:#3730A3;",
     "已提案":      "background:#E2E8F0;color:#334155;",
-    "修订变更":     "background:#FEF3C7;color:#92400E;",
+    "修订变更":     "background:#7C3AED;color:#FFFFFF;",
     "已废止":      "background:#F1F5F9;color:#475569;",
     "执法动态":    "background:#FEE2E2;color:#991B1B;",
-    "政策信号":    "background:#F1F5F9;color:#475569;",
+    "立法动态":    "background:#D97706;color:#FFFFFF;",
 }
 
 IMPACT_CONFIG = {
     3: {"dots": "●●●", "label": "高优先",  "color": "#DC2626", "title": "高优先：已生效/即将生效/官方执法"},
     2: {"dots": "●●○", "label": "中优先",  "color": "#D97706", "title": "中优先：草案/立法中/执法动态"},
-    1: {"dots": "●○○", "label": "低优先",  "color": "#16A34A", "title": "低优先：政策信号/背景信息"},
+    1: {"dots": "●○○", "label": "低优先",  "color": "#16A34A", "title": "低优先：立法动态/背景信息"},
 }
 
 TIER_CONFIG = {
@@ -304,7 +304,7 @@ TERMINAL_STATUS_COLORS = {
     "修订变更": C.YELLOW,
     "已废止": C.DIM,
     "执法动态": C.RED,
-    "政策信号": C.DIM,
+    "立法动态": C.DIM,
 }
 
 
@@ -331,7 +331,7 @@ def print_table(items: List[dict], max_summary_len: int = 50):
     print(f"{'-'*140}")
 
     for item in items:
-        status = item.get("status", "政策信号")
+        status = item.get("status", "立法动态")
         color = TERMINAL_STATUS_COLORS.get(status, C.RESET)
         title = _get_display_title(item)
         summary_zh = _get_summary_zh(item)
