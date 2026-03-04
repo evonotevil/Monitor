@@ -555,6 +555,195 @@ def _check_ai_reachable() -> bool:
     return _ai_reachable
 
 
+# ── LLM 批量翻译（3 篇/次，3× 吞吐，4s sleep/批次而非/条）──────────
+
+def _ai_process_batch(items_data: list) -> list:
+    """
+    将 2-3 篇文章打包进一次 LLM 调用，返回等长结果列表。
+    items_data: list of dict，每个 dict 含 title/summary/region_hint/category_hint/status_hint
+    返回: list of dict（与 _ai_process() 格式相同），失败的条目对应位置为 None
+    调用方收到 None 时应降级为单条 translate_item_fields()。
+    """
+    if not _HAS_AI or not _AI_CLIENT or not items_data:
+        return [None] * len(items_data)
+
+    n = len(items_data)
+    parts = []
+    for i, d in enumerate(items_data):
+        hint_parts = []
+        if d.get("region_hint"):
+            hint_parts.append(f"地区={d['region_hint']}")
+        if d.get("category_hint"):
+            hint_parts.append(f"分类={d['category_hint']}")
+        if d.get("status_hint"):
+            hint_parts.append(f"状态={d['status_hint']}")
+        hint_line = f"\n初步分类参考（可修正）：{'、'.join(hint_parts)}" if hint_parts else ""
+
+        has_context = (d.get("summary") and len(d.get("summary", "")) > 40)
+        lean_warn = "\n⚠️ 内容极少，需依专业背景扩充摘要。" if not has_context else ""
+
+        parts.append(
+            f"【文章{i + 1}】\n"
+            f"英文标题：{d.get('title', '')}\n"
+            f"原始摘要：{d.get('summary', '') or '（无）'}"
+            f"{hint_line}{lean_warn}"
+        )
+
+    user_msg = (
+        f"以下 {n} 篇文章，逐篇按顺序分析，返回长度严格为 {n} 的 JSON 数组，"
+        f"每个元素格式与单篇相同（is_relevant=false 时只含该字段）。\n\n"
+        + "\n\n".join(parts)
+    )
+
+    try:
+        resp = _AI_CLIENT.chat.completions.create(
+            model=_LLM_MODEL,
+            max_tokens=350 * n,
+            messages=[
+                {"role": "system", "content": _AI_SYSTEM},
+                {"role": "user",   "content": user_msg},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        logger.info(f"[AI batch raw] n={n} {text[:300]}")
+
+        # 解析顶层 JSON 数组
+        arr_m = re.search(r'\[.*\]', text, re.DOTALL)
+        if arr_m:
+            try:
+                arr = json.loads(arr_m.group())
+                if isinstance(arr, list) and len(arr) == n:
+                    return arr
+                logger.warning(f"[AI batch] 数组长度 {len(arr)} ≠ {n}，降级逐条处理")
+            except json.JSONDecodeError as je:
+                logger.warning(f"[AI batch] JSON 解析失败 ({je})，降级逐条处理")
+        else:
+            logger.warning(f"[AI batch] 未找到 JSON 数组，降级逐条处理: {text[:150]}")
+
+    except Exception as e:
+        err_str = str(e)
+        if "429" in err_str or "rate_limit" in err_str.lower():
+            wait = min(float(re.search(r'try again in (\d+\.?\d*)s', err_str, re.IGNORECASE).group(1)) + 1.5
+                       if re.search(r'try again in (\d+\.?\d*)s', err_str, re.IGNORECASE) else 6.0, 35.0)
+            logger.warning(f"[AI batch] 速率限制，等待 {wait:.1f}s")
+            time.sleep(wait)
+        else:
+            logger.warning(f"[AI batch] 调用失败，降级逐条处理: {type(e).__name__}: {e}")
+
+    return [None] * n
+
+
+# 地区前缀兜底规则（批量后处理时使用，与 _ai_process 内保持一致）
+_REGION_PREFIX_RULES = [
+    ("美国",    r'\b(US|USA|United States|America[n]?|FTC|Congress|Senate|White House)\b'),
+    ("英国",    r'\b(UK|United Kingdom|Britain|British|ASA|Ofcom|ICO)\b'),
+    ("欧盟",    r'\b(EU|European Union|Europe[an]?|GDPR|DSA|DMA|CNIL)\b'),
+    ("韩国",    r'\b(Korea[n]?|South Korea|GRAC|KCA)\b'),
+    ("日本",    r'\b(Japan[ese]?)\b'),
+    ("澳大利亚", r'\b(Austral[ia]+[n]?|eSafety)\b'),
+    ("加拿大",  r'\b(Canada[ian]?)\b'),
+    ("越南",    r'\b(Vietnam[ese]?)\b'),
+    ("印度",    r'\b(India[n]?)\b'),
+    ("全球",    r'\b(global[ly]?|worldwide|international)\b'),
+]
+
+
+def translate_items_batch(items_dicts: list, batch_size: int = 3) -> list:
+    """
+    批量翻译和分类：每 batch_size 条发一次 LLM 请求（一次 4s sleep），
+    单条失败时自动降级为 translate_item_fields()。
+    返回列表与 items_dicts 等长，每条格式与 translate_item_fields() 相同。
+    """
+    if not items_dicts:
+        return []
+
+    # LLM 不可用时直接逐条 Google Translate
+    if not (_HAS_AI and _check_ai_reachable()):
+        return [translate_item_fields(d) for d in items_dicts]
+
+    results = []
+
+    for batch_start in range(0, len(items_dicts), batch_size):
+        batch = items_dicts[batch_start: batch_start + batch_size]
+
+        # 准备批量输入
+        batch_data = [
+            {
+                "title":         (d.get("title")       or "").strip(),
+                "summary":       (d.get("summary")     or "").strip(),
+                "region_hint":   (d.get("region")      or "").strip(),
+                "category_hint": (d.get("category_l1") or "").strip(),
+                "status_hint":   (d.get("status")      or "").strip(),
+            }
+            for d in batch
+        ]
+
+        raw_results = _ai_process_batch(batch_data)
+
+        for item_dict, raw in zip(batch, raw_results):
+            if raw is None:
+                # 批次失败 → 单条降级（已含内部 sleep）
+                logger.info(f"[batch fallback] {item_dict.get('title','')[:40]}")
+                results.append(translate_item_fields(item_dict))
+                continue
+
+            # LLM 判定不相关
+            if raw.get("is_relevant") is False:
+                item_dict["_llm_is_relevant"] = False
+                results.append(item_dict)
+                continue
+
+            title_zh   = (raw.get("title_zh")   or "").strip()
+            summary_zh = (raw.get("summary_zh") or "").strip()
+
+            if not title_zh or not summary_zh:
+                logger.info(f"[batch fallback] 字段为空 → 单条降级: {item_dict.get('title','')[:40]}")
+                results.append(translate_item_fields(item_dict))
+                continue
+
+            # 清理 JSON 残留字符
+            title_zh   = re.sub(r'[\}\{"\s,]+$', '', title_zh).strip()
+            summary_zh = re.sub(r'[\}\{"\s,]+$', '', summary_zh).strip()
+
+            # [地区] 前缀兜底
+            if not re.match(r'^\[.+?\]', title_zh):
+                for region_cn, pattern in _REGION_PREFIX_RULES:
+                    if re.search(pattern, batch_data[batch.index(item_dict)]["title"], re.IGNORECASE):
+                        title_zh = f"[{region_cn}] {title_zh}"
+                        break
+
+            # 专有名词纠错
+            title_zh   = _apply_term_corrections(title_zh)
+            summary_zh = _apply_term_corrections(summary_zh)
+
+            # bigram 相似度过高 → 单条重试（含内部 sleep）
+            if _bigram_similarity(title_zh, summary_zh) > 0.55:
+                logger.warning(f"[batch] bigram 过高，单条重试: {title_zh[:40]}")
+                results.append(translate_item_fields(item_dict))
+                continue
+
+            # 校验分类字段合法性
+            llm_region   = (raw.get("region")      or "").strip()
+            llm_category = (raw.get("category_l1") or "").strip()
+            llm_status   = (raw.get("status")      or "").strip()
+            if llm_region   not in _VALID_REGIONS:        llm_region   = ""
+            if llm_category not in _VALID_CATEGORIES_L1:  llm_category = ""
+            if llm_status   not in _VALID_STATUSES:        llm_status   = ""
+
+            item_dict["title_zh"]         = title_zh
+            item_dict["summary_zh"]       = summary_zh
+            item_dict["_llm_is_relevant"] = True
+            item_dict["_llm_region"]      = llm_region
+            item_dict["_llm_category_l1"] = llm_category
+            item_dict["_llm_status"]      = llm_status
+            results.append(item_dict)
+
+        # 每批次 sleep 一次（代替原来每条 sleep）
+        time.sleep(4)
+
+    return results
+
+
 # ── LLM 批量重复验证（供 reporter.py 调用）────────────────────────────
 
 def verify_duplicate_pairs(pairs: list) -> list:

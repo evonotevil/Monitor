@@ -15,11 +15,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. 拉取代码（含历史 DB + latest 报告）────────────────────────
+      # ── 1. 拉取代码（浅克隆，仅需最新一次 commit；DB 已由当日 daily_check 更新）
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
 
       # ── 2. Python 环境 ─────────────────────────────────────────────
       - name: Set up Python 3.11
@@ -37,15 +38,30 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install playwright
-          playwright install --with-deps chromium
 
-      # ── 3. 抓取最新数据 & 生成 HTML 报告 ──────────────────────────
-      - name: Fetch data & generate HTML
+      # ── Playwright 浏览器缓存（命中时安装从 90s 降到 5s）──────────
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('requirements.txt') }}
+
+      - name: Install Playwright Chromium (only if cache miss)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: playwright install --with-deps chromium
+
+      - name: Install Chromium system deps (always, fast if browsers cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: playwright install-deps chromium
+
+      # ── 3. 生成 HTML 报告（DB 已由当日 daily_check 更新，无需重复抓取）
+      #    注意：周一 daily_check 在 09:33 运行，本流程在 09:47，DB 已最新
+      #    如需强制重新抓取，可手动触发并在步骤前加 python monitor.py run
+      - name: Generate HTML report
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-        run: |
-          python monitor.py run --period week
-          python monitor.py report --format html --period week
+        run: python monitor.py report --format html --period week
 
       # ── 4. 生成 PDF（同时写 latest.html / latest.pdf 和带日期文件名）
       - name: Generate PDF report

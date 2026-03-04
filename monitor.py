@@ -24,8 +24,9 @@ from datetime import datetime
 
 from models import Database
 from fetcher import fetch_and_process
-from translator import translate_item_fields
-from reporter import print_table, save_markdown, save_html, generate_markdown, _get_region_group
+from translator import translate_item_fields, translate_items_batch
+from reporter import print_table, save_markdown, save_html, generate_markdown
+from utils import _get_region_group
 from config import PERIOD_DAYS
 
 # ─── 日志配置 ─────────────────────────────────────────────────────────
@@ -145,13 +146,15 @@ def cmd_run(args):
                 logger.info("已跳过翻译 (--no-translate)")
             else:
                 from classifier import score_impact
-                logger.info(f"正在翻译并分类 ({len(items)} 条)...")
+                logger.info(f"正在批量翻译并分类 ({len(items)} 条，每批 3 篇)...")
                 kept_items = []
                 llm_filtered = 0
-                for item in items:
-                    item_dict = item.to_dict()
-                    translated = translate_item_fields(item_dict)
 
+                # ── 批量翻译：3 条/LLM 请求，速度 3× ─────────────────
+                items_dicts = [item.to_dict() for item in items]
+                translated_list = translate_items_batch(items_dicts, batch_size=3)
+
+                for item, translated in zip(items, translated_list):
                     # ── LLM 相关性过滤 ─────────────────────────────────
                     if translated.get("_llm_is_relevant") is False:
                         llm_filtered += 1
