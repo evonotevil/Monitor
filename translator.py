@@ -555,6 +555,67 @@ def _check_ai_reachable() -> bool:
     return _ai_reachable
 
 
+# ── LLM 批量重复验证（供 reporter.py 调用）────────────────────────────
+
+def verify_duplicate_pairs(pairs: list) -> list:
+    """
+    批量 LLM 验证候选重复新闻对。
+    pairs : [(title_zh_a, title_zh_b), ...]  每批最多 20 对
+    返回  : [True/False, ...]  与 pairs 等长，True = 是同一事件
+    不可用时（LLM 未配置/调用失败）全部返回 False（保守策略：不误删）。
+    """
+    if not pairs:
+        return []
+    if not _HAS_AI or not _AI_CLIENT:
+        return [False] * len(pairs)
+
+    # 截断到最多 20 对，避免超出 token 限制
+    pairs = pairs[:20]
+
+    pair_lines = "\n".join(
+        f"{i + 1}. A：{a}\n   B：{b}"
+        for i, (a, b) in enumerate(pairs)
+    )
+    user_msg = (
+        f"以下 {len(pairs)} 对新闻标题，判断每对是否描述【同一事件】"
+        f"（忽略来源差异，只看核心事件是否相同）。\n"
+        f"只输出 JSON 布尔数组，长度必须等于 {len(pairs)}，"
+        f"例如：[true, false, true]\n\n{pair_lines}"
+    )
+
+    try:
+        resp = _AI_CLIENT.chat.completions.create(
+            model=_LLM_MODEL,
+            max_tokens=60 + len(pairs) * 8,
+            messages=[
+                {"role": "system", "content":
+                 "你是新闻去重专家。判断两条中文新闻标题是否报道同一事件，"
+                 "只输出 JSON 布尔数组，不含其他文字。"},
+                {"role": "user", "content": user_msg},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        logger.info(f"[AI verify_dup] {text[:200]}")
+
+        # 尝试解析 JSON 数组
+        arr_m = re.search(r'\[.*?\]', text, re.DOTALL)
+        if arr_m:
+            result = json.loads(arr_m.group())
+            if isinstance(result, list) and len(result) == len(pairs):
+                return [bool(r) for r in result]
+
+        # 兜底：按行解析 true/false
+        tokens = re.findall(r'\b(true|false)\b', text.lower())
+        if len(tokens) == len(pairs):
+            return [t == 'true' for t in tokens]
+
+        logger.warning(f"[AI verify_dup] 无法解析返回，保守返回 False: {text[:100]}")
+    except Exception as e:
+        logger.warning(f"[AI verify_dup] 调用失败: {e}")
+
+    return [False] * len(pairs)
+
+
 # ── 主入口 ────────────────────────────────────────────────────────────
 
 def translate_item_fields(item_dict: dict) -> dict:
