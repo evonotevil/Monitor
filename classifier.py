@@ -214,7 +214,7 @@ STATUS_PATTERNS = {
     "草案/征求意见": [r"draft|consultation|comment period|草案|征求意见|意见稿|パブリックコメント|public comment|입법예고"],
     "立法进行中": [r"under review|reading|deliberat|审议中|进行中|under consideration|审议|审查"],
     "已提案": [r"\bpropos\w*\b|\bintroduc\w*\b|bill filed|已提案|提出|提交|new bill|发议案|법안 발의"],
-    "已修订": [r"\bamend\w*\b|已修订|修改|修正|개정|revision"],
+    "修订变更": [r"\bamend\w*\b|已修订|修改|修正|개정|revision"],
     "已废止": [r"repeal|abolish|已废止|废除|폐지"],
     "执法动态": [r"enforcement|(?:fined?|penalty|penalised|penalized)\b|sanction|处罚|罚款|执法|violation|settle|consent order|enforcement.?action|벌금|제재"],
     "政策信号": [r"announce|plan to|consider|signal|intend|upcoming|将|拟|검토|예정"],
@@ -234,7 +234,7 @@ STATUS_PATTERNS = {
 _IMPACT_STATUS_BASE = {
     "已生效":       3,
     "即将生效":     3,
-    "已修订":       3,
+    "修订变更":      3,
     "执法动态":     2,
     "草案/征求意见": 2,
     "立法进行中":   2,
