@@ -60,6 +60,55 @@ def _get_region_group(region: str) -> str:
     return "其他"
 
 
+def _select_diverse_highlights(candidates: list, max_items: int = 5) -> list:
+    """
+    从候选重点条目中选出地区和分类多样化的列表，避免同一区域或同一分类扎堆。
+
+    规则：
+    - 同一区域分组最多出现 2 条
+    - 同一 category_l1 最多出现 1 条
+    - 标题 Bigram 相似度 > 60% 视为重复，只保留优先级更高的那条
+    """
+    def _bigram_sim(a: str, b: str) -> float:
+        if not a or not b or len(a) < 2 or len(b) < 2:
+            return 0.0
+        bg_a = {a[i:i + 2] for i in range(len(a) - 1)}
+        bg_b = {b[i:i + 2] for i in range(len(b) - 1)}
+        union = bg_a | bg_b
+        return len(bg_a & bg_b) / len(union) if union else 0.0
+
+    selected: list = []
+    region_count: dict = {}
+    category_seen: set = set()
+
+    for item in candidates:
+        group = _get_region_group(item.get("region", "其他"))
+        cat = item.get("category_l1", "")
+
+        # 同一区域分组上限 2 条
+        if region_count.get(group, 0) >= 2:
+            continue
+        # 同一分类只保留 1 条
+        if cat in category_seen:
+            continue
+        # 标题 Bigram 去重（与已选条目过于相似则跳过）
+        title = (item.get("title_zh") or item.get("title") or "")
+        if any(
+            _bigram_sim(title, (s.get("title_zh") or s.get("title") or "")) > 0.60
+            for s in selected
+        ):
+            continue
+
+        selected.append(item)
+        region_count[group] = region_count.get(group, 0) + 1
+        category_seen.add(cat)
+
+        if len(selected) >= max_items:
+            break
+
+    return selected
+
+
 # ── 状态 / 分类 emoji ────────────────────────────────────────────────
 
 STATUS_EMOJI = {
@@ -116,9 +165,9 @@ def get_weekly_data():
         (week_ago,),
     ).fetchall()
 
-    # 重点条目：执法/已生效优先，最多 5 条
-    highlights = conn.execute(
-        """SELECT title, summary_zh, summary, region, status, category_l1,
+    # 重点条目候选：取更多条目，再通过多样性算法筛选（避免同区域/同分类扎堆）
+    highlight_candidates = conn.execute(
+        """SELECT title, title_zh, summary_zh, summary, region, status, category_l1,
                   source_url, date
            FROM legislation WHERE date >= ?
            ORDER BY
@@ -130,7 +179,7 @@ def get_weekly_data():
                WHEN '立法进行中'    THEN 4
                ELSE 5 END,
              impact_score DESC
-           LIMIT 5""",
+           LIMIT 20""",
         (week_ago,),
     ).fetchall()
 
@@ -142,7 +191,8 @@ def get_weekly_data():
         group = _get_region_group(row["region"])
         by_region_group[group] = by_region_group.get(group, 0) + row["cnt"]
 
-    return total, [dict(r) for r in by_cat], by_region_group, [dict(r) for r in highlights]
+    highlights = _select_diverse_highlights([dict(r) for r in highlight_candidates])
+    return total, [dict(r) for r in by_cat], by_region_group, highlights
 
 
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
@@ -209,7 +259,7 @@ def build_card(total, by_cat, by_region_group, highlights, html_url, pdf_url):
     if hl_elements:
         elements += [
             {"tag": "hr"},
-            {"tag": "markdown", "content": "**📌 本周重点关注**"},
+            {"tag": "markdown", "content": "**📌 上周重点关注**"},
             *hl_elements,
         ]
 
