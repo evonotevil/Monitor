@@ -27,40 +27,8 @@ import requests
 
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
-# ── 区域分组配置（与 reporter.py 保持一致）────────────────────────────
-
-_REGION_GROUP_MAP = {
-    "东南亚": "东南亚", "越南": "东南亚", "印度尼西亚": "东南亚",
-    "泰国": "东南亚", "菲律宾": "东南亚", "马来西亚": "东南亚", "新加坡": "东南亚",
-    # 亚太：原南亚 + 大洋洲合并
-    "南亚": "亚太", "亚太": "亚太",
-    "印度": "亚太", "巴基斯坦": "亚太", "孟加拉国": "亚太", "斯里兰卡": "亚太",
-    "大洋洲": "亚太", "澳大利亚": "亚太", "新西兰": "亚太",
-    "中东/非洲": "中东", "中东": "中东", "沙特": "中东", "阿联酋": "中东", "土耳其": "中东",
-    "欧洲": "欧洲", "欧盟": "欧洲", "英国": "欧洲", "德国": "欧洲",
-    "法国": "欧洲", "荷兰": "欧洲", "意大利": "欧洲", "西班牙": "欧洲",
-    "北美": "北美", "美国": "北美", "加拿大": "北美",
-    "南美": "南美", "巴西": "南美", "墨西哥": "南美", "阿根廷": "南美",
-    "日本": "日韩台", "韩国": "日韩台", "港澳台": "日韩台", "台湾": "日韩台",
-    "全球": "其他", "其他": "其他",
-}
-
-_GROUP_ORDER = ["东南亚", "亚太", "中东", "欧洲", "北美", "南美", "日韩台", "其他"]
-
-_GROUP_EMOJI = {
-    "东南亚": "🌏", "亚太": "🌏", "中东": "🕌",
-    "欧洲": "🌍", "北美": "🌎", "南美": "🌎",
-    "日韩台": "🌸", "其他": "🌐",
-}
-
-
-def _get_region_group(region: str) -> str:
-    if region in _REGION_GROUP_MAP:
-        return _REGION_GROUP_MAP[region]
-    for key, group in _REGION_GROUP_MAP.items():
-        if key in region or region in key:
-            return group
-    return "其他"
+# ── 区域分组配置（统一从 utils 导入，禁止在此重复定义）──────────────
+from utils import _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group
 
 
 def _select_diverse_highlights(candidates: list, max_items: int = 5) -> list:

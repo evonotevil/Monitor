@@ -15,11 +15,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. 拉取代码（含历史 DB）─────────────────────────────────────
+      # ── 1. 拉取代码（浅克隆，仅需最新 commit，避免拉取完整 DB 历史）──
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
 
       # ── 2. Python 环境 ─────────────────────────────────────────────
       - name: Set up Python 3.11
