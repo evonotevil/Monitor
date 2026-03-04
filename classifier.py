@@ -217,7 +217,7 @@ STATUS_PATTERNS = {
     "修订变更": [r"\bamend\w*\b|已修订|修改|修正|개정|revision"],
     "已废止": [r"repeal|abolish|已废止|废除|폐지"],
     "执法动态": [r"enforcement|(?:fined?|penalty|penalised|penalized)\b|sanction|处罚|罚款|执法|violation|settle|consent order|enforcement.?action|벌금|제재"],
-    "政策信号": [r"announce|plan to|consider|signal|intend|upcoming|将|拟|검토|예정"],
+    "立法动态": [r"announce|plan to|consider|signal|intend|upcoming|将|拟|검토|예정"],
 }
 
 
@@ -227,8 +227,8 @@ STATUS_PATTERNS = {
 #   信源层级 × 状态标签 → 影响评分 (1=低 / 2=中 / 3=高)
 #
 # 高(3): 已生效/即将生效/修订 的法规；官方来源的执法/草案动态
-# 中(2): 草案/立法/执法 动态；官方来源的政策信号
-# 低(1): 一般政策信号、行业讨论
+# 中(2): 草案/立法/执法 动态；官方来源的立法动态
+# 低(1): 一般立法动态、行业讨论
 #
 
 _IMPACT_STATUS_BASE = {
@@ -240,7 +240,7 @@ _IMPACT_STATUS_BASE = {
     "立法进行中":   2,
     "已提案":       2,
     "已废止":       1,
-    "政策信号":     1,
+    "立法动态":     1,
 }
 
 
@@ -371,7 +371,7 @@ def _detect_category(text: str) -> Tuple[str, str]:
 def _detect_status(text: str) -> str:
     """检测状态"""
     text_lower = text.lower()
-    best_status = "政策信号"
+    best_status = "立法动态"
     best_score = 0
 
     for status, patterns in STATUS_PATTERNS.items():
