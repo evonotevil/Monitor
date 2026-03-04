@@ -7,7 +7,7 @@
 ## 功能概览
 
 - **自动抓取**：从 30+ 个官方监管机构、法律媒体、行业资讯 RSS 源实时获取法规动态；同时通过 Google News 多语言搜索（英、日、韩、越、印尼、德、法、葡、西、泰、阿拉伯语等）覆盖本地语种媒体
-- **AI 翻译与提炼**：基于硅基流动 Qwen2.5-7B 批量处理，将英文原文转化为规范中文标题和合规摘要；专有名词（Loot Box、GDPR、FTC 等）自动保留英文；每批 3 条并发处理，效率比逐条提升 3 倍
+- **AI 翻译与提炼**：基于硅基流动 Qwen3-8B 批量处理，将英文原文转化为规范中文标题和合规摘要；专有名词（Loot Box、GDPR、FTC 等）自动保留英文；每批 3 条并发处理，效率比逐条提升 3 倍
 - **智能分类**：按地区（东南亚 / 亚太 / 欧洲 / 北美 / 日韩台 等）和合规类别（数据隐私 / 未成年人保护 / 玩法合规 / 广告营销 等）自动归类
 - **三重去重**：URL 精确匹配 → Bigram 语义相似度（阈值 0.45）→ LLM 批量核验，有效过滤跨来源的同主题重复报道
 - **HTML 报告**：生成可交互的 HTML 报告，支持按地区、分类、状态筛选和关键词搜索；区域内按官方 > 法律 > 行业 > 媒体信源优先级排列
@@ -160,7 +160,7 @@ python monitor.py retranslate
 |------|------|--------|
 | `LLM_API_KEY` | 硅基流动 API Key | 必填 |
 | `LLM_BASE_URL` | LLM API 地址 | `https://api.siliconflow.cn/v1` |
-| `LLM_MODEL` | 使用的模型 | `Qwen/Qwen2.5-7B-Instruct` |
+| `LLM_MODEL` | 使用的模型 | `Qwen/Qwen3-8B` |
 | `FEISHU_WEBHOOK_URL` | 飞书 Webhook 地址 | 必填（通知功能） |
 | `REPORT_HTML_URL` | 周报 HTML 公开链接（飞书卡片按钮用） | 可选 |
 | `REPORT_PDF_URL` | 周报 PDF 公开链接（飞书卡片按钮用） | 可选 |
@@ -182,7 +182,7 @@ python monitor.py retranslate
 
 ## 技术说明
 
-- **LLM**：硅基流动免费层 `Qwen/Qwen2.5-7B-Instruct`，每批 3 条并行处理，批间 4 秒冷却（遵守免费层限速）
+- **LLM**：硅基流动免费层 `Qwen/Qwen3-8B`，每批 3 条并行处理，批间 4 秒冷却（遵守免费层限速）
 - **数据库**：SQLite，存储在 `data/monitor.db`，每次 CI 运行后自动提交回仓库
 - **PDF 生成**：Playwright Chromium（GitHub Actions 已配置缓存，缓存命中时安装时间从 90 秒降至 5 秒）
 - **Git 优化**：所有 workflow 使用 `fetch-depth: 1` 浅克隆，避免拉取含完整 DB 历史的大体积仓库
