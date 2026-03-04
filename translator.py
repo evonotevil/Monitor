@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
 
 _LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.siliconflow.cn/v1")
 _LLM_API_KEY  = os.environ.get("LLM_API_KEY", "")
-_LLM_MODEL    = os.environ.get("LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")  # 可通过环境变量覆盖
+_LLM_MODEL    = os.environ.get("LLM_MODEL", "Qwen/Qwen3-8B")  # 可通过环境变量覆盖
+
+# Qwen3 系列默认开启思维链（会生成大段推理过程），翻译场景无需思考直接输出；
+# 其他模型不支持此参数则传空 dict，由硅基流动忽略。
+_LLM_EXTRA_BODY = {"enable_thinking": False} if "Qwen3" in _LLM_MODEL else {}
 
 try:
     from openai import OpenAI as _OpenAI
@@ -268,6 +272,7 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
         resp = _AI_CLIENT.chat.completions.create(
             model=_LLM_MODEL,
             max_tokens=300,
+            extra_body=_LLM_EXTRA_BODY,
             messages=[
                 {"role": "system", "content": _AI_SYSTEM},
                 {"role": "user",   "content": user_msg},
@@ -385,6 +390,7 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
                         resp3 = _AI_CLIENT.chat.completions.create(
                             model=_LLM_MODEL,
                             max_tokens=300,
+                            extra_body=_LLM_EXTRA_BODY,
                             messages=[
                                 {"role": "system", "content": _AI_SYSTEM},
                                 {"role": "user",   "content": dedup_msg},
@@ -433,6 +439,7 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
                 resp2 = _AI_CLIENT.chat.completions.create(
                     model=_LLM_MODEL,
                     max_tokens=300,
+                    extra_body=_LLM_EXTRA_BODY,
                     messages=[
                         {"role": "system", "content": _AI_SYSTEM},
                         {"role": "user",   "content": user_msg},
@@ -536,6 +543,7 @@ def _check_ai_reachable() -> bool:
             model=_LLM_MODEL,
             max_tokens=5,
             timeout=10.0,
+            extra_body=_LLM_EXTRA_BODY,
             messages=[{"role": "user", "content": "hi"}],
         )
         logger.info("[AI] 连通性预检通过，将使用 LLM 处理")
@@ -599,6 +607,7 @@ def _ai_process_batch(items_data: list) -> list:
         resp = _AI_CLIENT.chat.completions.create(
             model=_LLM_MODEL,
             max_tokens=350 * n,
+            extra_body=_LLM_EXTRA_BODY,
             messages=[
                 {"role": "system", "content": _AI_SYSTEM},
                 {"role": "user",   "content": user_msg},
@@ -776,6 +785,7 @@ def verify_duplicate_pairs(pairs: list) -> list:
         resp = _AI_CLIENT.chat.completions.create(
             model=_LLM_MODEL,
             max_tokens=60 + len(pairs) * 8,
+            extra_body=_LLM_EXTRA_BODY,
             messages=[
                 {"role": "system", "content":
                  "你是新闻去重专家。判断两条中文新闻标题是否报道同一事件，"
