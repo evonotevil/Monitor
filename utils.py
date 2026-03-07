@@ -74,3 +74,60 @@ def _get_region_group(region: str) -> str:
         if key in region or region in key:
             return group
     return "其他"
+
+
+# ── 共享展示工具（feishu_notify / daily_check / reporter 复用）────────────
+
+CAT_EMOJI: dict = {
+    "数据隐私":        "🔒",
+    "玩法合规":        "🎲",
+    "未成年人保护":    "🧒",
+    "广告营销合规":    "📣",
+    "消费者保护":      "🛡️",
+    "经营合规":        "🏢",
+    "平台政策":        "📱",
+    "内容监管":        "📋",
+    "PC & 跨平台合规": "💻",
+}
+
+# 来源权威性排序权重（越高越优先展示）
+_TIER_SORT: dict = {"official": 4, "legal": 3, "industry": 2, "news": 1}
+
+
+def _impact_emoji(score: float) -> str:
+    """根据 impact_score 返回红绿灯 Emoji。"""
+    if score >= 9.0:
+        return "🔴"
+    elif score >= 7.0:
+        return "🟠"
+    return "🔵"
+
+
+def _bigram_sim(a: str, b: str) -> float:
+    """Jaccard bigram 相似度（0~1），用于标题去重。"""
+    a, b = (a or "").lower(), (b or "").lower()
+    if len(a) < 2 or len(b) < 2:
+        return 0.0
+    bg_a = {a[i:i + 2] for i in range(len(a) - 1)}
+    bg_b = {b[i:i + 2] for i in range(len(b) - 1)}
+    union = bg_a | bg_b
+    return len(bg_a & bg_b) / len(union) if union else 0.0
+
+
+def _pick_group_items(candidates: list, max_items: int) -> list:
+    """Bigram 去重 + 同分类限 1 条，取 max_items 条。"""
+    selected: list = []
+    cat_count: dict = {}
+    for item in candidates:
+        cat   = item.get("category_l1", "")
+        title = (item.get("title_zh") or item.get("title") or "")
+        if any(_bigram_sim(title, (s.get("title_zh") or s.get("title") or "")) > 0.45
+               for s in selected):
+            continue
+        if cat_count.get(cat, 0) >= 1:
+            continue
+        selected.append(item)
+        cat_count[cat] = cat_count.get(cat, 0) + 1
+        if len(selected) >= max_items:
+            break
+    return selected

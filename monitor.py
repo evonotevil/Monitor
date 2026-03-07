@@ -119,11 +119,8 @@ def _deduplicate_items(items):
             group = [(i, 0.0)] + duplicates
             group.sort(key=lambda x: (-items[x[0]].impact_score, x[0]))
             winner_idx = group[0][0]
-            loser_count = len(group) - 1
             for idx, _ in group[1:]:
                 dropped.add(idx)
-            if loser_count > 0 and items[winner_idx].summary:
-                items[winner_idx].summary += f" [另有 {loser_count} 篇同主题报道]"
 
     # ── 阶段 2：30 天窗口，事件级聚类（硬性合并同一法案不同阶段）────────
     # 同一法案在不同阶段（如印尼年龄禁令草案→已生效）严禁拆分展示，必须合并。
@@ -220,9 +217,12 @@ def _deduplicate_items(items):
 
 def _filter_valid_dates(items):
     """
-    过滤掉日期不在 2025/2026 年的条目（避免 RSS 日期回收等导致的噪音入库）。
+    过滤掉日期不在合理范围内的条目（避免 RSS 日期回收等导致的噪音入库）。
+    保留当年及前一年的条目。
     """
-    valid = [item for item in items if item.date[:4] in ("2025", "2026")]
+    current_year = datetime.now().year
+    valid_years = {str(current_year), str(current_year - 1)}
+    valid = [item for item in items if item.date[:4] in valid_years]
     removed = len(items) - len(valid)
     if removed:
         logger.info(f"[日期过滤] 移除 {removed} 条日期不在 2025-2026 的条目")
