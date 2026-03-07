@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-飞书机器人通知 - 每周合规简报卡片
-发送内容: 本周统计 + 区域分布 + HTML/PDF 链接按钮
+飞书机器人通知 — 每周合规简报卡片（决策参考版）
 
 必需环境变量:
     FEISHU_WEBHOOK_URL   飞书自定义机器人的 Webhook 地址
@@ -16,10 +15,10 @@
     python feishu_notify.py
 """
 
-import json
 import os
 import sqlite3
 import sys
+from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -27,160 +26,249 @@ import requests
 
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
-# ── 区域分组配置（统一从 utils 导入，禁止在此重复定义）──────────────
-from utils import _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status
+from utils import _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status
+from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
 
-def _select_diverse_highlights(candidates: list, max_items: int = 5) -> list:
-    """
-    从候选重点条目中选出地区和分类多样化的列表，避免同一区域或同一分类扎堆。
+# ── 影响力红绿灯 ──────────────────────────────────────────────────────
 
-    规则：
-    - 同一区域分组最多出现 2 条
-    - 同一 category_l1 最多出现 1 条
-    - 标题 Bigram 相似度 > 60% 视为重复，只保留优先级更高的那条
-    """
-    def _bigram_sim(a: str, b: str) -> float:
-        if not a or not b or len(a) < 2 or len(b) < 2:
-            return 0.0
-        bg_a = {a[i:i + 2] for i in range(len(a) - 1)}
-        bg_b = {b[i:i + 2] for i in range(len(b) - 1)}
-        union = bg_a | bg_b
-        return len(bg_a & bg_b) / len(union) if union else 0.0
-
-    selected: list = []
-    region_count: dict = {}
-    category_seen: set = set()
-
-    for item in candidates:
-        group = _get_region_group(item.get("region", "其他"))
-        cat = item.get("category_l1", "")
-
-        # 同一区域分组上限 2 条
-        if region_count.get(group, 0) >= 2:
-            continue
-        # 同一分类只保留 1 条
-        if cat in category_seen:
-            continue
-        # 标题 Bigram 去重（与已选条目过于相似则跳过）
-        title = (item.get("title_zh") or item.get("title") or "")
-        if any(
-            _bigram_sim(title, (s.get("title_zh") or s.get("title") or "")) > 0.60
-            for s in selected
-        ):
-            continue
-
-        selected.append(item)
-        region_count[group] = region_count.get(group, 0) + 1
-        category_seen.add(cat)
-
-        if len(selected) >= max_items:
-            break
-
-    return selected
+def _impact_emoji(score: float) -> str:
+    """根据 impact_score 返回红绿灯 Emoji。"""
+    if score >= 9.0:
+        return "🔴"
+    elif score >= 7.0:
+        return "🟠"
+    else:
+        return "🔵"
 
 
-# ── 状态 / 分类 emoji ────────────────────────────────────────────────
-
-STATUS_EMOJI = {
-    "执法动态":     "🔴",
-    "已生效":       "🟢",
-    "即将生效":     "🟡",
-    "草案/征求意见": "🔵",
-    "立法进行中":   "🔵",
-    "已提案":       "⚪",
-    "修订变更":      "🟠",
-    "已废止":       "⬜",
-    "立法动态":     "🟡",
-}
+# ── 分类 Emoji ────────────────────────────────────────────────────────
 
 CAT_EMOJI = {
-    "数据隐私":    "🔒",
-    "玩法合规":    "🎲",
-    "未成年人保护": "🧒",
-    "广告营销合规": "📣",
-    "消费者保护":  "🛡️",
-    "经营合规":    "🏢",
-    "平台政策":    "📱",
-    "内容监管":    "📋",
+    "数据隐私":        "🔒",
+    "玩法合规":        "🎲",
+    "未成年人保护":    "🧒",
+    "广告营销合规":    "📣",
+    "消费者保护":      "🛡️",
+    "经营合规":        "🏢",
+    "平台政策":        "📱",
+    "内容监管":        "📋",
+    "PC & 跨平台合规": "💻",
 }
+
+# ── 业务影响标签（按 category_l1 分别给出移动端 / PC 端关注点）──────────
+
+_MOBILE_IMPACT: dict = {
+    "平台政策":        "商店分成比例、IAP 规则合规、IDFA/GAID 采集授权",
+    "玩法合规":        "Gacha 概率公示、Loot Box 合规、IAP 道具随机机制",
+    "未成年人保护":    "移动端实名/年龄验证 SDK、防沉迷机制接入",
+    "广告营销合规":    "移动端广告 SDK 合规、IDFA 授权流程",
+    "消费者保护":      "IAP 退款政策、虚拟货币兑换透明度",
+    "数据隐私":        "IDFA/GAID 采集同意、数据跨境传输合规",
+    "经营合规":        "App Store/Google Play 经营资质、本地化实体要求",
+    "内容监管":        "移动端分级证书、平台内容审核接入",
+    "PC & 跨平台合规": "账号体系跨端打通、移动端同步政策核查",
+}
+
+_PC_IMPACT: dict = {
+    "平台政策":        "D2C 充值页支付合规、第三方 Launcher 接入规则",
+    "玩法合规":        "PC 端 Loot Box 概率展示、Steam 概率公示合规",
+    "未成年人保护":    "PC 端年龄验证机制、防沉迷实名接入",
+    "广告营销合规":    "PC 端广告追踪合规、Cookie 同意管理",
+    "消费者保护":      "PC 官网充值退款条款、D2C 消费者权益",
+    "数据隐私":        "PC 端 SDK 数据采集合规、跨境传输合规",
+    "经营合规":        "PC 官网经营资质、本地化合规备案",
+    "内容监管":        "PC 端分级证书、内核级安全软件合规",
+    "PC & 跨平台合规": "PC 启动器权限、Anti-cheat 内核安全、D2C 发行服务、跨端账号体系",
+}
+
+_DEFAULT_MOBILE = "关注商店分成、IDFA 采集、SDK 合规"
+_DEFAULT_PC     = "关注 PC 启动器隐私、D2C 发行服务、跨端账号体系"
+
+
+def _business_label(category_l1: str) -> str:
+    """返回每条动态的全平台合规影响标签（移动端优先）。"""
+    mobile = _MOBILE_IMPACT.get(category_l1, _DEFAULT_MOBILE)
+    pc     = _PC_IMPACT.get(category_l1, _DEFAULT_PC)
+    return (
+        f"**【全平台合规影响】**\n"
+        f"📱 **移动端**：{mobile}\n"
+        f"💻 **PC 渠道**：{pc}"
+    )
 
 
 # ── 数据库查询 ────────────────────────────────────────────────────────
 
+_TIER_SORT = {"official": 4, "legal": 3, "industry": 2, "news": 1}
+
+
 def get_weekly_data():
+    """
+    返回 (today, week_ago, total, by_cat, by_region_group, all_items)
+
+    all_items 为本周内 impact_score > 0、已有中文标题的条目列表，
+    已按 source_tier DESC → impact_score DESC 排序，供区域分组直接使用。
+    """
     if not DB_PATH.exists():
         print(f"⚠️  数据库不存在: {DB_PATH}")
-        return 0, [], {}
+        return datetime.now(), datetime.now() - timedelta(days=7), 0, [], {}, []
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+
+    today    = datetime.now()
+    week_ago = today - timedelta(days=7)
+    since    = week_ago.strftime("%Y-%m-%d")
+
+    # ── 噪音门控：仅计 impact_score > 0 的条目 ──────────────────────
+    NOISE_GUARD = "COALESCE(impact_score, 1.0) > 0"
 
     total = conn.execute(
-        "SELECT COUNT(*) FROM legislation WHERE date >= ?", (week_ago,)
+        f"SELECT COUNT(*) FROM legislation WHERE date >= ? AND {NOISE_GUARD}",
+        (since,),
     ).fetchone()[0]
 
     by_cat = conn.execute(
-        """SELECT category_l1, COUNT(*) AS cnt
-           FROM legislation WHERE date >= ?
-           GROUP BY category_l1 ORDER BY cnt DESC""",
-        (week_ago,),
+        f"""SELECT category_l1, COUNT(*) AS cnt
+            FROM legislation WHERE date >= ? AND {NOISE_GUARD}
+            GROUP BY category_l1 ORDER BY cnt DESC""",
+        (since,),
     ).fetchall()
 
-    # 按实际区域统计，再汇总到分组
     by_region_raw = conn.execute(
-        """SELECT region, COUNT(*) AS cnt
-           FROM legislation WHERE date >= ?
-           GROUP BY region ORDER BY cnt DESC""",
-        (week_ago,),
+        f"""SELECT region, COUNT(*) AS cnt
+            FROM legislation WHERE date >= ? AND {NOISE_GUARD}
+            GROUP BY region""",
+        (since,),
     ).fetchall()
 
-    # 重点条目候选：取更多条目，再通过多样性算法筛选（避免同区域/同分类扎堆）
-    highlight_candidates = conn.execute(
-        """SELECT title, title_zh, summary_zh, summary, region, status, category_l1,
-                  source_url, date
-           FROM legislation WHERE date >= ?
-           ORDER BY
-             CASE status
-               WHEN '执法动态'      THEN 0
-               WHEN '已生效'        THEN 1
-               WHEN '即将生效'      THEN 2
-               WHEN '草案/征求意见'  THEN 3
-               WHEN '立法进行中'    THEN 4
-               ELSE 5 END,
-             impact_score DESC
-           LIMIT 20""",
-        (week_ago,),
+    # 所有条目（用于综述生成 + 区域分组展示）
+    # title_zh 过滤：没有中文标题的条目不展示在卡片中
+    all_rows = conn.execute(
+        f"""SELECT title, title_zh, summary_zh, summary, region, status, category_l1,
+                   source_url, date,
+                   COALESCE(impact_score, 1.0) AS impact_score,
+                   COALESCE(source_name, '') AS source_name
+            FROM legislation
+            WHERE date >= ?
+              AND {NOISE_GUARD}
+              AND title_zh IS NOT NULL AND TRIM(title_zh) != ''
+            ORDER BY COALESCE(impact_score, 1.0) DESC""",
+        (since,),
     ).fetchall()
 
     conn.close()
 
-    # 汇总到 8 大分组
     by_region_group: dict = {}
     for row in by_region_raw:
         group = _get_region_group(row["region"])
         by_region_group[group] = by_region_group.get(group, 0) + row["cnt"]
 
-    highlights = _select_diverse_highlights([dict(r) for r in highlight_candidates])
-    return total, [dict(r) for r in by_cat], by_region_group, highlights
+    # ── 实时噪音门控（兜底 DB 中旧评分残留）──────────────────────────
+    # DB 中 impact_score 可能是旧版分类结果，用最新规则再过滤一次
+    def _is_noise(item: dict) -> bool:
+        text = " ".join(filter(None, [
+            item.get("title", ""),
+            item.get("title_zh", ""),
+            item.get("summary", ""),
+        ]))
+        return _is_hardware_noise(text) or _is_google_apple_non_core(text)
+
+    # ── 每条目补充 source_tier，排序：tier DESC → score DESC ──────────
+    items = []
+    for r in all_rows:
+        d = dict(r)
+        if _is_noise(d):
+            continue
+        d["_tier"] = _TIER_SORT.get(get_source_tier(d.get("source_name", "")), 1)
+        items.append(d)
+    items.sort(key=lambda x: (x["_tier"], float(x.get("impact_score", 1.0))), reverse=True)
+
+    return today, week_ago, total, [dict(r) for r in by_cat], by_region_group, items
+
+
+# ── 执行摘要（复用 HTML 报告同一 LLM 函数）───────────────────────────
+
+def _get_exec_summary(items: list) -> str:
+    """调用 translator.generate_executive_summary 获取 300 字综述；失败静默返回空。"""
+    try:
+        from translator import generate_executive_summary
+        return generate_executive_summary(items)
+    except Exception as e:
+        print(f"⚠️  综述生成失败（将跳过）: {e}")
+        return ""
 
 
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
 
-def build_card(total, by_cat, by_region_group, highlights, html_url, pdf_url):
-    today    = datetime.now()
-    week_ago = today - timedelta(days=7)
-    date_range = f"{week_ago.strftime('%Y/%m/%d')} – {today.strftime('%m/%d')}"
+# 每个区域分组最多展示条目数（避免卡片过长）
+_MAX_PER_GROUP = 3
+# 全局条目上限
+_MAX_TOTAL_ITEMS = 12
 
-    # 分类统计行
+
+def _bigram_sim(a: str, b: str) -> float:
+    a, b = (a or "").lower(), (b or "").lower()
+    if len(a) < 2 or len(b) < 2:
+        return 0.0
+    bg_a = {a[i:i + 2] for i in range(len(a) - 1)}
+    bg_b = {b[i:i + 2] for i in range(len(b) - 1)}
+    union = bg_a | bg_b
+    return len(bg_a & bg_b) / len(union) if union else 0.0
+
+
+def _pick_group_items(candidates: list, max_items: int) -> list:
+    """
+    从候选条目中筛选 max_items 条，应用两层去重：
+    1. Bigram 相似度 > 0.45 → 视为同一事件，保留首条
+    2. 同一 category_l1 最多保留 2 条（避免同分类扎堆）
+    """
+    selected: list = []
+    cat_count: dict = {}
+    for item in candidates:
+        cat   = item.get("category_l1", "")
+        title = (item.get("title_zh") or item.get("title") or "")
+        # Bigram 去重
+        if any(
+            _bigram_sim(title, (s.get("title_zh") or s.get("title") or "")) > 0.45
+            for s in selected
+        ):
+            continue
+        # 同分类上限 1 条（飞书卡片空间有限，同分类只取最优一条）
+        if cat_count.get(cat, 0) >= 1:
+            continue
+        selected.append(item)
+        cat_count[cat] = cat_count.get(cat, 0) + 1
+        if len(selected) >= max_items:
+            break
+    return selected
+
+
+def build_card(
+    today: datetime,
+    week_ago: datetime,
+    total: int,
+    by_cat: list,
+    by_region_group: dict,
+    all_items: list,
+    exec_summary: str,
+    html_url: str,
+    pdf_url: str,
+) -> dict:
+
+    # ── 日期范围文案 ─────────────────────────────────────────────────
+    date_range = (
+        f"{week_ago.strftime('%Y/%m/%d')} – {today.strftime('%Y/%m/%d')}"
+    )
+
+    # ── 分类统计行 ───────────────────────────────────────────────────
     cat_parts = [
         f"{CAT_EMOJI.get(r['category_l1'], '•')} {r['category_l1']} **{r['cnt']}**"
-        for r in by_cat
+        for r in by_cat if r.get("category_l1")
     ]
     cat_line = "　".join(cat_parts) if cat_parts else "暂无数据"
 
-    # 区域分组统计行
+    # ── 区域分组统计行（按 _GROUP_ORDER 排序）──────────────────────
     region_parts = []
     for group in _GROUP_ORDER:
         cnt = by_region_group.get(group, 0)
@@ -189,66 +277,111 @@ def build_card(total, by_cat, by_region_group, highlights, html_url, pdf_url):
             region_parts.append(f"{emoji} {group} **{cnt}**")
     region_line = "　".join(region_parts) if region_parts else "暂无数据"
 
-    # 重点条目 elements
-    hl_elements = []
-    for item in highlights:
-        emoji   = STATUS_EMOJI.get(normalize_status(item["status"]), "•")
-        cat_em  = CAT_EMOJI.get(item["category_l1"], "")
-        summary = (item.get("summary_zh") or item.get("summary") or "")[:80]
-        if len(summary) >= 80:
-            summary += "…"
-        title_text = item["title"][:65] + ("…" if len(item["title"]) > 65 else "")
-        url = item.get("source_url", "")
-        title_md = f"[{title_text}]({url})" if url else title_text
+    # ── 将条目按区域分组，每组 bigram 去重后限 _MAX_PER_GROUP 条 ──────
+    raw_grouped: dict = defaultdict(list)
+    for item in all_items:
+        group = _get_region_group(item.get("region", "其他"))
+        raw_grouped[group].append(item)
 
-        # 日期格式「YYYY-MM-DD」
-        raw_date = item.get("date", "")
-        date_tag = f"「{raw_date}」" if raw_date else ""
+    grouped = {g: _pick_group_items(v, _MAX_PER_GROUP) for g, v in raw_grouped.items()}
 
-        hl_elements.append({
+    # ── 组装卡片 elements ────────────────────────────────────────────
+    elements: list = []
+
+    # 副标题
+    elements.append({
+        "tag": "markdown",
+        "content": f"📅 **上周合规动态回顾** | {date_range}",
+    })
+
+    # 引用块：综述（有内容才展示）
+    if exec_summary:
+        elements.append({
             "tag": "markdown",
             "content": (
-                f"{emoji} **[{item['region']}]** {item['status']} "
-                f"· {cat_em} {item['category_l1']}\n"
-                f"{date_tag} {title_md}\n"
-                f"_{summary}_"
+                f"> 📋 **本周趋势综述**\n"
+                + "\n".join(f"> {line}" for line in exec_summary.splitlines())
             ),
         })
 
-    # 组装 elements
-    elements = [
-        {
+    # 统计数据
+    elements.append({
+        "tag": "markdown",
+        "content": (
+            f"共监测到 **{total}** 条合规动态（噪音已过滤）\n\n"
+            f"**📂 按分类**\n{cat_line}\n\n"
+            f"**🗺️ 按地区**\n{region_line}"
+        ),
+    })
+
+    # ── 分区域展示重点条目 ───────────────────────────────────────────
+    total_shown = 0
+    for group in _GROUP_ORDER:
+        items_in_group = grouped.get(group, [])
+        if not items_in_group:
+            continue
+
+        elements.append({"tag": "hr"})
+
+        group_emoji = _GROUP_EMOJI.get(group, "🌐")
+        group_cnt   = by_region_group.get(group, 0)
+        elements.append({
             "tag": "markdown",
-            "content": (
-                f"上周共监测到 **{total}** 条立法 / 执法动态\n\n"
-                f"**📂 按分类**\n{cat_line}\n\n"
-                f"**🗺️ 按地区**\n{region_line}"
-            ),
-        },
-    ]
+            "content": f"**{group_emoji} {group}** · 本周 {group_cnt} 条",
+        })
 
-    if hl_elements:
-        elements += [
-            {"tag": "hr"},
-            {"tag": "markdown", "content": "**📌 上周重点关注**"},
-            *hl_elements,
-        ]
+        for item in items_in_group:
+            if total_shown >= _MAX_TOTAL_ITEMS:
+                break
 
+            score   = float(item.get("impact_score", 1.0))
+            risk_em = _impact_emoji(score)
+            cat     = item.get("category_l1", "")
+            cat_em  = CAT_EMOJI.get(cat, "")
+            status  = normalize_status(item.get("status", ""))
+            region  = item.get("region", "")
+
+            # 使用清洗后的中文标题
+            title_zh = (item.get("title_zh") or "").strip()
+            url      = item.get("source_url", "")
+            title_md = f"[{title_zh}]({url})" if url else title_zh
+
+            # 摘要（优先中文，截断至 90 字）
+            summary = (item.get("summary_zh") or item.get("summary") or "").strip()
+            if len(summary) > 90:
+                summary = summary[:90] + "…"
+
+            date_tag = item.get("date", "")
+
+            biz = _business_label(cat)
+
+            elements.append({
+                "tag": "markdown",
+                "content": (
+                    f"{risk_em} **[{region}]** {status} · {cat_em} {cat}\n"
+                    f"{title_md}\n"
+                    f"_{summary}_\n"
+                    f"「{date_tag}」\n"
+                    f"{biz}"
+                ),
+            })
+            total_shown += 1
+
+    # ── 底部按钮 ─────────────────────────────────────────────────────
     elements.append({"tag": "hr"})
 
-    # 操作按钮
     actions = []
     if html_url:
         actions.append({
             "tag": "button",
-            "text": {"tag": "plain_text", "content": "🌐 查看 HTML 简报"},
+            "text": {"tag": "plain_text", "content": "🌐 查看本周 HTML 交互简报"},
             "type": "primary",
             "url": html_url,
         })
     if pdf_url:
         actions.append({
             "tag": "button",
-            "text": {"tag": "plain_text", "content": "📄 下载 PDF 报告"},
+            "text": {"tag": "plain_text", "content": "📄 下载 PDF 专业内参"},
             "type": "default",
             "url": pdf_url,
         })
@@ -258,10 +391,10 @@ def build_card(total, by_cat, by_region_group, highlights, html_url, pdf_url):
     return {
         "config": {"wide_screen_mode": True},
         "header": {
-            "template": "blue",
+            "template": "red",
             "title": {
                 "tag": "plain_text",
-                "content": f"🌍 Lilith Legal 全球游戏合规周报 · {date_range}",
+                "content": "🌍 Lilith Legal · 全球游戏合规周报",
             },
         },
         "elements": elements,
@@ -297,10 +430,20 @@ def main():
         print("❌ 未设置 FEISHU_WEBHOOK_URL 环境变量")
         sys.exit(1)
 
-    total, by_cat, by_region_group, highlights = get_weekly_data()
-    print(f"本周数据: {total} 条，区域分布: {by_region_group}，重点: {len(highlights)} 条")
+    today, week_ago, total, by_cat, by_region_group, all_items = get_weekly_data()
+    print(f"本周数据: {total} 条（噪音过滤后），区域分布: {by_region_group}，展示条目: {len(all_items)}")
 
-    card = build_card(total, by_cat, by_region_group, highlights, html_url, pdf_url)
+    # 综述生成（LLM，失败不阻断）
+    exec_summary = _get_exec_summary(all_items)
+    if exec_summary:
+        print(f"综述生成成功，{len(exec_summary)} 字")
+    else:
+        print("综述生成跳过（无 API Key 或调用失败）")
+
+    card = build_card(
+        today, week_ago, total, by_cat, by_region_group, all_items,
+        exec_summary, html_url, pdf_url,
+    )
     send_card(webhook_url, card)
 
 
