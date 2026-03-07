@@ -14,6 +14,7 @@
 import os
 import sqlite3
 import sys
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -24,31 +25,59 @@ import requests
 
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
-# ── 区域分组配置（统一从 utils 导入，禁止在此重复定义）──────────────
-from utils import _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status
-
-STATUS_EMOJI = {
-    "执法动态":     "🔴",
-    "已生效":       "🟢",
-    "即将生效":     "🟡",
-    "草案/征求意见": "🔵",
-    "立法进行中":   "🔵",
-    "已提案":       "⚪",
-    "修订变更":      "🟠",
-    "已废止":       "⬜",
-    "立法动态":     "🟡",
-}
+from utils import _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status
+from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
 CAT_EMOJI = {
-    "数据隐私":    "🔒",
-    "玩法合规":    "🎲",
-    "未成年人保护": "🧒",
-    "广告营销合规": "📣",
-    "消费者保护":  "🛡️",
-    "经营合规":    "🏢",
-    "平台政策":    "📱",
-    "内容监管":    "📋",
+    "数据隐私":        "🔒",
+    "玩法合规":        "🎲",
+    "未成年人保护":    "🧒",
+    "广告营销合规":    "📣",
+    "消费者保护":      "🛡️",
+    "经营合规":        "🏢",
+    "平台政策":        "📱",
+    "内容监管":        "📋",
+    "PC & 跨平台合规": "💻",
 }
+
+_TIER_SORT = {"official": 4, "legal": 3, "industry": 2, "news": 1}
+
+
+def _impact_emoji(score: float) -> str:
+    if score >= 9.0:
+        return "🔴"
+    elif score >= 7.0:
+        return "🟠"
+    return "🔵"
+
+
+def _bigram_sim(a: str, b: str) -> float:
+    a, b = (a or "").lower(), (b or "").lower()
+    if len(a) < 2 or len(b) < 2:
+        return 0.0
+    bg_a = {a[i:i + 2] for i in range(len(a) - 1)}
+    bg_b = {b[i:i + 2] for i in range(len(b) - 1)}
+    union = bg_a | bg_b
+    return len(bg_a & bg_b) / len(union) if union else 0.0
+
+
+def _pick_group_items(candidates: list, max_items: int) -> list:
+    """Bigram 去重 + 同分类限 1 条，取 max_items 条。"""
+    selected: list = []
+    cat_count: dict = {}
+    for item in candidates:
+        cat   = item.get("category_l1", "")
+        title = (item.get("title_zh") or item.get("title") or "")
+        if any(_bigram_sim(title, (s.get("title_zh") or s.get("title") or "")) > 0.45
+               for s in selected):
+            continue
+        if cat_count.get(cat, 0) >= 1:
+            continue
+        selected.append(item)
+        cat_count[cat] = cat_count.get(cat, 0) + 1
+        if len(selected) >= max_items:
+            break
+    return selected
 
 
 # ── 数据库查询 ────────────────────────────────────────────────────────
@@ -59,6 +88,7 @@ def get_daily_items() -> list:
     双重过滤确保：
       1. 文章发布日期是昨天或今天（北京时间）
       2. 是本次抓取才新入库的，不是历史旧数据
+    噪音门控：impact_score > 0 且实时过滤硬件/非核心 Google-Apple 条目。
     """
     if not DB_PATH.exists():
         print(f"⚠️  数据库不存在: {DB_PATH}")
@@ -66,9 +96,8 @@ def get_daily_items() -> list:
 
     now_cst = datetime.now(_TZ_CST)
     yesterday_str = (now_cst - timedelta(days=1)).strftime("%Y-%m-%d")
-    today_str = now_cst.strftime("%Y-%m-%d")
+    today_str     = now_cst.strftime("%Y-%m-%d")
 
-    # created_at 存储的是 UTC 时间；26 小时确保覆盖时区偏差
     from datetime import timezone as _tz
     cutoff_utc = (datetime.now(_tz.utc) - timedelta(hours=26)).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -80,36 +109,47 @@ def get_daily_items() -> list:
     rows = conn.execute(
         """
         SELECT title, title_zh, summary_zh, summary, region, status, category_l1,
-               source_url, date, created_at
+               source_url, date, created_at,
+               COALESCE(impact_score, 1.0) AS impact_score,
+               COALESCE(source_name, '')   AS source_name
         FROM legislation
         WHERE date IN (?, ?)
           AND created_at >= ?
-        ORDER BY
-          CASE status
-            WHEN '执法动态'      THEN 0
-            WHEN '已生效'        THEN 1
-            WHEN '即将生效'      THEN 2
-            WHEN '草案/征求意见'  THEN 3
-            WHEN '立法进行中'    THEN 4
-            ELSE 5 END,
-          impact_score DESC,
-          date DESC
+          AND COALESCE(impact_score, 1.0) > 0
+          AND title_zh IS NOT NULL AND TRIM(title_zh) != ''
         """,
         (yesterday_str, today_str, cutoff_utc),
     ).fetchall()
 
     conn.close()
-    return [dict(r) for r in rows]
+
+    # 实时噪音门控（兜底旧 DB 评分）
+    def _is_noise(d: dict) -> bool:
+        text = " ".join(filter(None, [d.get("title", ""), d.get("title_zh", ""), d.get("summary", "")]))
+        return _is_hardware_noise(text) or _is_google_apple_non_core(text)
+
+    items = [dict(r) for r in rows if not _is_noise(dict(r))]
+
+    # 按 source_tier DESC → impact_score DESC 排序
+    for d in items:
+        d["_tier"] = _TIER_SORT.get(get_source_tier(d.get("source_name", "")), 1)
+    items.sort(key=lambda x: (x["_tier"], float(x.get("impact_score", 1.0))), reverse=True)
+
+    return items
 
 
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
 
-def build_daily_card(items: list) -> dict:
-    today = datetime.now(_TZ_CST)
-    yesterday = today - timedelta(days=1)
-    date_label = f"{yesterday.strftime('%m/%d')} – {today.strftime('%m/%d %H:%M')} CST"
+_MAX_PER_GROUP = 2   # 日报每区域最多展示条数（比周报更精简）
+_MAX_TOTAL     = 8   # 日报全局上限
 
-    # 按区域分组统计
+
+def build_daily_card(items: list) -> dict:
+    now_cst   = datetime.now(_TZ_CST)
+    yesterday = now_cst - timedelta(days=1)
+    date_range = f"{yesterday.strftime('%Y/%m/%d')} – {now_cst.strftime('%Y/%m/%d %H:%M')} CST"
+
+    # 区域统计（用原始 items，未去重前的总数）
     group_counts: dict = {}
     for item in items:
         group = _get_region_group(item.get("region", "其他"))
@@ -121,65 +161,74 @@ def build_daily_card(items: list) -> dict:
         if cnt > 0:
             emoji = _GROUP_EMOJI.get(group, "•")
             region_parts.append(f"{emoji} {group} **{cnt}**")
-    region_line = "　".join(region_parts)
+    region_line = "　".join(region_parts) if region_parts else "暂无数据"
 
-    # 条目详情（最多展示 8 条，避免卡片过长）
-    display_items = items[:8]
-    item_elements = []
-    for item in display_items:
-        emoji = STATUS_EMOJI.get(normalize_status(item["status"]), "•")
-        cat_emoji = CAT_EMOJI.get(item["category_l1"], "")
-        url = item.get("source_url", "")
+    # 按区域分组，每组 bigram 去重 + 同分类限 1 条
+    raw_grouped: dict = defaultdict(list)
+    for item in items:
+        raw_grouped[_get_region_group(item.get("region", "其他"))].append(item)
+    grouped = {g: _pick_group_items(v, _MAX_PER_GROUP) for g, v in raw_grouped.items()}
 
-        # 日期格式「YYYY-MM-DD」
-        raw_date = item.get("date", "")
-        date_tag = f"「{raw_date}」" if raw_date else ""
+    # 组装 elements
+    elements: list = []
 
-        # 中文主内容：优先 title_zh，回退到 summary_zh
-        title_zh = (item.get("title_zh") or "").strip()
-        summary_zh = (item.get("summary_zh") or item.get("summary") or "").strip()
-        zh_primary = title_zh if title_zh else summary_zh
-        zh_primary = zh_primary[:100] + ("…" if len(zh_primary) > 100 else "")
+    # 副标题 + 统计
+    elements.append({
+        "tag": "markdown",
+        "content": (
+            f"📅 **今日合规动态** | {date_range}\n\n"
+            f"昨日新增 **{len(items)}** 条合规动态\n\n"
+            f"**🗺️ 按地区**\n{region_line}"
+        ),
+    })
 
-        # 完整摘要（如 title_zh 是主内容，则在下面补充 summary_zh 作为说明）
-        detail = ""
-        if title_zh and summary_zh and summary_zh != title_zh:
-            detail_text = summary_zh[:80] + ("…" if len(summary_zh) > 80 else "")
-            detail = f"\n_{detail_text}_"
+    # 分区域展示
+    total_shown = 0
+    for group in _GROUP_ORDER:
+        group_items = grouped.get(group, [])
+        if not group_items:
+            continue
 
-        source_link = f"[查看原文]({url})" if url else ""
-
-        item_elements.append({
+        elements.append({"tag": "hr"})
+        group_cnt = group_counts.get(group, 0)
+        elements.append({
             "tag": "markdown",
-            "content": (
-                f"{emoji} **[{item['region']}]** {item['status']} "
-                f"· {cat_emoji} {item['category_l1']}\n"
-                f"{date_tag} **{zh_primary}**"
-                f"{detail}\n"
-                f"_{source_link}_"
-            ),
+            "content": f"**{_GROUP_EMOJI.get(group, '🌐')} {group}** · 今日 {group_cnt} 条",
         })
 
-    # 超出条目提示
-    extra_note = []
-    if len(items) > 8:
-        extra_note.append({
-            "tag": "markdown",
-            "content": f"_… 另有 {len(items) - 8} 条动态，请查看完整 HTML 简报_",
-        })
+        for item in group_items:
+            if total_shown >= _MAX_TOTAL:
+                break
 
-    elements = [
-        {
-            "tag": "markdown",
-            "content": (
-                f"昨日新增 **{len(items)}** 条立法 / 执法动态\n"
-                f"{region_line}"
-            ),
-        },
-        {"tag": "hr"},
-        *item_elements,
-        *extra_note,
-    ]
+            score   = float(item.get("impact_score", 1.0))
+            risk_em = _impact_emoji(score)
+            cat     = item.get("category_l1", "")
+            cat_em  = CAT_EMOJI.get(cat, "")
+            status  = normalize_status(item.get("status", ""))
+            region  = item.get("region", "")
+
+            title_zh = (item.get("title_zh") or "").strip()
+            url      = item.get("source_url", "")
+            title_md = f"[{title_zh}]({url})" if url else title_zh
+
+            summary = (item.get("summary_zh") or item.get("summary") or "").strip()
+            if len(summary) > 90:
+                summary = summary[:90] + "…"
+
+            date_tag = item.get("date", "")
+
+            elements.append({
+                "tag": "markdown",
+                "content": (
+                    f"{risk_em} **[{region}]** {status} · {cat_em} {cat}\n"
+                    f"{title_md}\n"
+                    f"_{summary}_\n"
+                    f"「{date_tag}」"
+                ),
+            })
+            total_shown += 1
+
+    elements.append({"tag": "hr"})
 
     return {
         "config": {"wide_screen_mode": True},
@@ -187,7 +236,7 @@ def build_daily_card(items: list) -> dict:
             "template": "orange",
             "title": {
                 "tag": "plain_text",
-                "content": f"📡 Lilith Legal 每日合规动态 · {date_label}",
+                "content": "📡 Lilith Legal · 每日合规动态",
             },
         },
         "elements": elements,
