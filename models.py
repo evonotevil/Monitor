@@ -230,5 +230,10 @@ class Database:
         )
         self.conn.commit()
 
+    def delete_item(self, item_id: int):
+        """按 id 删除条目（用于 retranslate 清理 LLM 判定不相关的历史垃圾条目）。"""
+        self.conn.execute("DELETE FROM legislation WHERE id = ?", (item_id,))
+        self.conn.commit()
+
     def close(self):
         self.conn.close()
