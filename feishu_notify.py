@@ -26,80 +26,14 @@ import requests
 
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
-from utils import _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status
+from utils import (
+    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status,
+    CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items,
+)
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
 
-# ── 影响力红绿灯 ──────────────────────────────────────────────────────
-
-def _impact_emoji(score: float) -> str:
-    """根据 impact_score 返回红绿灯 Emoji。"""
-    if score >= 9.0:
-        return "🔴"
-    elif score >= 7.0:
-        return "🟠"
-    else:
-        return "🔵"
-
-
-# ── 分类 Emoji ────────────────────────────────────────────────────────
-
-CAT_EMOJI = {
-    "数据隐私":        "🔒",
-    "玩法合规":        "🎲",
-    "未成年人保护":    "🧒",
-    "广告营销合规":    "📣",
-    "消费者保护":      "🛡️",
-    "经营合规":        "🏢",
-    "平台政策":        "📱",
-    "内容监管":        "📋",
-    "PC & 跨平台合规": "💻",
-}
-
-# ── 业务影响标签（按 category_l1 分别给出移动端 / PC 端关注点）──────────
-
-_MOBILE_IMPACT: dict = {
-    "平台政策":        "商店分成比例、IAP 规则合规、IDFA/GAID 采集授权",
-    "玩法合规":        "Gacha 概率公示、Loot Box 合规、IAP 道具随机机制",
-    "未成年人保护":    "移动端实名/年龄验证 SDK、防沉迷机制接入",
-    "广告营销合规":    "移动端广告 SDK 合规、IDFA 授权流程",
-    "消费者保护":      "IAP 退款政策、虚拟货币兑换透明度",
-    "数据隐私":        "IDFA/GAID 采集同意、数据跨境传输合规",
-    "经营合规":        "App Store/Google Play 经营资质、本地化实体要求",
-    "内容监管":        "移动端分级证书、平台内容审核接入",
-    "PC & 跨平台合规": "账号体系跨端打通、移动端同步政策核查",
-}
-
-_PC_IMPACT: dict = {
-    "平台政策":        "D2C 充值页支付合规、第三方 Launcher 接入规则",
-    "玩法合规":        "PC 端 Loot Box 概率展示、Steam 概率公示合规",
-    "未成年人保护":    "PC 端年龄验证机制、防沉迷实名接入",
-    "广告营销合规":    "PC 端广告追踪合规、Cookie 同意管理",
-    "消费者保护":      "PC 官网充值退款条款、D2C 消费者权益",
-    "数据隐私":        "PC 端 SDK 数据采集合规、跨境传输合规",
-    "经营合规":        "PC 官网经营资质、本地化合规备案",
-    "内容监管":        "PC 端分级证书、内核级安全软件合规",
-    "PC & 跨平台合规": "PC 启动器权限、Anti-cheat 内核安全、D2C 发行服务、跨端账号体系",
-}
-
-_DEFAULT_MOBILE = "关注商店分成、IDFA 采集、SDK 合规"
-_DEFAULT_PC     = "关注 PC 启动器隐私、D2C 发行服务、跨端账号体系"
-
-
-def _business_label(category_l1: str) -> str:
-    """返回每条动态的全平台合规影响标签（移动端优先）。"""
-    mobile = _MOBILE_IMPACT.get(category_l1, _DEFAULT_MOBILE)
-    pc     = _PC_IMPACT.get(category_l1, _DEFAULT_PC)
-    return (
-        f"**【全平台合规影响】**\n"
-        f"📱 **移动端**：{mobile}\n"
-        f"💻 **PC 渠道**：{pc}"
-    )
-
-
 # ── 数据库查询 ────────────────────────────────────────────────────────
-
-_TIER_SORT = {"official": 4, "legal": 3, "industry": 2, "news": 1}
 
 
 def get_weekly_data():
@@ -205,43 +139,6 @@ def _get_exec_summary(items: list) -> str:
 _MAX_PER_GROUP = 3
 # 全局条目上限
 _MAX_TOTAL_ITEMS = 12
-
-
-def _bigram_sim(a: str, b: str) -> float:
-    a, b = (a or "").lower(), (b or "").lower()
-    if len(a) < 2 or len(b) < 2:
-        return 0.0
-    bg_a = {a[i:i + 2] for i in range(len(a) - 1)}
-    bg_b = {b[i:i + 2] for i in range(len(b) - 1)}
-    union = bg_a | bg_b
-    return len(bg_a & bg_b) / len(union) if union else 0.0
-
-
-def _pick_group_items(candidates: list, max_items: int) -> list:
-    """
-    从候选条目中筛选 max_items 条，应用两层去重：
-    1. Bigram 相似度 > 0.45 → 视为同一事件，保留首条
-    2. 同一 category_l1 最多保留 2 条（避免同分类扎堆）
-    """
-    selected: list = []
-    cat_count: dict = {}
-    for item in candidates:
-        cat   = item.get("category_l1", "")
-        title = (item.get("title_zh") or item.get("title") or "")
-        # Bigram 去重
-        if any(
-            _bigram_sim(title, (s.get("title_zh") or s.get("title") or "")) > 0.45
-            for s in selected
-        ):
-            continue
-        # 同分类上限 1 条（飞书卡片空间有限，同分类只取最优一条）
-        if cat_count.get(cat, 0) >= 1:
-            continue
-        selected.append(item)
-        cat_count[cat] = cat_count.get(cat, 0) + 1
-        if len(selected) >= max_items:
-            break
-    return selected
 
 
 def build_card(

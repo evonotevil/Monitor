@@ -18,7 +18,10 @@ from typing import List, Optional
 
 from config import OUTPUT_DIR, REGION_DISPLAY_ORDER
 from classifier import get_source_tier
-from utils import _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status
+from utils import (
+    _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status,
+    _bigram_sim, _TIER_SORT,
+)
 
 
 def ensure_output_dir():
@@ -54,8 +57,7 @@ def _clean_title(title: str) -> str:
     2. 去除媒体机构后缀（"FTC fines game - Reuters" → "FTC fines game"）
     3. 去除不完整的 HTML 实体残留（如截断的 Türk...）
     """
-    import html as _html
-    t = _html.unescape(title or "")
+    t = html_mod.unescape(title or "")
     t = _MEDIA_SUFFIXES.sub("", t).strip()
     # 去除仍残留的不完整实体（如 &amp 没有分号）
     t = re.sub(r"&\w{2,8}$", "", t).strip()
@@ -155,16 +157,7 @@ def _dedup_for_display(items: List[dict]) -> List[dict]:
     import logging as _logging
     _logger = _logging.getLogger(__name__)
 
-    TIER_PRIORITY = {"official": 4, "legal": 3, "industry": 2, "news": 1}
-
-    def _bigram_sim(a: str, b: str) -> float:
-        a, b = (a or "").lower(), (b or "").lower()
-        if len(a) < 2 or len(b) < 2:
-            return 0.0
-        bg_a = {a[i:i + 2] for i in range(len(a) - 1)}
-        bg_b = {b[i:i + 2] for i in range(len(b) - 1)}
-        union = bg_a | bg_b
-        return len(bg_a & bg_b) / len(union) if union else 0.0
+    TIER_PRIORITY = _TIER_SORT
 
     def _priority(item: dict) -> tuple:
         impact = float(item.get("impact_score", 1.0))
@@ -194,7 +187,7 @@ def _dedup_for_display(items: List[dict]) -> List[dict]:
             # ① URL 精确去重
             url_kept = (kitem.get("source_url") or "").strip()
             if url_item and url_kept and url_item == url_kept:
-                extra[kidx] = extra.get(kidx, 0) + 1
+                extra_items.setdefault(kidx, []).append(dict(items[idx]))
                 is_dup = True
                 break
 
@@ -526,7 +519,6 @@ def generate_html(items: List[dict], title: str = "全球游戏行业立法动�
             f'</td></tr>'
         )
         # 条目行（按来源权威性排序：source_tier（官方>法律>行业>媒体）> impact_score > 日期）
-        _TIER_SORT = {"official": 4, "legal": 3, "industry": 2, "news": 1}
         for item in sorted(
             group_items,
             key=lambda x: (

@@ -25,59 +25,11 @@ import requests
 
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
-from utils import _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status
+from utils import (
+    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status,
+    CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items,
+)
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
-
-CAT_EMOJI = {
-    "数据隐私":        "🔒",
-    "玩法合规":        "🎲",
-    "未成年人保护":    "🧒",
-    "广告营销合规":    "📣",
-    "消费者保护":      "🛡️",
-    "经营合规":        "🏢",
-    "平台政策":        "📱",
-    "内容监管":        "📋",
-    "PC & 跨平台合规": "💻",
-}
-
-_TIER_SORT = {"official": 4, "legal": 3, "industry": 2, "news": 1}
-
-
-def _impact_emoji(score: float) -> str:
-    if score >= 9.0:
-        return "🔴"
-    elif score >= 7.0:
-        return "🟠"
-    return "🔵"
-
-
-def _bigram_sim(a: str, b: str) -> float:
-    a, b = (a or "").lower(), (b or "").lower()
-    if len(a) < 2 or len(b) < 2:
-        return 0.0
-    bg_a = {a[i:i + 2] for i in range(len(a) - 1)}
-    bg_b = {b[i:i + 2] for i in range(len(b) - 1)}
-    union = bg_a | bg_b
-    return len(bg_a & bg_b) / len(union) if union else 0.0
-
-
-def _pick_group_items(candidates: list, max_items: int) -> list:
-    """Bigram 去重 + 同分类限 1 条，取 max_items 条。"""
-    selected: list = []
-    cat_count: dict = {}
-    for item in candidates:
-        cat   = item.get("category_l1", "")
-        title = (item.get("title_zh") or item.get("title") or "")
-        if any(_bigram_sim(title, (s.get("title_zh") or s.get("title") or "")) > 0.45
-               for s in selected):
-            continue
-        if cat_count.get(cat, 0) >= 1:
-            continue
-        selected.append(item)
-        cat_count[cat] = cat_count.get(cat, 0) + 1
-        if len(selected) >= max_items:
-            break
-    return selected
 
 
 # ── 数据库查询 ────────────────────────────────────────────────────────
