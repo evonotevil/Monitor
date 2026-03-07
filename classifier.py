@@ -1,6 +1,12 @@
 """
-文章分类器 - 自动分配区域、一级分类、二级分类、状态
-分类对齐 config.py: 数据隐私/玩法合规/未成年人保护/广告营销合规/消费者保护/经营合规/平台政策/内容监管
+文章分类器 - 自动分配区域、一级分类、二级分类、状态、影响评分
+分类对齐 config.py: 数据隐私/玩法合规/未成年人保护/广告营销合规/消费者保护/
+                    经营合规/平台政策/内容监管/PC & 跨平台合规
+
+影响评分 (1.0–10.0, 面向中资游戏出海):
+  高风险 ≥9.0 — 概率公示处罚 / 应用商店下架 / PC反作弊隐私被诉
+  中风险 ≥7.0 — 跨平台数据限制 / 强制年龄验证
+  核心市场 (北美/欧洲/日本/韩国/东南亚) 自动 +2.0
 """
 
 import re
@@ -203,6 +209,44 @@ CATEGORY_PATTERNS = {
         "知识产权保护": [r"intellectual.*property.*(?:law|regulat)|copyright.*(?:law|act)|知识产权|著作権"],
         "版权合规": [r"copyright.*infring|pirac.*(?:law|enforce)|版权合规|著作権侵害"],
     },
+
+    # ── PC & 跨平台合规 ───────────────────────────────────────────────
+    # 专门标记 PC 启动器权限、驱动级反作弊合规、PC充值绕开平台分成、跨平台数据流动限制
+    # 与"平台政策"的区别：平台政策聚焦 App Store/Google Play（移动端）；
+    # 本类聚焦 Steam/Epic/PC 启动器及 D2C/三方充值等 PC 特有风险
+    "PC & 跨平台合规": {
+        "_l1": [
+            # 驱动级反作弊（唯一信号，不与其他分类重叠）
+            r"kernel.?level.*anti.?cheat|anti.?cheat.*(?:driver|kernel)",
+            # PC 启动器监管语境（Steam/Epic 须与法规词共现）
+            r"(?:steam|epic.?games?\s*store|pc\s*launcher).*(?:polic|regulat|privac|law|ban|restrict)\w*",
+            r"(?:polic|regulat|privac|law|ban|restrict)\w*.*(?:steam|epic.?games?\s*store|pc\s*launcher)",
+            # D2C 直销 / 三方充值
+            r"D2C.*(?:game|publisher|distribut)\w*",
+            r"direct.to.consumer.*(?:game|publisher).*(?:regulat|law|polic)",
+            r"third.?party.*top.?up.*(?:game|ban|regulat|consumer)",
+            # 跨平台数据流
+            r"cross.?platform.*(?:data|privac)\w*.*(?:restrict|limit|regulat|law)",
+        ],
+        "PC启动器权限": [
+            r"pc\s*(?:game|launcher).*(?:permiss|privac|data|access)\w*",
+            r"launcher.*(?:permiss|privac|data.*collect|regulat)",
+        ],
+        "反作弊程序合规": [
+            r"kernel.?level.*anti.?cheat|anti.?cheat.*(?:driver|kernel)",
+            r"anti.?cheat.*(?:privac|data.*collect|ban|regulat|lawsuit|sued)",
+            r"(?:driver|kernel).*anti.?cheat.*(?:privac|fine|restrict)",
+        ],
+        "PC充值/D2C合规": [
+            r"D2C.*(?:game|publisher)|direct.to.consumer.*game.*(?:regulat|law|polic)",
+            r"third.?party.*top.?up.*(?:game|ban|regulat|consumer)",
+            r"pc.*(?:payment|pay).*(?:bypass|circumvent|alternativ).*(?:store|platform)",
+        ],
+        "跨平台数据合规": [
+            r"cross.?platform.*(?:data|privac|transfer)\w*.*(?:regulat|restrict|law|limit)",
+            r"(?:pc.*mobile|mobile.*pc).*data.*(?:transfer|sync|share).*(?:regulat|restrict|law)",
+        ],
+    },
 }
 
 
@@ -221,27 +265,96 @@ STATUS_PATTERNS = {
 }
 
 
-# ─── 影响评分体系 ─────────────────────────────────────────────────────
+# ─── 影响评分体系 (10 分制) ───────────────────────────────────────────
 #
-# 参考"分布式检索 + 影响评估模型"专业框架:
-#   信源层级 × 状态标签 → 影响评分 (1=低 / 2=中 / 3=高)
+# 面向中资游戏出海合规优先级 (Lilith/米哈游/鹰角视角)
 #
-# 高(3): 已生效/即将生效/修订 的法规；官方来源的执法/草案动态
-# 中(2): 草案/立法/执法 动态；官方来源的立法动态
-# 低(1): 一般立法动态、行业讨论
+# 分值区间含义：
+#   ≥9.0 高风险 — 须立即响应（概率公示处罚 / 应用商店下架 / PC反作弊隐私被诉）
+#   ≥7.0 中风险 — 需纳入季度合规审查
+#   ≥5.0 关注   — 应跟踪立法进展
+#   <5.0 低优先 — 知悉即可
+#
+# 计分逻辑：
+#   基础分  (1.0–5.0) 由状态决定
+#   +信源加成 official +2.0 / legal +1.0 / industry +0.5
+#   +核心市场加成 北美/欧洲/日本/韩国/东南亚 +2.0
+#   +高风险内容加成 概率公示处罚/下架风险/反作弊隐私 +1.5 / 跨平台数据/年龄验证 +0.5
+#   上限 10.0，下限 1.0
 #
 
+# 状态基础分
 _IMPACT_STATUS_BASE = {
-    "已生效":       3,
-    "即将生效":     3,
-    "修订变更":      3,
-    "执法动态":     2,
-    "草案/征求意见": 2,
-    "立法进行中":   2,
-    "已提案":       2,
-    "已废止":       1,
-    "立法动态":     1,
+    "已生效":        5.0,
+    "即将生效":      5.0,
+    "执法动态":      5.0,
+    "修订变更":      4.5,
+    "草案/征求意见": 4.0,
+    "立法进行中":    3.5,
+    "已提案":        3.0,
+    "立法动态":      2.0,
+    "已废止":        1.0,
 }
+
+# 核心市场 — Lilith/米哈游/鹰角出海核心营收来源
+# 同时包含显示分组名（北美/欧洲/东南亚）和具体国家名（美国/英国/越南等），
+# 因为 DB region 字段可能是 LLM 返回的国家名，而非显示分组名。
+_CORE_MARKETS = {
+    # 显示分组名
+    "北美", "欧洲", "日本", "韩国", "东南亚",
+    # 北美
+    "美国", "加拿大",
+    # 欧洲
+    "欧盟", "英国", "德国", "法国", "荷兰", "比利时", "奥地利",
+    "意大利", "西班牙", "波兰", "瑞典", "挪威",
+    # 东南亚
+    "越南", "印度尼西亚", "泰国", "菲律宾", "马来西亚", "新加坡",
+}
+
+# 高风险内容检测规则 (addon_score, patterns)
+# 每组内只计一次加成（不叠加），各组之间可叠加
+_HIGH_RISK_PATTERNS: list = [
+    # (+1.5) 概率公示不实处罚 — 直接触发监管执法 & 商店下架
+    (1.5, [
+        r"probability\s*disclos\w*.*(?:fine|penalt|enforce|violat|sanction)",
+        r"(?:fine|penalt|enforce|sanction)\w*.*probability\s*disclos",
+        r"gacha.*(?:fine|penalt|enforce|sanction|banned|illegal)",
+        r"(?:fine|penalt|enforce|sanction)\w*.*gacha",
+        r"loot.?box.*(?:fine|penalt|enforce|banned|illegal)",
+        r"확률형.*(?:과징금|제재|처분|위반)",
+        r"ガチャ.*(?:処分|罰則|違反|課徴金)",
+        r"概率.*(?:罚款|处罚|违规|整改)",
+    ]),
+    # (+1.5) 应用商店下架风险 — 对出海运营直接致命
+    (1.5, [
+        r"(?:remov|delist|pull|taken?\s*down|ban)\w*\s+(?:from\s+)?(?:app.?store|google.?play|steam|epic)",
+        r"(?:app.?store|google.?play|steam|epic)\w*.*(?:remov|delist|pull|ban)\w*",
+        r"game\w*.*(?:remov|delist|banned)\w*.*(?:store|platform|market)",
+        r"下架.*(?:应用商店|App\s*Store|Google\s*Play|Steam)",
+        r"게임.*(?:삭제|퇴출).*(?:스토어|플랫폼)",
+    ]),
+    # (+1.5) PC端反作弊程序被诉侵犯隐私 — 新兴PC合规风险
+    (1.5, [
+        r"kernel.?level.*anti.?cheat.*(?:privac|sued|lawsuit|ban|fine|regulat)",
+        r"anti.?cheat.*(?:privac\w*.*violat|sued|lawsuit|fine|regulat)",
+        r"(?:driver|kernel).*anti.?cheat.*(?:privac|data.*collect|ban)",
+    ]),
+    # (+0.5) PC/移动端跨平台数据转移限制
+    (0.5, [
+        r"cross.?platform.*data.*(?:restrict|limit|transfer|regulat|law)",
+        r"(?:pc|mobile).*data.*cross.?platform.*(?:restrict|regulat)",
+        r"跨平台.*数据.*(?:限制|转移|合规|规定)",
+    ]),
+    # (+0.5) 要求强制年龄验证拦截机制
+    (0.5, [
+        r"mandator\w+\s+age.?verif",
+        r"age.?verif\w*.*(?:mandator|required|compulsor|oblig)\w*",
+        r"age.?gate.*(?:require|mandator|law|legislat)",
+        r"强制.*年龄验证|年龄验证.*(?:强制|义务|必须)",
+        r"強制.*年齢確認|年齢確認.*義務",
+        r"연령\s*확인.*(?:의무|강제)",
+    ]),
+]
 
 
 def get_source_tier(source_name: str) -> str:
@@ -257,22 +370,49 @@ def get_source_tier(source_name: str) -> str:
     return "news"
 
 
-def score_impact(status: str, source_name: str) -> int:
+def _high_risk_bonus(text: str) -> float:
     """
-    计算影响评分 (1–3):
-      - 基础分来自状态标签
-      - 官方信源 (official) 额外 +1（上限3），体现一手信息的权威性
-      - 法律情报源 (legal) 额外 +0.5 → 取 ceil（反映专业解读价值）
+    检测文章是否触及高风险合规场景，返回累计附加分。
+    每组模式只计一次（命中第一条即止），各组可叠加。
     """
-    base = _IMPACT_STATUS_BASE.get(status, 1)
+    text_lower = text.lower()
+    bonus = 0.0
+    for add, patterns in _HIGH_RISK_PATTERNS:
+        for p in patterns:
+            if re.search(p, text_lower, re.IGNORECASE):
+                bonus += add
+                break
+    return bonus
+
+
+def score_impact(
+    status: str,
+    source_name: str,
+    region: str = "",
+    text: str = "",
+) -> float:
+    """
+    计算影响评分 (1.0–10.0):
+
+      基础分   = 状态权重 (1.0–5.0)
+      + 信源加成  official +2.0 / legal +1.0 / industry +0.5
+      + 核心市场  北美/欧洲/日本/韩国/东南亚 +2.0
+      + 高风险内容 概率公示处罚/下架/反作弊隐私 +1.5 各一次
+                   跨平台数据/强制年龄验证 +0.5 各一次
+
+    高风险 ≥9.0 / 中风险 ≥7.0 / 关注 ≥5.0 / 低优先 <5.0
+    """
+    base = _IMPACT_STATUS_BASE.get(status, 2.0)
+
     tier = get_source_tier(source_name)
+    tier_bonus = {"official": 2.0, "legal": 1.0, "industry": 0.5}.get(tier, 0.0)
 
-    if tier == "official":
-        base = min(3, base + 1)
-    elif tier == "legal" and base < 3:
-        base = min(3, base + 1)   # legal tier 同样升一级，但不超过3
+    market_bonus = 2.0 if region in _CORE_MARKETS else 0.0
 
-    return base
+    risk_bonus = _high_risk_bonus(text) if text else 0.0
+
+    total = base + tier_bonus + market_bonus + risk_bonus
+    return round(min(10.0, max(1.0, total)), 1)
 
 
 # ─── 分类入口 ────────────────────────────────────────────────────────
@@ -285,7 +425,7 @@ def classify_article(article: dict) -> LegislationItem:
     l1, l2 = _detect_category(text)
     status = _detect_status(text)
     source_name = article.get("source", "")
-    impact = score_impact(status, source_name)
+    impact = score_impact(status, source_name, region=region, text=text)
 
     return LegislationItem(
         region=region,
