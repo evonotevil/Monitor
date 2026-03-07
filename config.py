@@ -1,8 +1,9 @@
 """
 全球游戏行业立法动态监控工具 - 配置文件
-面向中资手游出海合规视角 (以原神发行模式为参考)
-重点覆盖: 数据隐私、玩法合规(开箱/抽卡)、广告营销合规、涉赌合规、
-         未成年保护、消费者保护、经营合规(本地代理/代表处/分级)
+面向中资手游出海合规视角 (以原神/Lilith/鹰角发行模式为参考)
+重点覆盖: 数据隐私、玩法合规(开箱/抽卡/概率公示)、广告营销合规、涉赌合规、
+         未成年保护(防沉迷)、消费者保护(虚拟货币/三方充值)、
+         经营合规(本地代理/代表处/分级)、PC平台合规(Steam/Epic/驱动级反作弊/D2C)
 """
 
 # ─── 重点监控区域（不含中国大陆）──────────────────────────────────────
@@ -142,6 +143,32 @@ STATUS_LABELS = [
 
 # ─── 搜索关键词库 (聚焦手游出海合规 - 以原神发行方式为参考) ──────────────────
 
+# ─── PC 平台合规关键词（独立导出，供 fetcher 路由使用）────────────────────────
+#
+# 覆盖米哈游/Lilith/鹰角等中资游戏在 PC 端的合规风险：
+#   Steam / Epic Games Store 政策变更、驱动级反作弊隐私争议、
+#   D2C（绕开平台直销）监管、三方充值平台合规。
+#
+PC_PLATFORM_KEYWORDS_EN = [
+    # Steam / Epic / PC 启动器
+    "Steam game regulation consumer privacy",
+    "Epic Games Store policy loot box regulation",
+    "PC game launcher privacy data collection law",
+    "PC game DRM consumer regulation",
+    # 驱动级反作弊
+    "kernel-level anti-cheat privacy regulation",
+    "game anti-cheat driver ban restriction consumer",
+    # D2C 直销渠道
+    "D2C game distribution regulation publisher",
+    "direct-to-consumer game platform law",
+    # 三方充值
+    "third-party top-up game consumer protection regulation",
+    "game top-up platform ban restriction",
+    # 游戏分级机构 — PC 端延伸（ESRB/PEGI 对 Steam 上架内容的影响）
+    "ESRB rating requirement PC game Steam regulation",
+    "PEGI age rating PC game regulation Europe",
+]
+
 KEYWORDS = {
     "en": [
         # === 玩法合规 / 涉赌 - Loot Box / Gacha ===
@@ -249,6 +276,10 @@ KEYWORDS = {
         "apple app store game policy",
         "third party payment game regulation",
         "app store commission game fee regulation",
+
+        # === PC 平台合规 (Steam / Epic / D2C / 驱动级反作弊) ===
+        # 注: 该段由 PC_PLATFORM_KEYWORDS_EN 导入，fetcher 会对其单独做 UK/EU 路由
+        *PC_PLATFORM_KEYWORDS_EN,
     ],
     "ja": [
         "ゲーム規制 法律 2025",
@@ -262,6 +293,10 @@ KEYWORDS = {
         "消費者庁 ゲーム 処分 罰則",
         "子ども ゲーム 利用 規制",
         "ゲーム 個人情報 保護 規制",
+        # 消費者庁 / CESA 专项 — 景表法与抽卡规则
+        "消費者庁 ゲーム 景品表示法 処分 2026",
+        "消費者庁 ガチャ 確率 規制 改正",
+        "CESA ゲーム 自主規制 ガチャ 改正 2026",
     ],
     "ko": [
         "게임 규제 법안 2025",
@@ -275,6 +310,10 @@ KEYWORDS = {
         "게임 등급 분류 의무",
         "청소년 게임 이용 제한 법률",
         "게임 광고 규제 법안",
+        # GRAC（게임물관리위원회）专项 — 关注确率型道具罚单
+        "게임물관리위원회 확률형 처분 제재 2026",
+        "GRAC 게임 등급 규제 제재 2026",
+        "확률형 아이템 과징금 처분 게임사",
     ],
     "vi": [
         "quy định trò chơi điện tử 2025",
@@ -365,6 +404,18 @@ KEYWORDS = {
 #   "industry" — 行业媒体 / 贸易协会（市场视角）
 #
 RSS_FEEDS = [
+    # ── 平台官方 (Official tier) ─ 出海"宪法"级别 ──────────────────────
+    {
+        # Apple Developer News — App Store 政策、隐私框架、分级规则变更
+        # 与 Android Developers Blog 同列 RECYCLED_DATE_SOURCES（日期需二次抓取）
+        "name": "Apple Developer News",
+        "url": "https://developer.apple.com/news/rss/news.rss",
+        "lang": "en",
+        "type": "rss",
+        "region": "全球",
+        "tier": "official",
+    },
+
     # ── 行业媒体 (Industry tier) ──────────────────────────────────────
     {
         "name": "GamesIndustry.biz",
@@ -506,6 +557,13 @@ SOURCE_TIER_MAP = {
     "GRAC":                           "official",
     "KCA":                            "official",
     "GDPR.eu News":                   "official",   # 官方解读机构
+    # 游戏分级机构 — PC 平台合规关键信源
+    "ESRB":                           "official",
+    "PEGI":                           "official",
+    "CESA":                           "official",   # 日本コンピュータエンターテインメント協会
+    "消費者庁":                        "official",   # 日本消費者庁
+    # 平台官方 — 出海"宪法"
+    "Apple Developer News":           "official",
     # ── legal ─────────────────────────────────────────────────────────
     "IAPP News":                      "legal",
     "IAPP":                           "legal",
@@ -531,7 +589,9 @@ SOURCE_TIER_PATTERNS = [
         r"\bFTC\b|\bFederal Trade Commission\b"
         r"|Information Commissioner(?:'s Office)?"
         r"|\bCNIL\b|\bICO\b|\beSafety\b"
-        r"|\bGRAC\b|\bKCA\b|\bMOLEG\b"
+        r"|\bGRAC\b|\b게임물관리위원회\b|\bKCA\b|\bMOLEG\b"
+        r"|\bESRB\b|\bPEGI\b|\bCESA\b"
+        r"|消費者庁|게임물관리위원회"
         r"|Federal Register"
         r"|Ministry of (?:Culture|Information|Communication|Justice)"
         r"|Kominfo|KemenKominfo"
@@ -541,6 +601,7 @@ SOURCE_TIER_PATTERNS = [
         r"|Attorney General"
         r"|Data Protection Authority|Data Protection Board"
         r"|Office of (?:the |)Privacy Commissioner"
+        r"|Apple Developer"
     )),
     ("legal", (
         r"\bIAPP\b|Lexology|JD Supra|Law360"

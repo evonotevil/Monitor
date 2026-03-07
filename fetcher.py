@@ -19,6 +19,7 @@ from bs4 import BeautifulSoup
 from config import (
     RSS_FEEDS,
     KEYWORDS,
+    PC_PLATFORM_KEYWORDS_EN,
     GOOGLE_NEWS_SEARCH_TEMPLATE,
     GOOGLE_NEWS_REGIONS,
     FETCH_TIMEOUT,
@@ -191,8 +192,9 @@ REGULATORY_SIGNALS = [
     r"\bpolicy\b", r"\bguideline\w*\b", r"\brule\w*\b",
     r"\bdraft\b", r"\bconsultation\b", r"\bproposal\b",
     r"\bFTC\b", r"\bCOPPA\b", r"\bGDPR\b", r"\bCCPA\b", r"\bDSA\b", r"\bDMA\b",
-    r"\bIGAC\b", r"\bGRAC\b", r"\bESRB\b", r"\bPEGI\b", r"\bCERO\b",
+    r"\bIGAC\b", r"\bGRAC\b", r"\bESRB\b", r"\bPEGI\b", r"\bCERO\b", r"\bCESA\b",
     r"\bOnline Safety Act\b", r"\bKIDS Act\b",
+    r"消費者庁", r"게임물관리위원회",
     # 日文
     r"規制", r"法律", r"法案", r"条例", r"施行", r"罰則", r"処分", r"義務",
     r"景品表示法", r"資金決済法", r"特商法",
@@ -215,6 +217,36 @@ GAME_SIGNALS = [
     r"\b(?:regulat|law|legislat|ban|restrict|fine|enforc)\w*\b.*\bgame\b",
     r"ゲーム", r"ガチャ",
     r"게임", r"확률형",
+
+    # ── PC 平台信号 (Steam / Epic / D2C / 驱动级反作弊) ──────────────
+    # Steam/Epic 须与监管词共现，避免误捕普通游戏新闻
+    r"\bsteam\b.*\b(?:regulat|law|ban|polic|privac|restrict|fine)\w*\b",
+    r"\b(?:regulat|law|ban|polic|privac|restrict|fine)\w*\b.*\bsteam\b",
+    r"\bepic\s*games?\s*store\b.*\b(?:regulat|law|polic|ban)\w*\b",
+    r"\b(?:regulat|law|polic|ban)\w*\b.*\bepic\s*games?\s*store\b",
+    r"\bpc\s*(?:game|gaming|launcher)\b.*\b(?:regulat|law|polic|privac)\w*\b",
+    r"\bkernel.?level\s*anti.?cheat\b",
+    r"\banti.?cheat\s*driver\b.*\b(?:ban|regulat|privac|restrict)\w*\b",
+    r"\b(?:D2C|direct.to.consumer)\b.*\bgame\w*\b",
+    r"\bgame\w*\b.*\b(?:D2C|direct.to.consumer)\b",
+    r"\bthird.?party\s*top.?up\b",
+
+    # ── 核心游戏合规信号（Loot Box/Gacha Probability/In-game Currency/Minor）──
+    r"\bgacha\s*probability\b",
+    r"\bprobability\s*disclosur\w*\b.*\bgame\b",
+    r"\bgame\b.*\bprobability\s*disclosur\w*\b",
+    r"\bin.?game\s*currenc\w*\b.*\b(?:regulat|law|ban|restrict)\w*\b",
+    r"\b(?:regulat|law|ban|restrict)\w*\b.*\bin.?game\s*currenc\w*\b",
+    r"\bgame\s*addiction\s*(?:prevent|protect|law|ban|limit)\w*\b",
+    r"\bscreen\s*time\s*(?:limit|law|regulat)\w*\b.*\bgame\b",
+    # 中文核心概念（出现即视为强信号，无需与英文监管词共现）
+    r"防沉迷", r"概率公示", r"虚拟货币",
+    # 日文增强
+    r"確率.*ガチャ|ガチャ.*確率",
+    r"未成年.*ゲーム|ゲーム.*未成年",
+    # 韩文增强
+    r"게임.*미성년|미성년.*게임",
+    r"가챠.*확률|확률.*가챠",
 ]
 
 # 排除词 - 即使匹配了上面的词，如果标题中大量出现这些词，基本可以判断不是法规新闻
@@ -319,8 +351,10 @@ def is_recent(article: dict, max_days: int = MAX_ARTICLE_AGE_DAYS) -> bool:
 # ─── 精确发布时间抓取 ─────────────────────────────────────────────────
 
 # 已知RSS日期不可信的来源（会把抓取日期当作发布日期）
+# Apple Developer News 与 Android Developers Blog 行为相同：RSS pubDate 为当日
 RECYCLED_DATE_SOURCES = {
     "Android Developers Blog",
+    "Apple Developer News",
 }
 
 def try_fetch_article_date(url: str, timeout: int = 8) -> Optional[str]:
@@ -565,6 +599,9 @@ def fetch_google_news_all() -> List[dict]:
     for kw in KEYWORDS["en"]:
         tasks.append((kw, "en_US"))
     for kw in KEYWORDS["en"][30:50]:  # 经营合规相关关键词补充英国视角
+        tasks.append((kw, "en_UK"))
+    # PC 平台合规专项：Steam/Epic/驱动反作弊/D2C 的监管重心在欧洲（DMA/GDPR/PEGI）
+    for kw in PC_PLATFORM_KEYWORDS_EN:
         tasks.append((kw, "en_UK"))
     for kw in KEYWORDS["en"][10:30]:  # 未成年/数据隐私补充澳洲视角
         tasks.append((kw, "en_AU"))
