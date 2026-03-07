@@ -443,12 +443,9 @@ def cmd_retranslate(args):
         cleared = db.clear_stale_translations(dirty_terms + extra_patterns)
         logger.info(f"[重译] 已清空 {cleared} 条含脏词翻译的条目")
 
-        force = getattr(args, "force", False)
-        if cleared == 0 and not force:
-            logger.info("[重译] 无需重译条目，数据库已是最新。若想强制全量重译请加 --force")
-            return
-
         # ── 阶段 2：查询所有 title_zh 为空的条目并重译 ─────────────────
+        # 注意：即使 cleared==0（无脏词），--no-translate 抓取的新条目也需要在这里翻译，
+        # 因此不提前返回，让下方的 items_dicts 为空判断处理"真正无事可做"的情形。
         limit = getattr(args, "limit", 100)
         items_dicts = db.query_items_untranslated(limit=limit)
         if not items_dicts:
