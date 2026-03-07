@@ -40,12 +40,13 @@ jobs:
         continue-on-error: true
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-        run: python monitor.py run --period week
+        run: python monitor.py run --period day
 
       # ── 4. 检查昨日新增，有则推送飞书 ────────────────────────────
       - name: Check and notify daily updates
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: python daily_check.py
 
       # ── 5. 将更新后的 DB 提交回仓库 ────────────────────────────────

@@ -989,6 +989,69 @@ def generate_executive_summary(items: list) -> str:
         return ""
 
 
+# ── 日报综述生成（150 字以内）────────────────────────────────────────
+
+def generate_daily_summary(items: list) -> str:
+    """
+    将昨日动态列表传给 LLM，生成 150 字以内的中文日报综述。
+    聚焦：昨日最值得关注的 1-2 个监管动作 + 对移动端的直接影响。
+    失败时返回空字符串。
+    """
+    if not items:
+        return ""
+    if not (_HAS_AI and _AI_CLIENT):
+        return ""
+
+    sorted_items = sorted(items, key=lambda x: float(x.get("impact_score", 0)), reverse=True)
+    material_lines = []
+    for it in sorted_items[:15]:   # 日报条数少，取前 15 条即可
+        title = (it.get("title_zh") or it.get("title") or "").strip()
+        summary = (it.get("summary_zh") or "").strip()
+        region = (it.get("region") or "").strip()
+        cat = (it.get("category_l1") or "").strip()
+        score = float(it.get("impact_score", 0))
+        if title:
+            line = f"[{region}/{cat}/score={score:.1f}] {title}"
+            if summary:
+                line += f"：{summary[:80]}"
+            material_lines.append(line)
+
+    if not material_lines:
+        return ""
+
+    material = "\n".join(material_lines)
+    user_msg = (
+        f"以下是昨日全球游戏合规动态（共 {len(items)} 条，已按重要性排序）。\n"
+        f"请以资深合规分析师视角，为 Lilith 等中资出海游戏公司撰写一段 150 字以内的中文日报综述。\n\n"
+        f"要求：\n"
+        f"① 点出昨日最值得关注的 1-2 个监管动作（具体市场/政策名）\n"
+        f"② 说明对移动端（App Store/Google Play/IAP）的直接影响\n"
+        f"③ 语言简洁专业，像给业务 VP 发的一条 Slack 消息，不用标题或序号\n\n"
+        f"动态素材：\n{material}"
+    )
+
+    try:
+        resp = _AI_CLIENT.chat.completions.create(
+            model=_LLM_MODEL,
+            max_tokens=300,
+            extra_body=_LLM_EXTRA_BODY,
+            messages=[
+                {"role": "system", "content": "你是资深游戏行业合规分析师，擅长用简洁语言概括监管动态。"},
+                {"role": "user",   "content": user_msg},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        # 截断到 160 字以内
+        if len(text) > 160:
+            cut = text[:160].rfind("。")
+            text = text[:cut + 1] if cut > 0 else text[:150]
+        logger.info(f"[日报综述] 生成成功，{len(text)} 字")
+        return text
+    except Exception as e:
+        logger.warning(f"[日报综述] LLM 生成失败: {e}")
+        return ""
+
+
 # ── 主入口 ────────────────────────────────────────────────────────────
 
 def translate_item_fields(item_dict: dict) -> dict:

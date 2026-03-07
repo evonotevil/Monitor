@@ -177,7 +177,11 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
 
 # ─── Google News 搜索 ──────────────────────────────────────────────────
 
-def fetch_google_news(query: str, region_key: str = "en_US") -> List[dict]:
+def fetch_google_news(query: str, region_key: str = "en_US", max_results: int = 0) -> List[dict]:
+    """
+    抓取 Google News RSS 结果。
+    max_results: 每个查询最多返回条数（0 = 不限，日报模式建议 10）。
+    """
     region = GOOGLE_NEWS_REGIONS.get(region_key, GOOGLE_NEWS_REGIONS["en_US"])
     url = GOOGLE_NEWS_SEARCH_TEMPLATE.format(
         query=quote_plus(query),
@@ -214,6 +218,8 @@ def fetch_google_news(query: str, region_key: str = "en_US") -> List[dict]:
                 "region": "",  # 由 classifier 检测
                 "lang": region["hl"].split("-")[0],
             })
+            if max_results and len(items) >= max_results:
+                break
     except ET.ParseError as e:
         logger.warning(f"Google News RSS 解析失败: {e}")
 
@@ -324,6 +330,12 @@ EXCLUSION_PATTERNS = [
     r"(?:tax.*price|price.*tax).*(?:\d{2,3}\s*(?:store|market)|storefronts?)",  # Apple价格/税收更新
     r"应用.*价格.*税收|价格.*税收.*更新|税收.*价格.*更新",  # 中文版苹果价格税收更新
     r"应用.*税收.*价格|税收.*更新.*店面",  # 中文版苹果税收价格
+    # ── 纯硬件/性能类文章（无监管背景）──────────────────────────────────
+    r"\bbattery\s*(?:life|health|optim\w+|drain|test|review|sav\w+)\b",  # battery optimization
+    r"\benergy\s*(?:sav\w+|efficien\w+|consumption|optim\w+)\b",         # energy saving
+    r"\bperformance\s*(?:optim\w+|benchmark|boost|test)\b",              # performance optimization
+    r"\bprocessor\s*(?:speed|test|benchmark|review|launch|spec\w*|architect\w+)\b",
+    r"\bhardware\s*(?:spec|test|review|benchmark|perform\w+|launch|upgrade)\b",
     # 博彩/赌场 (casino gambling) 不是游戏行业法规
     r"\bcasino\b", r"\bsports?\s*bet", r"\bpoker\b", r"\bslot\s*machine\b",
     r"\bbookie\b", r"\bhorse\s*rac", r"\b赌场\b",
@@ -652,12 +664,19 @@ def fetch_all_rss() -> List[dict]:
     return all_items
 
 
-def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS) -> List[dict]:
+def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = False) -> List[dict]:
+    """
+    聚合所有语言/地区的 Google News 查询。
+    daily_mode=True 时：强制使用 when:1d（过去 24 小时），每查询仅取前 10 条，减少噪音并提速。
+    """
     all_items = []
     tasks = []  # (query, region_key)
 
-    # 动态日期过滤：when:Xd 替代硬编码年份（Google News 识别此参数，无效时静默降级）
-    when = f" when:{max_days}d"
+    # 日期过滤参数：日报强制 when:1d，周报/全量用 when:{max_days}d
+    when_days = 1 if daily_mode else max_days
+    when = f" when:{when_days}d"
+    # 日报每查询限制条数（减少无关内容，提升处理速度）
+    max_results_per_query = 10 if daily_mode else 0
     # 英文通用查询降噪后缀（附加 -conference -summit -funding -investment）
     noise = INDUSTRY_QUERY_NOISE_SUFFIX
 
@@ -712,7 +731,7 @@ def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS) -> List[dict]:
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
         futures = {}
         for query, region in tasks:
-            future = executor.submit(fetch_google_news, query, region)
+            future = executor.submit(fetch_google_news, query, region, max_results_per_query)
             futures[future] = (query, region)
             time.sleep(0.5)
 
@@ -769,7 +788,7 @@ def _is_foreign_commentary(lang: str, region: str) -> bool:
     return region not in acceptable
 
 
-def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS) -> List[LegislationItem]:
+def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = False) -> List[LegislationItem]:
     """
     完整抓取 & 处理流水线:
     1. 抓取 RSS + Google News
@@ -777,15 +796,17 @@ def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS) -> List[LegislationI
     3. 分类为 LegislationItem
     4. 语言-地区一致性过滤（外语转载非本地新闻）
     5. 翻译标题和摘要
+
+    daily_mode=True: Google News 强制 when:1d，每查询限 10 条，适合日报场景。
     """
     logger.info("=" * 60)
-    logger.info("开始抓取数据...")
+    logger.info(f"开始抓取数据 ({'日报模式 when:1d' if daily_mode else f'when:{max_days}d'})...")
 
     # 1. 抓取
     rss_items = fetch_all_rss()
     logger.info(f"RSS 抓取完成: {len(rss_items)} 条原始数据")
 
-    news_items = fetch_google_news_all(max_days)
+    news_items = fetch_google_news_all(max_days, daily_mode=daily_mode)
     logger.info(f"Google News 抓取完成: {len(news_items)} 条原始数据")
 
     all_raw = rss_items + news_items
