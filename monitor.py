@@ -45,6 +45,8 @@ logger = logging.getLogger(__name__)
 
 def _period_to_days(period: str) -> int:
     """将周期名称转为天数"""
+    if period == "day":
+        return 1
     return PERIOD_DAYS.get(period, PERIOD_DAYS["all"])
 
 
@@ -230,7 +232,7 @@ def _filter_valid_dates(items):
 
 
 def _period_label(period: str) -> str:
-    labels = {"week": "周报（近7天）", "month": "月报（近30天）", "all": "全量报告"}
+    labels = {"day": "日报（昨日）", "week": "周报（近7天）", "month": "月报（近30天）", "all": "全量报告"}
     return labels.get(period, "全量报告")
 
 
@@ -243,8 +245,9 @@ def cmd_run(args):
     logger.info(f"开始执行抓取 [{label}]...")
     db = Database()
 
+    daily_mode = (args.period == "day")
     try:
-        items = fetch_and_process(max_days=days)
+        items = fetch_and_process(max_days=days, daily_mode=daily_mode)
 
         if items:
             # 严格日期过滤：只保留 2025/2026 年的条目
@@ -509,9 +512,9 @@ def cmd_schedule(args):
 def _add_period_arg(p):
     p.add_argument(
         "--period", "-p",
-        choices=["week", "month", "all"],
+        choices=["day", "week", "month", "all"],
         default="all",
-        help="报告周期: week=周报(近7天)  month=月报(近30天)  all=全量(默认)",
+        help="报告周期: day=日报(昨日,when:1d)  week=周报(近7天)  month=月报(近30天)  all=全量(默认)",
     )
 
 

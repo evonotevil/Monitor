@@ -6,6 +6,9 @@
 必需环境变量:
     FEISHU_WEBHOOK_URL   飞书自定义机器人的 Webhook 地址
 
+可选环境变量:
+    LLM_API_KEY          用于生成 AI 综述（未设置时跳过综述）
+
 本地调试:
     FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx \
     python daily_check.py
@@ -30,6 +33,44 @@ from utils import (
     CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items,
 )
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
+
+
+# ── 全平台影响简短标签 ────────────────────────────────────────────────
+# 按分类给出移动端 / PC 端最关键的合规关注点（一句话）
+
+_MOBILE_SHORT: dict = {
+    "数据隐私":        "App/SDK 数据同意流程合规",
+    "玩法合规":        "Gacha/Loot Box 概率公示更新",
+    "未成年人保护":    "实名/年龄验证 SDK 接入",
+    "广告营销合规":    "IDFA 授权 + 广告 SDK 合规",
+    "消费者保护":      "IAP 退款条款/订阅自动续费",
+    "经营合规":        "App Store/Play 经营资质核查",
+    "平台政策":        "IAP 分成及支付规则变动",
+    "内容监管":        "移动端内容分级/审核接入",
+    "PC & 跨平台合规": "跨端账号数据同步合规",
+}
+
+_PC_SHORT: dict = {
+    "数据隐私":        "PC SDK/云存储数据合规",
+    "玩法合规":        "Steam 概率公示/D2C 合规",
+    "未成年人保护":    "PC 端年龄验证实名接入",
+    "广告营销合规":    "PC 广告追踪 Cookie 合规",
+    "消费者保护":      "D2C 官网退款/订阅条款",
+    "经营合规":        "PC 官网经营资质/本地备案",
+    "平台政策":        "D2C 充值及 Launcher 策略",
+    "内容监管":        "PC 端内容分级证书更新",
+    "PC & 跨平台合规": "Launcher 权限/Anti-cheat 合规",
+}
+
+_DEFAULT_MOBILE = "App Store/IAP 相关合规排查"
+_DEFAULT_PC     = "PC Launcher/D2C 相关合规排查"
+
+
+def _short_platform_impact(category_l1: str) -> str:
+    """返回简洁的全平台合规影响一行文字。"""
+    mobile = _MOBILE_SHORT.get(category_l1, _DEFAULT_MOBILE)
+    pc     = _PC_SHORT.get(category_l1, _DEFAULT_PC)
+    return f"📱 {mobile} | 💻 {pc}"
 
 
 # ── 数据库查询 ────────────────────────────────────────────────────────
@@ -92,14 +133,23 @@ def get_daily_items() -> list:
 
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
 
-_MAX_PER_GROUP = 2   # 日报每区域最多展示条数（比周报更精简）
+_MAX_PER_GROUP = 2   # 日报每区域最多展示条数
 _MAX_TOTAL     = 8   # 日报全局上限
 
 
-def build_daily_card(items: list) -> dict:
+def build_daily_card(items: list, exec_summary: str = "") -> dict:
     now_cst   = datetime.now(_TZ_CST)
     yesterday = now_cst - timedelta(days=1)
-    date_range = f"{yesterday.strftime('%Y/%m/%d')} – {now_cst.strftime('%Y/%m/%d %H:%M')} CST"
+    yesterday_date = yesterday.strftime("%Y-%m-%d")
+
+    # Header 颜色：按最高 impact_score 分级
+    max_score = max((float(i.get("impact_score", 1.0)) for i in items), default=0.0)
+    if max_score >= 9.0:
+        header_color = "red"
+    elif max_score >= 7.0:
+        header_color = "orange"
+    else:
+        header_color = "blue"
 
     # 区域统计（用原始 items，未去重前的总数）
     group_counts: dict = {}
@@ -124,24 +174,31 @@ def build_daily_card(items: list) -> dict:
     # 组装 elements
     elements: list = []
 
-    # 副标题 + 统计
+    # 统计概览
     elements.append({
         "tag": "markdown",
         "content": (
-            f"📅 **今日合规动态** | {date_range}\n\n"
-            f"昨日新增 **{len(items)}** 条合规动态\n\n"
-            f"**🗺️ 按地区**\n{region_line}"
+            f"昨日新增 **{len(items)}** 条合规动态　**{yesterday_date}**\n\n"
+            f"**🗺️ 按地区**　{region_line}"
         ),
     })
 
-    # 分区域展示
+    # AI 综述（有则展示为引用块）
+    if exec_summary:
+        elements.append({
+            "tag": "markdown",
+            "content": "\n".join(f"> {line}" for line in exec_summary.splitlines()),
+        })
+
+    elements.append({"tag": "hr"})
+
+    # 分区域展示动态列表
     total_shown = 0
     for group in _GROUP_ORDER:
         group_items = grouped.get(group, [])
         if not group_items:
             continue
 
-        elements.append({"tag": "hr"})
         group_cnt = group_counts.get(group, 0)
         elements.append({
             "tag": "markdown",
@@ -152,20 +209,23 @@ def build_daily_card(items: list) -> dict:
             if total_shown >= _MAX_TOTAL:
                 break
 
-            score   = float(item.get("impact_score", 1.0))
-            risk_em = _impact_emoji(score)
-            cat     = item.get("category_l1", "")
-            cat_em  = CAT_EMOJI.get(cat, "")
-            status  = normalize_status(item.get("status", ""))
-            region  = item.get("region", "")
+            score    = float(item.get("impact_score", 1.0))
+            risk_em  = _impact_emoji(score)
+            cat      = item.get("category_l1", "")
+            cat_em   = CAT_EMOJI.get(cat, "")
+            status   = normalize_status(item.get("status", ""))
+            region   = item.get("region", "")
 
             title_zh = (item.get("title_zh") or "").strip()
             url      = item.get("source_url", "")
             title_md = f"[{title_zh}]({url})" if url else title_zh
 
-            summary = (item.get("summary_zh") or item.get("summary") or "").strip()
-            if len(summary) > 90:
-                summary = summary[:90] + "…"
+            # 机制变动：从 summary_zh 提取前 55 字（已含监管核心要求）
+            summary_zh = (item.get("summary_zh") or item.get("summary") or "").strip()
+            mechanism  = summary_zh[:55] + "…" if len(summary_zh) > 55 else summary_zh
+
+            # 全平台影响：分类驱动的简洁一行
+            platform_impact = _short_platform_impact(cat)
 
             date_tag = item.get("date", "")
 
@@ -174,21 +234,22 @@ def build_daily_card(items: list) -> dict:
                 "content": (
                     f"{risk_em} **[{region}]** {status} · {cat_em} {cat}\n"
                     f"{title_md}\n"
-                    f"_{summary}_\n"
+                    f"🔧 **机制变动**：{mechanism}\n"
+                    f"🌐 **全平台影响**：{platform_impact}\n"
                     f"「{date_tag}」"
                 ),
             })
             total_shown += 1
 
-    elements.append({"tag": "hr"})
+        elements.append({"tag": "hr"})
 
     return {
         "config": {"wide_screen_mode": True},
         "header": {
-            "template": "orange",
+            "template": header_color,
             "title": {
                 "tag": "plain_text",
-                "content": "📡 Lilith Legal · 每日合规动态",
+                "content": f"📅 [日报] 全球游戏合规动态 ({yesterday_date})",
             },
         },
         "elements": elements,
@@ -227,7 +288,20 @@ def main():
         sys.exit(0)
 
     print(f"📡 发现 {len(items)} 条新增动态，发送飞书通知...")
-    card = build_daily_card(items)
+
+    # AI 综述（150 字以内，失败不阻断）
+    exec_summary = ""
+    try:
+        from translator import generate_daily_summary
+        exec_summary = generate_daily_summary(items)
+        if exec_summary:
+            print(f"📝 日报综述生成成功，{len(exec_summary)} 字")
+        else:
+            print("📝 日报综述跳过（无 API Key 或调用失败）")
+    except Exception as e:
+        print(f"⚠️  综述生成失败（将跳过）: {e}")
+
+    card = build_daily_card(items, exec_summary=exec_summary)
     send_card(webhook_url, card)
 
 
