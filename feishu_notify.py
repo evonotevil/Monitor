@@ -294,14 +294,11 @@ def build_card(
         "content": f"📅 **上周合规动态回顾** | {date_range}",
     })
 
-    # 引用块：综述（有内容才展示）
+    # 引用块：综述（有内容才展示，不带标题直接显示正文）
     if exec_summary:
         elements.append({
             "tag": "markdown",
-            "content": (
-                f"> 📋 **本周趋势综述**\n"
-                + "\n".join(f"> {line}" for line in exec_summary.splitlines())
-            ),
+            "content": "\n".join(f"> {line}" for line in exec_summary.splitlines()),
         })
 
     # 统计数据
@@ -353,16 +350,13 @@ def build_card(
 
             date_tag = item.get("date", "")
 
-            biz = _business_label(cat)
-
             elements.append({
                 "tag": "markdown",
                 "content": (
                     f"{risk_em} **[{region}]** {status} · {cat_em} {cat}\n"
                     f"{title_md}\n"
                     f"_{summary}_\n"
-                    f"「{date_tag}」\n"
-                    f"{biz}"
+                    f"「{date_tag}」"
                 ),
             })
             total_shown += 1
@@ -374,14 +368,14 @@ def build_card(
     if html_url:
         actions.append({
             "tag": "button",
-            "text": {"tag": "plain_text", "content": "🌐 查看本周 HTML 交互简报"},
+            "text": {"tag": "plain_text", "content": "🌐 查看完整报告"},
             "type": "primary",
             "url": html_url,
         })
     if pdf_url:
         actions.append({
             "tag": "button",
-            "text": {"tag": "plain_text", "content": "📄 下载 PDF 专业内参"},
+            "text": {"tag": "plain_text", "content": "📄 下载 PDF 报告"},
             "type": "default",
             "url": pdf_url,
         })
