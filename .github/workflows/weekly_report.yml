@@ -107,8 +107,9 @@ jobs:
           # 将本周 HTML 存入归档（HTML 约 70KB，适合文本分析；PDF 1.8MB 太大不归档）
           cp reports/latest.html "${ARCHIVE_DIR}/weekly.html"
 
-          # 更新 latest 文件 + DB + 本周存档
+          # 更新 latest 文件 + DB + 本周存档（含带日期的 PDF，供飞书链接使用）
           git add reports/latest.html reports/latest.pdf data/monitor.db
+          git add "reports/${PDF_FILENAME}" 2>/dev/null || true
           git add "${ARCHIVE_DIR}/weekly.html"
 
           # 如果没有变化就跳过 commit（避免空提交报错）
