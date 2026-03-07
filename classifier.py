@@ -298,11 +298,11 @@ _IMPACT_STATUS_BASE = {
 }
 
 # 核心市场 — Lilith/米哈游/鹰角出海核心营收来源
-# 同时包含显示分组名（北美/欧洲/东南亚）和具体国家名（美国/英国/越南等），
+# 同时包含显示分组名（北美/欧洲/亚太区）和具体国家名（美国/英国/越南等），
 # 因为 DB region 字段可能是 LLM 返回的国家名，而非显示分组名。
 _CORE_MARKETS = {
     # 显示分组名
-    "北美", "欧洲", "日本", "韩国", "东南亚",
+    "北美", "欧洲", "日本", "韩国", "东南亚", "亚太区",
     # 北美
     "美国", "加拿大",
     # 欧洲
@@ -310,6 +310,12 @@ _CORE_MARKETS = {
     "意大利", "西班牙", "波兰", "瑞典", "挪威",
     # 东南亚
     "越南", "印度尼西亚", "泰国", "菲律宾", "马来西亚", "新加坡",
+    # 南亚（印度是重要移动市场）
+    "印度", "南亚",
+    # 日韩台
+    "日本", "韩国", "台湾", "香港", "日韩台",
+    # 大洋洲
+    "澳大利亚", "新西兰",
 }
 
 # 高风险内容检测规则 (addon_score, patterns)
@@ -351,8 +357,8 @@ _HIGH_RISK_PATTERNS: list = [
         r"(?:in.?app.*purchas|IAP|app.*store.*commission).*(?:mandator|law|legislat|fine|ban|DMA)",
         r"(?:法规|法律|监管|禁止|要求).*(?:应用.*内购|IAP|App\s*Store.*分成|移动端.*支付)",
     ]),
-    # (+1.5) PC端反作弊程序被诉侵犯隐私 — 新兴PC合规风险
-    (1.5, [
+    # (+1.0) PC端反作弊程序被诉侵犯隐私 — PC合规风险（低于移动端优先级）
+    (1.0, [
         r"kernel.?level.*anti.?cheat.*(?:privac|sued|lawsuit|ban|fine|regulat)",
         r"anti.?cheat.*(?:privac\w*.*violat|sued|lawsuit|fine|regulat)",
         r"(?:driver|kernel).*anti.?cheat.*(?:privac|data.*collect|ban)",
@@ -373,6 +379,61 @@ _HIGH_RISK_PATTERNS: list = [
         r"연령\s*확인.*(?:의무|강제)",
     ]),
 ]
+
+
+# ── 硬件/系统层噪音模式（命中则 impact_score 归零）────────────────────
+# 这类文章与游戏合规无关，应在评分阶段直接抑制
+_HARDWARE_NOISE_PATTERNS = [
+    r"\bbattery\s*optim\w+\b",          # battery optimization
+    r"\bhardware\s*performance\b",       # hardware performance
+    r"\bwi-?fi\s*standard\w*\b",        # Wi-Fi standards
+    r"\bprocessor\s*architect\w+\b",     # processor architecture
+    r"\bchipset\s*(?:spec|feature|model|update)\b",
+    r"\bgpu\s*(?:benchmark|driver\s*update|spec)\b",
+    r"\bcpu\s*(?:architect|benchmark|overcloc)\w+\b",
+    r"\bdisplay\s*(?:refresh\s*rate|panel|resolution)\b",
+    r"\bram\s*(?:speed|type|capacity)\b",
+]
+
+# ── Google/Apple 非核心话题抑制（命中则 impact_score 归零）──────────
+# 仅涉及 Google/Apple 的技术/产品/财报但与支付/分发/分级/隐私/消保无关
+_GOOGLE_APPLE_CORE_TOPICS = re.compile(
+    r"pay(?:ment|ments)?|distribut\w+|rating\w*|privacy|data.?protect|consumer|fine|penalt"
+    r"|DMA\b|anti.?trust|monopol|IAP|app.?store.?polic|google.?play.?polic"
+    r"|third.?party|side.?load|commission|refund|GDPR|COPPA|children|minor",
+    re.IGNORECASE,
+)
+_GOOGLE_APPLE_MENTION = re.compile(
+    r"\b(?:google|apple|android|ios)\b", re.IGNORECASE,
+)
+_NON_CORE_GOOGLE_APPLE_NOISE = re.compile(
+    r"\b(?:google|apple)\b.*\b(?:pixel|macbook|iphone|ipad|watchos|macos|android.*update"
+    r"|search.*algorithm|maps|chrome|safari|siri|gemini.*product|earnings|revenue.*billion"
+    r"|stock|share.*price|quarterly.*result)\b"
+    r"|\b(?:pixel|macbook|iphone|ipad)\b.*\b(?:google|apple)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_hardware_noise(text: str) -> bool:
+    """返回 True 表示纯硬件/系统文章，应将 impact_score 归零。"""
+    tl = text.lower()
+    for p in _HARDWARE_NOISE_PATTERNS:
+        if re.search(p, tl, re.IGNORECASE):
+            return True
+    return False
+
+
+def _is_google_apple_non_core(text: str) -> bool:
+    """
+    返回 True 表示文章仅涉及 Google/Apple 的非合规话题
+    （不含支付/分发/分级/隐私/消保等核心关键词），应将 impact_score 归零。
+    """
+    if not _GOOGLE_APPLE_MENTION.search(text):
+        return False  # 不含 Google/Apple，与此规则无关
+    if _GOOGLE_APPLE_CORE_TOPICS.search(text):
+        return False  # 包含核心合规话题，正常评分
+    return bool(_NON_CORE_GOOGLE_APPLE_NOISE.search(text))
 
 
 def get_source_tier(source_name: str) -> str:
@@ -420,6 +481,10 @@ def score_impact(
 
     高风险 ≥9.0 / 中风险 ≥7.0 / 关注 ≥5.0 / 低优先 <5.0
     """
+    # 硬件噪音 / Google-Apple 非核心文章 → 直接归零，不进入评分链
+    if text and (_is_hardware_noise(text) or _is_google_apple_non_core(text)):
+        return 0.0
+
     base = _IMPACT_STATUS_BASE.get(status, 2.0)
 
     tier = get_source_tier(source_name)

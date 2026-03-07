@@ -457,15 +457,15 @@ def cmd_retranslate(args):
 
         logger.info(f"[重译] 开始重译 {len(items_dicts)} 条条目（限额 {limit}）…")
         updated = 0
+        deleted = 0
         for item_dict in items_dicts:
             translated = translate_item_fields(item_dict)
-            # LLM 判定不相关但条目已入库：降级 Google Translate 补充标题，避免报告留白
-            if translated.get("_llm_is_relevant") is False and not translated.get("title_zh"):
-                from translator import translate_to_zh, _build_source_text
-                raw_title = item_dict.get("title", "")
-                translated["title_zh"] = translate_to_zh(raw_title[:200]) if raw_title else ""
-                translated["summary_zh"] = translate_to_zh(_build_source_text(item_dict)) if raw_title else ""
-                logger.info(f"  ~ [GT兜底] [{item_dict.get('region','')}] {translated['title_zh'][:40]}")
+            # LLM 判定不相关：直接从 DB 删除，避免报告出现大量未翻译低价值条目
+            if translated.get("_llm_is_relevant") is False:
+                db.delete_item(item_dict["id"])
+                deleted += 1
+                logger.info(f"  ✗ [删除] [{item_dict.get('region','')}] {item_dict.get('title','')[:40]}")
+                continue
             if translated.get("title_zh"):
                 db.update_translation(
                     item_dict["id"],
@@ -474,7 +474,8 @@ def cmd_retranslate(args):
                 )
                 updated += 1
                 logger.info(f"  ✓ [{item_dict.get('region','')}] {translated['title_zh'][:40]}")
-
+        if deleted:
+            logger.info(f"[重译] 删除 {deleted} 条 LLM 判定不相关条目")
         logger.info(f"[重译] 完成，共更新 {updated} 条。")
     finally:
         db.close()
