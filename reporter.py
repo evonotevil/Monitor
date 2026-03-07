@@ -369,7 +369,7 @@ def print_table(items: List[dict], max_summary_len: int = 50):
         f"{'标题(原文)':<50} | "
         f"{'发布时间':<12} | "
         f"{'状态':<12} | "
-        f"摘要(中文)"
+        f"摘要与合规提示"
     )
     print(f"{C.BOLD}{header}{C.RESET}")
     print(f"{'-'*140}")
@@ -433,7 +433,7 @@ def generate_markdown(items: List[dict], title: str = "全球游戏行业立法�
 def _append_region_md(lines: list, region: str, region_items: list):
     lines.append(f"## {region} ({len(region_items)} 条)")
     lines.append("")
-    lines.append("| 类别 | 标题(原文) | 发布时间 | 状态 | 摘要(中文) |")
+    lines.append("| 类别 | 标题(原文) | 发布时间 | 状态 | 摘要与合规提示 |")
     lines.append("|------|------------|----------|------|------------|")
 
     for item in sorted(region_items, key=lambda x: x.get("date", ""), reverse=True):
@@ -614,7 +614,7 @@ def generate_html(items: List[dict], title: str = "全球游戏行业立法动�
     if exec_summary:
         exec_summary_html = (
             '<div class="exec-summary-card">'
-            '<div class="exec-summary-label">📋 本期综述</div>'
+            '<div class="exec-summary-label">📋 上周动态总结</div>'
             f'<div class="exec-summary-text">{html_mod.escape(exec_summary)}</div>'
             '</div>'
         )
@@ -980,7 +980,7 @@ td {{ padding: 9px 12px; font-size: 12px; vertical-align: top; }}
           <th onclick="sortTable(2)">标题 <span class="sort-icon">⇅</span></th>
           <th onclick="sortTable(3)">发布时间 <span class="sort-icon">⇅</span></th>
           <th onclick="sortTable(4)">标签 <span class="sort-icon">⇅</span></th>
-          <th>摘要(中文)</th>
+          <th>摘要与合规提示</th>
         </tr>
       </thead>
       <tbody>{rows_html}
