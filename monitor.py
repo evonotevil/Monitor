@@ -125,7 +125,9 @@ def _deduplicate_items(items):
             if loser_count > 0 and items[winner_idx].summary:
                 items[winner_idx].summary += f" [另有 {loser_count} 篇同主题报道]"
 
-    # ── 阶段 2：14 天窗口，事件级聚类 ───────────────────────────────────
+    # ── 阶段 2：30 天窗口，事件级聚类（硬性合并同一法案不同阶段）────────
+    # 同一法案在不同阶段（如印尼年龄禁令草案→已生效）严禁拆分展示，必须合并。
+    # 窗口扩展至 30 天；移除相似度上限（sim > 0.8 的高相似跨阶段对同样捕获）。
     # 状态优先级（高 → 低）
     _STATUS_RANK = {
         "已生效": 9, "即将生效": 8, "执法动态": 7, "修订变更": 6,
@@ -149,12 +151,13 @@ def _deduplicate_items(items):
                 d_i = _date.fromisoformat(item_i.date)
                 d_j = _date.fromisoformat(item_j.date)
                 diff = abs((d_i - d_j).days)
-                if diff <= 2 or diff > 14:   # 2 天内已处理，>14 天不合并
+                if diff <= 2 or diff > 30:   # 2 天内已处理，>30 天不合并
                     continue
             except ValueError:
                 continue
             sim = _title_bigram_sim(item_i.title, item_j.title)
-            if 0.5 <= sim <= 0.8:
+            # 移除上限：sim ≥ 0.5 均为候选（高相似跨阶段对在 LLM 验证后合并）
+            if sim >= 0.5:
                 candidates.append((i, j, sim))
 
     if candidates:
@@ -180,7 +183,7 @@ def _deduplicate_items(items):
             is_same_event = (
                 llm_results[idx_pair]
                 if llm_results and idx_pair < len(llm_results)
-                else sim > 0.65
+                else sim >= 0.65  # 无 LLM 时：高相似度 + 同地区同类 → 视为同一事件
             )
             if not is_same_event:
                 continue

@@ -825,7 +825,7 @@ td {{ padding: 9px 12px; font-size: 12px; vertical-align: top; }}
     width: 6%;
 }}
 .td-status {{ white-space: nowrap; width: 7%; }}
-.td-summary {{ width: 65%; min-width: 320px; color: #636366; line-height: 1.65; font-size: 11.5px; }}
+.td-summary {{ width: 65%; min-width: 320px; color: #636366; line-height: 1.65; font-size: 11.5px; word-break: break-word; overflow-wrap: break-word; }}
 
 /* ── 标签 badges ── */
 .cat-badge {{
