@@ -305,8 +305,7 @@ def build_card(
     elements.append({
         "tag": "markdown",
         "content": (
-            f"共监测到 **{total}** 条合规动态（噪音已过滤）\n\n"
-            f"**📂 按分类**\n{cat_line}\n\n"
+            f"共监测到 **{total}** 条合规动态\n\n"
             f"**🗺️ 按地区**\n{region_line}"
         ),
     })
