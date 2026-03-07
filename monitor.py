@@ -62,13 +62,16 @@ def _title_bigram_sim(a: str, b: str) -> float:
 
 def _deduplicate_items(items):
     """
-    在同一「显示分组」且日期相差 ≤2 天的文章中，找出英文标题 bigram 相似度 >65%
+    在同一「原始 region」且日期相差 ≤2 天的文章中，找出英文标题 bigram 相似度 >0.8
     的文章对，只保留 impact_score 最高的那篇（相同则保留最早抓到的）。
     其余视为重复，丢弃前在摘要末尾追加多来源提示。
 
-    注意：按显示分组（东南亚/欧洲/北美/其他…）而非原始 region 字段去重，
-    这样来自不同子 region（如"全球"/"澳大利亚"/"英国"）但属同一显示组的
-    同主题文章也能被合并。
+    去重条件（同时满足）：
+      1. 原始 region 字段相同（禁止跨国家/地区合并，如美国 vs 英国）
+      2. 标题 bigram 相似度 > 0.8（高置信度同主题）
+      3. 日期差 ≤2 天
+
+    注意：阈值从 0.65 提高至 0.8，避免将不同国家/平台的相似法案误合并。
     """
     from models import LegislationItem
     keep: list[LegislationItem] = []
@@ -77,13 +80,12 @@ def _deduplicate_items(items):
     for i, item_i in enumerate(items):
         if i in dropped:
             continue
-        group_i = _get_region_group(item_i.region)
         duplicates = []   # (j, sim)
         for j, item_j in enumerate(items):
             if j <= i or j in dropped:
                 continue
-            # 按显示分组比较，而非原始 region 字段
-            if group_i != _get_region_group(item_j.region):
+            # 必须同一原始 region（禁止跨国家合并）
+            if item_i.region != item_j.region:
                 continue
             # 日期差 ≤2 天
             try:
@@ -95,7 +97,7 @@ def _deduplicate_items(items):
             except ValueError:
                 continue
             sim = _title_bigram_sim(item_i.title, item_j.title)
-            if sim > 0.65:
+            if sim > 0.8:
                 duplicates.append((j, sim))
 
         if duplicates:
@@ -120,6 +122,17 @@ def _deduplicate_items(items):
     return result
 
 
+def _filter_valid_dates(items):
+    """
+    过滤掉日期不在 2025/2026 年的条目（避免 RSS 日期回收等导致的噪音入库）。
+    """
+    valid = [item for item in items if item.date[:4] in ("2025", "2026")]
+    removed = len(items) - len(valid)
+    if removed:
+        logger.info(f"[日期过滤] 移除 {removed} 条日期不在 2025-2026 的条目")
+    return valid
+
+
 def _period_label(period: str) -> str:
     labels = {"week": "周报（近7天）", "month": "月报（近30天）", "all": "全量报告"}
     return labels.get(period, "全量报告")
@@ -138,7 +151,9 @@ def cmd_run(args):
         items = fetch_and_process(max_days=days)
 
         if items:
-            # 语义去重：同地区同日期窗口内高度相似的文章合并为一条
+            # 严格日期过滤：只保留 2025/2026 年的条目
+            items = _filter_valid_dates(items)
+            # 语义去重：同 region 同日期窗口内高度相似的文章合并为一条
             items = _deduplicate_items(items)
 
             no_translate = getattr(args, 'no_translate', False)
@@ -178,7 +193,12 @@ def cmd_run(args):
                             f" | {item.title[:50]}"
                         )
                         item.status = llm_status
-                        item.impact_score = score_impact(item.status, item.source_name)
+                        item.impact_score = score_impact(
+                            item.status,
+                            item.source_name,
+                            region=item.region,
+                            text=f"{item.title} {item.summary_zh}",
+                        )
 
                     kept_items.append(item)
 

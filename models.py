@@ -26,7 +26,7 @@ class LegislationItem:
     lang: str = "en"        # 语言
     title_zh: str = ""      # 标题中文翻译
     summary_zh: str = ""    # 摘要中文翻译
-    impact_score: int = 1   # 影响评分 1=低/2=中/3=高 (信源层级 × 状态)
+    impact_score: float = 1.0  # 影响评分 1.0–10.0 (状态 × 信源层级 × 核心市场 × 高风险内容)
     id: Optional[int] = None
 
     def to_dict(self):
@@ -59,7 +59,7 @@ class Database:
                 lang TEXT DEFAULT 'en',
                 title_zh TEXT DEFAULT '',
                 summary_zh TEXT DEFAULT '',
-                impact_score INTEGER DEFAULT 1,
+                impact_score REAL DEFAULT 1.0,
                 created_at TEXT DEFAULT (datetime('now')),
                 UNIQUE(title, source_url)
             );
@@ -81,7 +81,7 @@ class Database:
         for col, definition in [
             ("title_zh",     "TEXT DEFAULT ''"),
             ("summary_zh",   "TEXT DEFAULT ''"),
-            ("impact_score", "INTEGER DEFAULT 1"),
+            ("impact_score", "REAL DEFAULT 1.0"),
         ]:
             try:
                 self.conn.execute(f"SELECT {col} FROM legislation LIMIT 1")
