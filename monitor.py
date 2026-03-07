@@ -60,64 +60,157 @@ def _title_bigram_sim(a: str, b: str) -> float:
     return len(bg_a & bg_b) / max(len(bg_a), len(bg_b))
 
 
+def _make_timeline_note(items_group: list) -> str:
+    """
+    将多个同主题条目（不同日期/状态）合并为时间轴注释。
+    返回格式：进展：YYYY-MM-DD [状态1] → YYYY-MM-DD [状态2] ...
+    """
+    stages = sorted(
+        {(item.date, item.status) for item in items_group},
+        key=lambda x: x[0],
+    )
+    if len(stages) <= 1:
+        return ""
+    parts = " → ".join(f"{d} [{s}]" for d, s in stages)
+    return f"进展：{parts}"
+
+
 def _deduplicate_items(items):
     """
-    在同一「原始 region」且日期相差 ≤2 天的文章中，找出英文标题 bigram 相似度 >0.8
-    的文章对，只保留 impact_score 最高的那篇（相同则保留最早抓到的）。
-    其余视为重复，丢弃前在摘要末尾追加多来源提示。
+    两阶段去重 + 事件级时间轴合并：
 
-    去重条件（同时满足）：
-      1. 原始 region 字段相同（禁止跨国家/地区合并，如美国 vs 英国）
-      2. 标题 bigram 相似度 > 0.8（高置信度同主题）
-      3. 日期差 ≤2 天
+    【阶段 1 — 当日去重（2 天窗口）】
+      同 region + 日期差 ≤2 天 + bigram 相似度 >0.8 → 确定重复，保留高分项。
 
-    注意：阈值从 0.65 提高至 0.8，避免将不同国家/平台的相似法案误合并。
+    【阶段 2 — 事件级聚类（14 天窗口）】
+      同 region + 同 category_l1 + 日期差 2–14 天 + 相似度 0.5–0.8
+      → 候选为"同一监管事件的不同进展阶段"
+      → 用 LLM verify_duplicate_pairs 确认（无 LLM 则用相似度 >0.65 启发式判断）
+      → 确认后：保留状态权重最高项，并在其 summary_zh 末尾追加时间轴进展注释
+
+    禁止跨 region 合并（如美国 vs 英国同主题法案仍独立显示）。
     """
     from models import LegislationItem
-    keep: list[LegislationItem] = []
-    dropped: set[int] = set()   # 索引集合
+    from datetime import date as _date
+    dropped: set[int] = set()
 
+    # ── 阶段 1：2 天窗口，高置信去重 ────────────────────────────────────
     for i, item_i in enumerate(items):
         if i in dropped:
             continue
-        duplicates = []   # (j, sim)
+        duplicates = []
         for j, item_j in enumerate(items):
             if j <= i or j in dropped:
                 continue
-            # 必须同一原始 region（禁止跨国家合并）
             if item_i.region != item_j.region:
                 continue
-            # 日期差 ≤2 天
             try:
-                from datetime import date
-                d_i = date.fromisoformat(item_i.date)
-                d_j = date.fromisoformat(item_j.date)
-                if abs((d_i - d_j).days) > 2:
+                d_i = _date.fromisoformat(item_i.date)
+                d_j = _date.fromisoformat(item_j.date)
+                diff = abs((d_i - d_j).days)
+                if diff > 2:
                     continue
             except ValueError:
                 continue
             sim = _title_bigram_sim(item_i.title, item_j.title)
             if sim > 0.8:
                 duplicates.append((j, sim))
-
         if duplicates:
-            # 收集所有候选（包括 i 自身）
             group = [(i, 0.0)] + duplicates
-            # 按 impact_score 降序排，分数相同则保留索引最小（先抓到的）
             group.sort(key=lambda x: (-items[x[0]].impact_score, x[0]))
             winner_idx = group[0][0]
             loser_count = len(group) - 1
             for idx, _ in group[1:]:
                 dropped.add(idx)
-            # 给保留项追加来源提示
             if loser_count > 0 and items[winner_idx].summary:
                 items[winner_idx].summary += f" [另有 {loser_count} 篇同主题报道]"
 
+    # ── 阶段 2：14 天窗口，事件级聚类 ───────────────────────────────────
+    # 状态优先级（高 → 低）
+    _STATUS_RANK = {
+        "已生效": 9, "即将生效": 8, "执法动态": 7, "修订变更": 6,
+        "草案/征求意见": 5, "立法进行中": 4, "已提案": 3, "立法动态": 2, "已废止": 1,
+    }
+
+    # 收集候选跨阶段对：(i, j)
+    candidates = []
+    for i, item_i in enumerate(items):
+        if i in dropped:
+            continue
+        for j, item_j in enumerate(items):
+            if j <= i or j in dropped:
+                continue
+            # 同 region + 同大类
+            if item_i.region != item_j.region:
+                continue
+            if item_i.category_l1 != item_j.category_l1:
+                continue
+            try:
+                d_i = _date.fromisoformat(item_i.date)
+                d_j = _date.fromisoformat(item_j.date)
+                diff = abs((d_i - d_j).days)
+                if diff <= 2 or diff > 14:   # 2 天内已处理，>14 天不合并
+                    continue
+            except ValueError:
+                continue
+            sim = _title_bigram_sim(item_i.title, item_j.title)
+            if 0.5 <= sim <= 0.8:
+                candidates.append((i, j, sim))
+
+    if candidates:
+        # 尝试用 LLM 批量验证
+        pairs_to_verify = []
+        for i, j, _ in candidates:
+            t_i = (items[i].title_zh or items[i].title or "")
+            t_j = (items[j].title_zh or items[j].title or "")
+            pairs_to_verify.append((t_i, t_j))
+
+        llm_results = None
+        try:
+            from translator import verify_duplicate_pairs
+            import time as _time
+            _time.sleep(2)
+            llm_results = verify_duplicate_pairs(pairs_to_verify)
+        except Exception as e:
+            logger.warning(f"[事件聚类] LLM 验证失败，使用启发式判断: {e}")
+
+        for idx_pair, (i, j, sim) in enumerate(candidates):
+            if i in dropped or j in dropped:
+                continue
+            is_same_event = (
+                llm_results[idx_pair]
+                if llm_results and idx_pair < len(llm_results)
+                else sim > 0.65
+            )
+            if not is_same_event:
+                continue
+
+            item_i, item_j = items[i], items[j]
+            # 保留状态优先级更高的项（草案→生效 保留"生效"条目）
+            rank_i = _STATUS_RANK.get(item_i.status, 0)
+            rank_j = _STATUS_RANK.get(item_j.status, 0)
+            if rank_i >= rank_j:
+                winner, loser_idx = i, j
+            else:
+                winner, loser_idx = j, i
+
+            dropped.add(loser_idx)
+            timeline = _make_timeline_note([item_i, item_j])
+            if timeline:
+                winner_item = items[winner]
+                if winner_item.summary_zh:
+                    winner_item.summary_zh = winner_item.summary_zh.rstrip("。") + f"。{timeline}"
+                else:
+                    winner_item.summary_zh = timeline
+                logger.info(
+                    f"[事件聚类] 合并跨阶段条目 → {timeline[:60]}"
+                )
+
     result = [item for i, item in enumerate(items) if i not in dropped]
-    if len(items) != len(result):
+    merged = len(items) - len(result)
+    if merged:
         logger.info(
-            f"[去重] 语义去重：{len(items)} 条 → {len(result)} 条"
-            f"（合并 {len(items) - len(result)} 条高度相似文章）"
+            f"[去重] 两阶段去重：{len(items)} 条 → {len(result)} 条（合并 {merged} 条）"
         )
     return result
 
