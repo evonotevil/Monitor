@@ -20,6 +20,8 @@ from config import (
     RSS_FEEDS,
     KEYWORDS,
     PC_PLATFORM_KEYWORDS_EN,
+    OFFICIAL_SITE_QUERIES,
+    INDUSTRY_QUERY_NOISE_SUFFIX,
     GOOGLE_NEWS_SEARCH_TEMPLATE,
     GOOGLE_NEWS_REGIONS,
     FETCH_TIMEOUT,
@@ -609,52 +611,62 @@ def fetch_all_rss() -> List[dict]:
     return all_items
 
 
-def fetch_google_news_all() -> List[dict]:
+def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS) -> List[dict]:
     all_items = []
-    tasks = []
+    tasks = []  # (query, region_key)
+
+    # 动态日期过滤：when:Xd 替代硬编码年份（Google News 识别此参数，无效时静默降级）
+    when = f" when:{max_days}d"
+    # 英文通用查询降噪后缀（附加 -conference -summit -funding -investment）
+    noise = INDUSTRY_QUERY_NOISE_SUFFIX
 
     # ── 英语圈：美国 + 英国/澳洲/加拿大/新加坡 补充视角 ──────────────
     for kw in KEYWORDS["en"]:
-        tasks.append((kw, "en_US"))
+        tasks.append((kw + noise + when, "en_US"))
     for kw in KEYWORDS["en"][30:50]:  # 经营合规相关关键词补充英国视角
-        tasks.append((kw, "en_UK"))
-    # PC 平台合规专项：Steam/Epic/驱动反作弊/D2C 的监管重心在欧洲（DMA/GDPR/PEGI）
+        tasks.append((kw + noise + when, "en_UK"))
+    # PC 平台合规专项：监管重心在欧洲（DMA/GDPR/PEGI），不加通用降噪（查询已足够精准）
     for kw in PC_PLATFORM_KEYWORDS_EN:
-        tasks.append((kw, "en_UK"))
+        tasks.append((kw + when, "en_UK"))
     for kw in KEYWORDS["en"][10:30]:  # 未成年/数据隐私补充澳洲视角
-        tasks.append((kw, "en_AU"))
+        tasks.append((kw + noise + when, "en_AU"))
     for kw in KEYWORDS["en"][30:50]:  # 东南亚经营合规补充新加坡视角
-        tasks.append((kw, "en_SG"))
+        tasks.append((kw + noise + when, "en_SG"))
+
+    # ── 官方政府域名精准查询（site: 定向，直接获取法律原文和处罚决定书）──
+    # 不添加降噪后缀（政府网站不发布融资/峰会内容）
+    for kw in OFFICIAL_SITE_QUERIES:
+        tasks.append((kw + when, "en_US"))
 
     # ── 亚洲本地语言 ───────────────────────────────────────────────
     for kw in KEYWORDS["ja"]:
-        tasks.append((kw, "ja_JP"))
+        tasks.append((kw + when, "ja_JP"))
     for kw in KEYWORDS["ko"]:
-        tasks.append((kw, "ko_KR"))
+        tasks.append((kw + when, "ko_KR"))
     for kw in KEYWORDS.get("vi", []):
-        tasks.append((kw, "vi_VN"))
+        tasks.append((kw + when, "vi_VN"))
     for kw in KEYWORDS.get("id", []):
-        tasks.append((kw, "en_ID"))
+        tasks.append((kw + when, "en_ID"))
     for kw in KEYWORDS.get("zh_tw", []):
-        tasks.append((kw, "zh_TW"))
+        tasks.append((kw + when, "zh_TW"))
     for kw in KEYWORDS.get("th", []):
-        tasks.append((kw, "th_TH"))
+        tasks.append((kw + when, "th_TH"))
 
     # ── 欧洲本地语言 ───────────────────────────────────────────────
     for kw in KEYWORDS.get("de", []):
-        tasks.append((kw, "de_DE"))
+        tasks.append((kw + when, "de_DE"))
     for kw in KEYWORDS.get("fr", []):
-        tasks.append((kw, "fr_FR"))
+        tasks.append((kw + when, "fr_FR"))
 
     # ── 南美 ───────────────────────────────────────────────────────
     for kw in KEYWORDS.get("pt", []):
-        tasks.append((kw, "pt_BR"))
+        tasks.append((kw + when, "pt_BR"))
     for kw in KEYWORDS.get("es", []):
-        tasks.append((kw, "es_MX"))
+        tasks.append((kw + when, "es_MX"))
 
     # ── 中东 ───────────────────────────────────────────────────────
     for kw in KEYWORDS.get("ar", []):
-        tasks.append((kw, "ar_SA"))
+        tasks.append((kw + when, "ar_SA"))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
         futures = {}
@@ -732,7 +744,7 @@ def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS) -> List[LegislationI
     rss_items = fetch_all_rss()
     logger.info(f"RSS 抓取完成: {len(rss_items)} 条原始数据")
 
-    news_items = fetch_google_news_all()
+    news_items = fetch_google_news_all(max_days)
     logger.info(f"Google News 抓取完成: {len(news_items)} 条原始数据")
 
     all_raw = rss_items + news_items

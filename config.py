@@ -157,12 +157,16 @@ STATUS_LABELS = [
 #   D2C（绕开平台直销）监管、三方充值平台合规。
 #
 PC_PLATFORM_KEYWORDS_EN = [
-    # Steam / Epic / PC 启动器
-    "Steam game regulation consumer privacy",
-    "Epic Games Store policy loot box regulation",
+    # Steam / Epic / PC 启动器（精确短语 Boolean 查询）
+    'Steam "alternative payment" (regulation OR ban OR law)',
+    'Steam game (regulation OR ban OR privacy) consumer',
+    'Epic Store OR "Epic Games Store" "Terms of Service" (game OR compliance)',
+    '"Epic Games Store" policy (loot box OR regulation OR law)',
+    '"PC Launcher" privacy (data collection OR regulation OR law)',
     "PC game launcher privacy data collection law",
     "PC game DRM consumer regulation",
-    # 驱动级反作弊
+    # 驱动级反作弊（精确短语）
+    '"kernel-level anti-cheat" (regulation OR privacy OR ban)',
     "kernel-level anti-cheat privacy regulation",
     "game anti-cheat driver ban restriction consumer",
     # D2C 直销渠道
@@ -178,24 +182,18 @@ PC_PLATFORM_KEYWORDS_EN = [
 
 KEYWORDS = {
     "en": [
-        # === 玩法合规 / 涉赌 - Loot Box / Gacha ===
-        "loot box regulation 2025",
-        "loot box regulation 2026",
-        "loot box ban law",
-        "gacha regulation law",
-        "game loot box gambling law",
-        "randomized purchase game regulation",
-        "probability disclosure mobile game law",
-        "pay to win regulation",
-        "mobile game gacha gambling classification",
-        "virtual goods gambling law game",
-        "game mechanic gambling determination",
-        "gacha pay-to-win ban",
+        # === 玩法合规 / Loot Box / Gacha（Boolean 查询，无硬编码年份）===
+        # 动态时效由 fetcher 附加 when:Xd 处理
+        '"loot box" (regulation OR law OR ban OR enforcement OR fine)',
+        '"loot box" OR gacha gambling classification game',
+        '"probability disclosure" (game OR gacha OR "loot box") law',
+        '("pay to win" OR "randomized purchase") game (regulation OR ban)',
+        '"virtual goods" OR "in-game currency" gambling law game',
+        '"in-game currency" consumer protection regulation',
 
         # === 未成年人保护 ===
         "children online safety act game",
-        "COPPA game enforcement 2025",
-        "COPPA game enforcement 2026",
+        "COPPA game enforcement",
         "FTC children game fine",
         "game age verification law",
         "minor gaming restriction law",
@@ -210,7 +208,7 @@ KEYWORDS = {
         "GDPR game enforcement",
         "GDPR mobile game fine",
         "CCPA game privacy law",
-        "game data privacy law 2026",
+        "game data privacy law",
         "children data protection game app",
         "game app privacy regulation",
         "cross-border data transfer game",
@@ -265,8 +263,7 @@ KEYWORDS = {
         # === 欧洲特定 ===
         "UK online safety act game age verification",
         "EU digital services act game platform",
-        "DSA game compliance 2025",
-        "DSA game compliance 2026",
+        "DSA game compliance",
         "DMA app store game regulation",
         "EU AI act game",
         "EU loot box regulation",
@@ -289,8 +286,7 @@ KEYWORDS = {
         *PC_PLATFORM_KEYWORDS_EN,
     ],
     "ja": [
-        "ゲーム規制 法律 2025",
-        "ゲーム規制 法律 2026",
+        "ゲーム規制 法律",
         "ガチャ規制 法案 改正",
         "未成年者 ゲーム 規制",
         "景品表示法 ガチャ 処分",
@@ -300,14 +296,13 @@ KEYWORDS = {
         "消費者庁 ゲーム 処分 罰則",
         "子ども ゲーム 利用 規制",
         "ゲーム 個人情報 保護 規制",
-        # 消費者庁 / CESA 专项 — 景表法与抽卡规则
-        "消費者庁 ゲーム 景品表示法 処分 2026",
+        # 消費者庁 / CESA 专项 — 景表法与抽卡规则（无硬编码年份）
+        "消費者庁 ゲーム 景品表示法 処分",
         "消費者庁 ガチャ 確率 規制 改正",
-        "CESA ゲーム 自主規制 ガチャ 改正 2026",
+        "CESA ゲーム 自主規制 ガチャ 改正",
     ],
     "ko": [
-        "게임 규제 법안 2025",
-        "게임 규제 법안 2026",
+        "게임 규제 법안",
         "확률형 아이템 규제 법안",
         "게임산업진흥법 개정",
         "미성년자 게임 규제 법률",
@@ -317,29 +312,27 @@ KEYWORDS = {
         "게임 등급 분류 의무",
         "청소년 게임 이용 제한 법률",
         "게임 광고 규제 법안",
-        # GRAC（게임물관리위원회）专项 — 关注确率型道具罚单
-        "게임물관리위원회 확률형 처분 제재 2026",
-        "GRAC 게임 등급 규제 제재 2026",
+        # GRAC（게임물관리위원회）专项 — 关注确率型道具罚单（无硬编码年份）
+        "게임물관리위원회 확률형 처분 제재",
+        "GRAC 게임 등급 규제 제재",
         "확률형 아이템 과징금 처분 게임사",
     ],
     "vi": [
-        "quy định trò chơi điện tử 2025",
-        "quy định trò chơi điện tử 2026",
+        "quy định trò chơi điện tử",
         "luật game mobile đại lý nước ngoài",
         "nghị định trò chơi điện tử",
         "Bộ Thông tin Truyền thông game",
     ],
     "id": [
-        "regulasi game mobile Indonesia 2025",
-        "regulasi game mobile Indonesia 2026",
+        "regulasi game mobile Indonesia",
         "penerbit game lokal Indonesia",
         "IGAC rating game mobile",
         "Kominfo regulasi game",
         "Kemenkominfo penerbit game asing",
     ],
     "de": [
-        # 德语 - 德国/奥地利
-        "Spieleregulierung Gesetz 2026",
+        # 德语 - 德国/奥地利（无硬编码年份）
+        "Spieleregulierung Gesetz",
         "Lootboxen Regulierung Deutschland",
         "Jugendschutz Videospiele Gesetz",
         "Datenschutz Mobile Games DSGVO",
@@ -348,18 +341,18 @@ KEYWORDS = {
         "Spielsucht Gesetz Jugendschutz",
     ],
     "fr": [
-        # 法语 - 法国/比利时
+        # 法语 - 法国/比利时（无硬编码年份）
         "réglementation loot box jeu vidéo",
         "protection mineurs jeux vidéo loi",
         "RGPD jeux mobiles France",
-        "jeu vidéo régulation loi 2026",
+        "jeu vidéo régulation loi",
         "microtransactions jeux vidéo loi",
         "jeux mobiles mineurs protection loi",
         "dark pattern jeux vidéo France",
     ],
     "pt": [
-        # 葡萄牙语 - 巴西
-        "regulação jogos mobile Brasil 2026",
+        # 葡萄牙语 - 巴西（无硬编码年份）
+        "regulação jogos mobile Brasil",
         "LGPD jogos eletrônicos aplicativo",
         "lei loot box jogo online",
         "proteção menores jogos mobile Brasil",
@@ -368,18 +361,18 @@ KEYWORDS = {
         "microtransação jogo regulação Brasil",
     ],
     "es": [
-        # 西班牙语 - 墨西哥/西班牙/拉美
+        # 西班牙语 - 墨西哥/西班牙/拉美（无硬编码年份）
         "regulación loot box videojuegos ley",
         "ley protección menores videojuegos España",
         "regulación videojuegos consumidor México",
         "privacidad datos videojuegos menores",
-        "regulación juegos móviles 2026",
+        "regulación juegos móviles",
         "microtransacciones videojuegos ley",
         "juegos online regulación España",
     ],
     "zh_tw": [
-        # 繁体中文 - 台湾/港澳
-        "遊戲法規 台灣 2026",
+        # 繁体中文 - 台湾/港澳（无硬编码年份）
+        "遊戲法規 台灣",
         "遊戲內購 消費者保護 法規",
         "未成年 遊戲 保護法 台灣",
         "個資法 遊戲 App 台灣",
@@ -387,15 +380,15 @@ KEYWORDS = {
         "手機遊戲 廣告 規範",
     ],
     "th": [
-        # 泰语
-        "กฎหมายเกมมือถือ ไทย 2026",
+        # 泰语（无硬编码年份）
+        "กฎหมายเกมมือถือ ไทย",
         "PDPA เกมออนไลน์ ไทย",
         "ระเบียบเกมมือถือ ผู้เยาว์",
         "คุ้มครองผู้บริโภค เกมออนไลน์ กฎหมาย",
     ],
     "ar": [
-        # 阿拉伯语 - 沙特/阿联酋
-        "تنظيم ألعاب الجوال السعودية 2026",
+        # 阿拉伯语 - 沙特/阿联酋（无硬编码年份）
+        "تنظيم ألعاب الجوال السعودية",
         "قانون ألعاب الفيديو الإمارات",
         "حماية الأطفال ألعاب إلكترونية",
         "صناديق الغنائم لعبة قانون",
@@ -638,3 +631,32 @@ PERIOD_DAYS = {
     "month": 30,
     "all":   90,
 }
+
+# ─── Google News 查询增强 ─────────────────────────────────────────────
+#
+# 行业媒体降噪后缀：附加至所有英文通用查询末尾，
+# 在查询层面过滤峰会 / 融资 / 投资类内容（比正则后置过滤更高效）
+INDUSTRY_QUERY_NOISE_SUFFIX = " -conference -summit -funding -investment"
+
+# 官方政府域名精准查询：site: 过滤，直接获取法律原文和处罚决定书
+# 这些查询不添加降噪后缀（政府网站不发布融资/峰会内容）
+OFFICIAL_SITE_QUERIES = [
+    # ── 北美 ──────────────────────────────────────────────────────────
+    "game regulation site:ftc.gov",
+    "children privacy game site:ftc.gov",
+    "game privacy site:oag.ca.gov",             # 加州 AG
+    # ── 欧洲 / 英国 ────────────────────────────────────────────────────
+    "game online safety regulation site:gov.uk",
+    "game age verification site:gov.uk",
+    "game privacy fine site:ico.org.uk",         # UK Information Commissioner
+    "loot box game regulation site:cnil.fr",     # 法国 CNIL
+    "game Datenschutz site:bfdi.bund.de",        # 德国联邦数据保护局
+    # ── 亚太 ────────────────────────────────────────────────────────────
+    "game regulation site:grac.or.kr",           # 韩国 GRAC
+    "game regulation site:moleg.go.kr",          # 韩국法制处
+    "game regulation site:mic.gov.vn",           # 越南信息通信部
+    "game regulation site:kominfo.go.id",        # 印尼 Kominfo
+    "game regulation site:pdpc.gov.sg",          # 新加坡个人数据保护委员会
+    "game regulation site:accc.gov.au",          # 澳大利亚竞争与消费者委员会
+    "game regulation site:oaic.gov.au",          # 澳大利亚信息专员办公室
+]
