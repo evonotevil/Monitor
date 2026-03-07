@@ -55,19 +55,32 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: playwright install-deps chromium
 
-      # ── 3. 生成 HTML 报告（DB 已由当日 daily_check 更新，无需重复抓取）
-      #    注意：周一 daily_check 在 09:33 运行，本流程在 09:47，DB 已最新
-      #    如需强制重新抓取，可手动触发并在步骤前加 python monitor.py run
+      # ── 3. 补充抓取本周最新数据（覆盖 daily_check 未运行、手动触发、race condition 等情形）
+      #    bulk_upsert 幂等设计，重复运行不会产生重复条目
+      - name: Fetch latest data (weekly refresh)
+        continue-on-error: true
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: python monitor.py run --period week --no-translate
+
+      # ── 4. 翻译未翻译条目（分离翻译步骤，避免 rate limit 超时导致整体失败）
+      - name: Translate untranslated items
+        continue-on-error: true
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: python monitor.py retranslate --limit 60
+
+      # ── 5. 生成 HTML 报告
       - name: Generate HTML report
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: python monitor.py report --format html --period week
 
-      # ── 4. 生成 PDF（同时写 latest.html / latest.pdf 和带日期文件名）
+      # ── 6. 生成 PDF（同时写 latest.html / latest.pdf 和带日期文件名）
       - name: Generate PDF report
         run: python generate_pdf.py
 
-      # ── 5. 计算本次报告的公开 URL ──────────────────────────────────
+      # ── 7. 计算本次报告的公开 URL ──────────────────────────────────
       - name: Set report URLs
         run: |
           REPO="${{ github.repository }}"
@@ -80,7 +93,7 @@ jobs:
           echo "PDF_URL=${BASE}/${PDF_FILENAME}" >> $GITHUB_ENV
           echo "PDF_FILENAME=${PDF_FILENAME}" >> $GITHUB_ENV
 
-      # ── 6. 先提交并推送报告，再发飞书（确保文件已在仓库中）─────────
+      # ── 8. 先提交并推送报告，再发飞书（确保文件已在仓库中）─────────
       - name: Commit reports back to repo
         run: |
           git config user.name  "github-actions[bot]"
@@ -103,7 +116,7 @@ jobs:
             git commit -m "📊 周报存档 ${WEEK_ID} $(date -u +%Y-%m-%d) [skip ci]"
           git push
 
-      # ── 7. 发送飞书卡片通知（文件已在仓库，链接可访问）──────────────
+      # ── 9. 发送飞书卡片通知（文件已在仓库，链接可访问）──────────────
       - name: Send Feishu notification
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
