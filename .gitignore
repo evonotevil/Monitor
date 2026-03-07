@@ -23,12 +23,13 @@ reports/report_*.md
 reports/weekly_*.html
 reports/weekly_*.pdf
 reports/weekly_*.md
-# generate_pdf.py 输出的带日期命名 PDF（latest.pdf 是唯一入库版本）
+# PDF 体积大（单文件 ~2MB）且可重新生成，不入库；飞书通知使用带日期命名 PDF 的 raw URL
+# latest.pdf 每周覆盖会不断堆积 git 历史，改为本地/CI 产物，不提交
+reports/latest.pdf
 reports/Lilith-Legal-Compliance-Report-*.pdf
 
-# 始终保留 latest 文件 和 每周存档目录
+# 始终保留 latest HTML 和 每周存档目录（HTML 约 80KB，适合文本 diff）
 !reports/latest.html
-!reports/latest.pdf
 !reports/.gitkeep
 !reports/archive/
 !reports/archive/**
