@@ -14,7 +14,7 @@
 - **HTML 报告**：生成可交互的 HTML 报告，支持按地区、分类、状态筛选和关键词搜索；顶部展示 LLM 生成的 200-300 字上周动态总结
 - **PDF 报告**：每周自动生成 PDF 版本，文件名含日期范围，方便分发存档
 - **飞书通知**：
-  - **日报**：有昨日新增动态时自动推送飞书卡片，按地区分组展示，最多 8 条（含 LLM 噪音实时过滤）
+  - **日报**：有昨日新增动态时推送执行级飞书卡片；按风险分级着色（🔴≥9.0 / 🟠≥7.0 / 🔵其他）；顶部附 AI 生成的 150 字综述；每条动态含机制变动摘要和全平台影响（移动端 + PC）；Google News 强制 `when:1d`，每查询限 10 条
   - **周报**：每周一生成过去 7 天汇总，含区域分布统计、LLM 综述、精选重点条目，附完整报告链接
 
 ---
@@ -77,9 +77,9 @@ Monitor/
 ├── data/
 │   └── monitor.db      # SQLite 数据库（法规条目）
 ├── reports/
-│   ├── latest.html     # 最新 HTML 报告
-│   ├── latest.pdf      # 最新 PDF 报告
-│   └── archive/        # 历史周报（YYYY-WXX/weekly.html）
+│   ├── latest.html                    # 最新 HTML 报告（入库，供 htmlpreview 访问）
+│   ├── YYYY-MM-DD - YYYY-MM-DD 周报.pdf  # 带日期命名 PDF（入库，飞书链接使用）
+│   └── archive/                       # 历史周报（YYYY-WXX/weekly.html）
 └── assets/
     └── lilith-logo.png # 品牌 Logo
 ```
@@ -123,7 +123,10 @@ playwright install chromium      # 仅 PDF 生成需要
 export LLM_API_KEY=sk-xxx
 export FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
 
-# 抓取最新数据并生成 HTML 报告（过去 7 天）
+# 抓取昨日数据（日报模式：when:1d，每查询 10 条）
+python monitor.py run --period day
+
+# 抓取过去 7 天数据并生成 HTML 报告
 python monitor.py run --period week
 
 # 仅生成报告（不抓取新数据）
@@ -132,7 +135,7 @@ python monitor.py report --format html --period week
 # 仅生成 PDF（需先生成 HTML）
 python generate_pdf.py
 
-# 发送日报飞书通知（本地测试）
+# 发送日报飞书通知（本地测试，含 AI 综述）
 python daily_check.py
 
 # 发送周报飞书通知（本地测试）
@@ -168,8 +171,8 @@ python monitor.py retranslate
 | 文件 | 说明 |
 |------|------|
 | [`reports/latest.html`](reports/latest.html) | 最新 HTML 交互报告（可在浏览器中打开） |
-| [`reports/latest.pdf`](reports/latest.pdf) | 最新 PDF 报告（可直接下载分发） |
-| [`reports/archive/`](reports/archive/) | 历史周报存档（按 ISO 周号归档） |
+| `reports/YYYY-MM-DD - YYYY-MM-DD 周报.pdf` | 带日期范围命名的 PDF（每周生成，飞书链接直接指向此文件） |
+| [`reports/archive/`](reports/archive/) | 历史周报 HTML 存档（按 ISO 周号归档） |
 
 > HTML 报告可通过 [htmlpreview.github.io](https://htmlpreview.github.io) 直接在线预览：
 > `https://htmlpreview.github.io/?https://raw.githubusercontent.com/evonotevil/Monitor/main/reports/latest.html`
@@ -180,7 +183,7 @@ python monitor.py retranslate
 
 - **LLM**：硅基流动免费层 `Qwen/Qwen3-8B`，每批 3 条并行处理，批间 4 秒冷却（遵守免费层限速）；Qwen3 系列默认关闭思维链（`enable_thinking: false`）以提速
 - **数据库**：SQLite，存储在 `data/monitor.db`，每次 CI 运行后自动提交回仓库
-- **PDF 生成**：Playwright Chromium（GitHub Actions 已配置缓存，缓存命中时安装时间从 90 秒降至 5 秒）
+- **PDF 生成**：Playwright Chromium（GitHub Actions 已配置缓存，缓存命中时安装时间从 90 秒降至 5 秒）；`latest.pdf` 不入库（每周覆盖会堆积 git 历史），飞书通知使用带日期命名的 PDF（如 `2026-03-01 - 2026-03-08 周报.pdf`）
 - **Git 优化**：所有 workflow 使用 `fetch-depth: 1` 浅克隆，避免拉取含完整 DB 历史的大体积仓库
 
 ---
