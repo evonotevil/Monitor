@@ -862,6 +862,61 @@ def verify_duplicate_pairs(pairs: list) -> list:
     return [False] * len(pairs)
 
 
+# ── 同主题多源摘要深度融合 ────────────────────────────────────────────
+
+def merge_duplicate_summaries(primary: dict, duplicates: list) -> str:
+    """
+    将同一事件的多篇报道摘要合并为一条细节互补的中文摘要。
+    不同信源如提供了不同处罚金额、生效时间或法案条款，必须完整体现在同一段落中。
+    严禁输出"另有 X 篇报道"等简单标注。
+    """
+    if not (_HAS_AI and _AI_CLIENT):
+        return (primary.get("summary_zh") or primary.get("summary") or "")
+
+    primary_title   = (primary.get("title_zh") or primary.get("title") or "").strip()
+    primary_summary = (primary.get("summary_zh") or primary.get("summary") or "").strip()
+    primary_src     = (primary.get("source_name") or "主要信源").strip()
+
+    dup_lines = []
+    for d in duplicates:
+        src = (d.get("source_name") or "补充信源").strip()
+        t   = (d.get("title_zh") or d.get("title") or "").strip()
+        s   = (d.get("summary_zh") or d.get("summary") or "").strip()
+        if s:
+            dup_lines.append(f"【{src}】{t}：{s}" if t else f"【{src}】{s}")
+
+    if not dup_lines:
+        return primary_summary
+
+    user_msg = (
+        f"以下是关于同一监管事件的多篇报道，请合并为一段细节互补的中文摘要（60-100字）。\n\n"
+        f"主报道（{primary_src}）：{primary_title}\n{primary_summary}\n\n"
+        f"补充报道：\n" + "\n".join(dup_lines) + "\n\n"
+        f"合并规则：\n"
+        f"1. 若不同信源提供了不同的处罚金额、生效时间或法案条款，必须在同一段落中完整体现\n"
+        f"2. 严禁使用「另有X篇报道」「多家媒体报道」等简单标注\n"
+        f"3. 移动端（App Store/IAP/Google Play）影响先于 PC 端，语言流畅自然\n"
+        f"4. 直接输出摘要正文，不含标题或序号"
+    )
+
+    try:
+        resp = _AI_CLIENT.chat.completions.create(
+            model=_LLM_MODEL,
+            max_tokens=250,
+            extra_body=_LLM_EXTRA_BODY,
+            messages=[
+                {"role": "system", "content": "你是资深游戏行业合规分析师，擅长从多信源提炼准确的监管事件摘要。"},
+                {"role": "user",   "content": user_msg},
+            ],
+        )
+        result = resp.choices[0].message.content.strip()
+        logger.info(f"[merge] 摘要融合成功: {primary_title[:30]}…")
+        return result
+    except Exception as e:
+        logger.warning(f"[merge] LLM 融合失败: {e}")
+        return primary_summary
+
+
 # ── 月报综述生成（HTML 报告 Header 展示）────────────────────────────
 
 def generate_executive_summary(items: list) -> str:
@@ -905,6 +960,8 @@ def generate_executive_summary(items: list) -> str:
         f"① 本周最大的 2 个风险点——具体说明是哪个市场/政策/监管动作，对移动端或 PC 端的实质威胁\n"
         f"② 1 个潜在机遇——如 D2C 充值政策松动、新市场准入窗口、竞争对手受罚带来的空间等\n"
         f"③ 综合行动提示——一句话说明优先级与关注节点\n\n"
+        f"⚠️ 渠道优先级硬性要求：综述必须优先概括移动端（App Store/Google Play/IAP）的变动；"
+        f"PC 端（Steam/D2C/Anti-cheat）仅作为补充建议，篇幅不超过综述的 20%。\n\n"
         f"写作要求：像给 CEO 汇报的简报，语言专业流畅，不含 Markdown、标题或序号，直接输出正文。\n\n"
         f"动态素材：\n{material}"
     )

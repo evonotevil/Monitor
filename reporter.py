@@ -175,9 +175,9 @@ def _dedup_for_display(items: List[dict]) -> List[dict]:
     # 按优先级降序排序 → 先处理高质量条目
     sorted_idx = sorted(range(len(items)), key=lambda i: _priority(items[i]), reverse=True)
 
-    kept_idx: list  = []   # 已保留条目的原始索引
-    extra: dict     = {}   # 原始索引 → 被合并的重复条目数
-    borderline: list = []  # [(kidx, idx)] 需 LLM 验证的模糊重复对
+    kept_idx: list   = []   # 已保留条目的原始索引
+    extra_items: dict = {}  # kept_idx → 被合并的重复条目列表（用于 LLM 深度摘要融合）
+    borderline: list  = []  # [(kidx, idx)] 需 LLM 验证的模糊重复对
 
     for idx in sorted_idx:
         item    = items[idx]
@@ -202,7 +202,7 @@ def _dedup_for_display(items: List[dict]) -> List[dict]:
             t_kept = (kitem.get("title_zh") or kitem.get("title") or "")
             sim = _bigram_sim(t_item, t_kept)
             if sim > 0.45:          # 确定重复
-                extra[kidx] = extra.get(kidx, 0) + 1
+                extra_items.setdefault(kidx, []).append(dict(items[idx]))
                 is_dup = True
                 break
             if sim > 0.35:          # 模糊，记录待 LLM 验证（阈值从 0.25 提高至 0.35，避免误合并）
@@ -231,7 +231,7 @@ def _dedup_for_display(items: List[dict]) -> List[dict]:
                 for (kidx, idx), is_same in zip(valid_bl, llm_results):
                     if is_same and idx in kept_idx:
                         kept_idx.remove(idx)
-                        extra[kidx] = extra.get(kidx, 0) + 1
+                        extra_items.setdefault(kidx, []).append(dict(items[idx]))
                         _logger.info(f"[dedup LLM] 合并重复: {items[idx].get('title_zh','')[:40]}")
         except Exception as e:
             _logger.warning(f"[dedup LLM] 批量验证失败，跳过: {e}")
@@ -241,12 +241,16 @@ def _dedup_for_display(items: List[dict]) -> List[dict]:
     for idx, item in enumerate(items):
         if idx not in kept_set:
             continue
-        if idx in extra:
+        if idx in extra_items:
             item = dict(item)   # 浅拷贝，避免污染原始数据
-            cnt  = extra[idx]
-            sz   = (item.get("summary_zh") or item.get("summary") or "")
-            if "另有" not in sz:
-                item["summary_zh"] = (sz + f" [另有 {cnt} 篇同主题报道]").strip()
+            dups = extra_items[idx]
+            try:
+                from translator import merge_duplicate_summaries
+                merged = merge_duplicate_summaries(item, dups)
+                if merged:
+                    item["summary_zh"] = merged
+            except Exception as _me:
+                _logger.warning(f"[dedup merge] LLM 融合失败，保留主摘要: {_me}")
         result.append(item)
 
     return result

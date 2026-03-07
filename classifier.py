@@ -384,56 +384,63 @@ _HIGH_RISK_PATTERNS: list = [
 # ── 硬件/系统层噪音模式（命中则 impact_score 归零）────────────────────
 # 这类文章与游戏合规无关，应在评分阶段直接抑制
 _HARDWARE_NOISE_PATTERNS = [
-    r"\bbattery\s*optim\w+\b",          # battery optimization
-    r"\bhardware\s*performance\b",       # hardware performance
-    r"\bwi-?fi\s*standard\w*\b",        # Wi-Fi standards
-    r"\bprocessor\s*architect\w+\b",     # processor architecture
-    r"\bchipset\s*(?:spec|feature|model|update)\b",
-    r"\bgpu\s*(?:benchmark|driver\s*update|spec)\b",
-    r"\bcpu\s*(?:architect|benchmark|overcloc)\w+\b",
+    # 电池/能耗
+    r"\bbattery\s*optim\w+\b",                          # battery optimization
+    r"\benergy.?sav\w+\b",                              # energy saving
+    r"\bpower\s*(?:consumption|efficiency|management)\b",
+    # 硬件性能
+    r"\bhardware\s*performance\b",
+    r"\bdevice\s*performance\s*(?:test|benchmark|review)\b",
+    # 无线标准
+    r"\bwi-?fi\s*(?:\d+[a-z]*|standard\w*|protocol\w*)\b",  # Wi-Fi 6/7/standards
+    r"\bbluetooth\s*(?:\d+[a-z]*|standard\w*|protocol\w*)\b",
+    r"\bwireless\s*standard\w*\b",
+    # 处理器/芯片
+    r"\bprocessor\s*architect\w+\b",
+    r"\bchipset\s*(?:spec|feature|model|update|launch)\b",
+    r"\b(?:cpu|gpu)\s*(?:architect\w+|benchmark|overcloc\w+|spec\w*|driver\s*update)\b",
+    # 显示/内存
     r"\bdisplay\s*(?:refresh\s*rate|panel|resolution)\b",
     r"\bram\s*(?:speed|type|capacity)\b",
+    # 设备评测/发布（英文）
+    r"\b(?:pixel|macbook|iphone|ipad)\s*(?:\d+|pro|mini|air|max|review|spec|launch|release)\b",
+    # 中文硬件噪音兜底
+    r"电池优化|续航优化|能效(?:评测|测试)|芯片性能|处理器架构|Wi-Fi标准|蓝牙标准|无线标准",
 ]
 
-# ── Google/Apple 非核心话题抑制（命中则 impact_score 归零）──────────
-# 仅涉及 Google/Apple 的技术/产品/财报但与支付/分发/分级/隐私/消保无关
+# ── Google/Apple 核心合规话题白名单（命中则保留，否则视为噪音）──────────
+# 覆盖：支付分成(IAP/Commission)、应用分发(Distribution)、分级、隐私、消保、抽卡
 _GOOGLE_APPLE_CORE_TOPICS = re.compile(
-    r"pay(?:ment|ments)?|distribut\w+|rating\w*|privacy|data.?protect|consumer|fine|penalt"
+    r"pay(?:ment|ments|out)?|commission|distribut\w+|rating\w*|age.?verif\w*"
+    r"|privacy|data.?protect|consumer|fine|penalt|lawsuit|regulat\w+"
     r"|DMA\b|anti.?trust|monopol|IAP|app.?store.?polic|google.?play.?polic"
-    r"|third.?party|side.?load|commission|refund|GDPR|COPPA|children|minor",
+    r"|third.?party|side.?load|refund|GDPR|COPPA|children|minor"
+    r"|gacha|loot.?box|random.*item|probabil\w+"
+    r"|支付|分成|分发|分级|隐私|消保|未成年|罚款|处罚|监管|合规|抽卡|抽奖|开箱|概率",
     re.IGNORECASE,
 )
 _GOOGLE_APPLE_MENTION = re.compile(
-    r"\b(?:google|apple|android|ios)\b", re.IGNORECASE,
-)
-_NON_CORE_GOOGLE_APPLE_NOISE = re.compile(
-    r"\b(?:google|apple)\b.*\b(?:pixel|macbook|iphone|ipad|watchos|macos|android.*update"
-    r"|search.*algorithm|maps|chrome|safari|siri|gemini.*product|earnings|revenue.*billion"
-    r"|stock|share.*price|quarterly.*result)\b"
-    r"|\b(?:pixel|macbook|iphone|ipad)\b.*\b(?:google|apple)\b",
-    re.IGNORECASE,
+    r"\b(?:google|apple|android|ios|app\s*store|google\s*play)\b", re.IGNORECASE,
 )
 
 
 def _is_hardware_noise(text: str) -> bool:
     """返回 True 表示纯硬件/系统文章，应将 impact_score 归零。"""
-    tl = text.lower()
     for p in _HARDWARE_NOISE_PATTERNS:
-        if re.search(p, tl, re.IGNORECASE):
+        if re.search(p, text, re.IGNORECASE):
             return True
     return False
 
 
 def _is_google_apple_non_core(text: str) -> bool:
     """
-    返回 True 表示文章仅涉及 Google/Apple 的非合规话题
-    （不含支付/分发/分级/隐私/消保等核心关键词），应将 impact_score 归零。
+    返回 True 表示文章含 Google/Apple 关键词但不涉及核心合规话题
+    （支付分成/应用分发/分级/隐私/消保/抽卡），应将 impact_score 归零。
+    策略：宽进严出——只要未命中核心合规白名单，一律视为噪音。
     """
     if not _GOOGLE_APPLE_MENTION.search(text):
         return False  # 不含 Google/Apple，与此规则无关
-    if _GOOGLE_APPLE_CORE_TOPICS.search(text):
-        return False  # 包含核心合规话题，正常评分
-    return bool(_NON_CORE_GOOGLE_APPLE_NOISE.search(text))
+    return not bool(_GOOGLE_APPLE_CORE_TOPICS.search(text))
 
 
 def get_source_tier(source_name: str) -> str:
