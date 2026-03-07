@@ -84,15 +84,21 @@ jobs:
       - name: Set report URLs
         run: |
           REPO="${{ github.repository }}"
-          BRANCH="main"
-          BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}/reports"
-          # 带日期的 PDF 文件名（与 generate_pdf.py 保持一致）
-          PDF_DATE=$(python -c "from datetime import datetime; print(datetime.now().strftime('%d-%m-%Y'))")
-          PDF_FILENAME="Lilith-Legal-Compliance-Report-${PDF_DATE}.pdf"
           CACHE_BUST=$(date -u +%Y%m%d%H%M)
+          BASE="https://raw.githubusercontent.com/${REPO}/main/reports"
           echo "HTML_URL=https://htmlpreview.github.io/?${BASE}/latest.html?v=${CACHE_BUST}" >> $GITHUB_ENV
-          echo "PDF_URL=${BASE}/${PDF_FILENAME}" >> $GITHUB_ENV
-          echo "PDF_FILENAME=${PDF_FILENAME}" >> $GITHUB_ENV
+          # PDF 文件名含空格和中文，整块交给 Python 生成并直接写入 GITHUB_ENV
+          python -c "
+          from datetime import datetime, timedelta
+          import urllib.parse, os
+          t = datetime.utcnow()
+          w = t - timedelta(days=7)
+          fn = f'{w.strftime(\"%Y-%m-%d\")} - {t.strftime(\"%Y-%m-%d\")} 周报.pdf'
+          base = 'https://raw.githubusercontent.com/${REPO}/main/reports'
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'PDF_FILENAME={fn}\n')
+              f.write(f'PDF_URL={base}/{urllib.parse.quote(fn)}\n')
+          "
 
       # ── 8. 先提交并推送报告，再发飞书（确保文件已在仓库中）─────────
       - name: Commit reports back to repo
@@ -124,4 +130,5 @@ jobs:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
           REPORT_HTML_URL:    ${{ env.HTML_URL }}
           REPORT_PDF_URL:     ${{ env.PDF_URL }}
+          LLM_API_KEY:        ${{ secrets.LLM_API_KEY }}
         run: python feishu_notify.py
