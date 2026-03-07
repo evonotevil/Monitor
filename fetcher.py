@@ -218,7 +218,7 @@ GAME_SIGNALS = [
     r"ゲーム", r"ガチャ",
     r"게임", r"확률형",
 
-    # ── PC 平台信号 (Steam / Epic / D2C / 驱动级反作弊) ──────────────
+    # ── PC 平台信号 (Steam / Epic / D2C / 驱动级反作弊 / Launcher / 跨平台) ──
     # Steam/Epic 须与监管词共现，避免误捕普通游戏新闻
     r"\bsteam\b.*\b(?:regulat|law|ban|polic|privac|restrict|fine)\w*\b",
     r"\b(?:regulat|law|ban|polic|privac|restrict|fine)\w*\b.*\bsteam\b",
@@ -230,6 +230,12 @@ GAME_SIGNALS = [
     r"\b(?:D2C|direct.to.consumer)\b.*\bgame\w*\b",
     r"\bgame\w*\b.*\b(?:D2C|direct.to.consumer)\b",
     r"\bthird.?party\s*top.?up\b",
+    # Launcher 隐私 / 数据收集（含驱动/内核权限争议）
+    r"\bgame\s*launcher\b.*\b(?:privac|data.collect|permission|telemetr)\w*\b",
+    r"\b(?:privac|data.collect|permission|telemetr)\w*\b.*\bgame\s*launcher\b",
+    # 跨平台进度同步（数据主权/GDPR 互操作性要求）
+    r"\bcross.?(?:platform|progression)\b.*\b(?:data|privac|account|regulat)\w*\b",
+    r"\b(?:data|privac|account|regulat)\w*\b.*\bcross.?(?:platform|progression)\b",
 
     # ── 核心游戏合规信号（Loot Box/Gacha Probability/In-game Currency/Minor）──
     r"\bgacha\s*probability\b",
@@ -293,6 +299,18 @@ EXCLUSION_PATTERNS = [
     r"骑士队",
     r"\blottery\b",  # 彩票
     r"\bbetting\b",  # 投注
+    # ── 行业会议 / 商务峰会（不涉及立法）────────────────────────────────
+    r"\bPocket Gamer Connects\b",            # Pocket Gamer Connects 系列峰会
+    r"\bThinkingData\b",                     # 数据分析服务商活动（非监管）
+    r"\bGDC\s*\d{0,4}\b",                   # Game Developers Conference
+    r"\bPAX\s*(?:East|West|South|Aus|Online)?\b",  # PAX 展会
+    r"\bGamescom\b", r"\bE3\b",             # 欧洲/北美游戏展
+    # 开发者大会主旨演讲（无监管内容）— 须有 game/gaming/apple/google 共现
+    r"\bkeynote\b.*\b(?:game|gaming|apple|google|wwdc)\b",
+    r"\binvestor\s*day\b",                   # 投资者日（无监管内容）
+    r"\bearnings\s*call\b", r"\bQ[1-4]\s*result\b",  # 财报电话会
+    # "game industry X summit/expo" 组合（允许1个中间词，如"industry"）
+    r"\b(?:game|gaming)\s+industry\s+(?:summit|expo)\b",
 ]
 
 
@@ -668,9 +686,9 @@ _LANG_ACCEPTABLE_REGIONS = {
     # key = lang 前缀, value = 该语言"一次信源"应覆盖的合理区域集合
     "ko": {"韩国",                          "全球", "其他"},
     "ja": {"日本",                          "全球", "其他"},
-    "vi": {"越南", "东南亚",                "全球", "其他"},
-    "id": {"印度尼西亚", "东南亚",          "全球", "其他"},
-    "th": {"泰国", "东南亚",               "全球", "其他"},
+    "vi": {"越南", "东南亚", "亚太",        "全球", "其他"},
+    "id": {"印度尼西亚", "东南亚", "亚太",  "全球", "其他"},
+    "th": {"泰国", "东南亚", "亚太",       "全球", "其他"},
     "zh": {"台湾", "香港", "澳门", "港澳台","全球", "其他"},
     "de": {"德国", "奥地利", "欧盟", "欧洲","全球", "其他"},
     "fr": {"法国", "比利时", "欧盟", "欧洲","全球", "其他"},
