@@ -177,7 +177,7 @@ def _dedup_for_display(items: List[dict]) -> List[dict]:
                 extra[kidx] = extra.get(kidx, 0) + 1
                 is_dup = True
                 break
-            if sim > 0.25:          # 模糊，记录待 LLM 验证
+            if sim > 0.35:          # 模糊，记录待 LLM 验证（阈值从 0.25 提高至 0.35，避免误合并）
                 borderline.append((kidx, idx))
 
         if not is_dup:
