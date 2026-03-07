@@ -4,9 +4,10 @@
                     经营合规/平台政策/内容监管/PC & 跨平台合规
 
 影响评分 (1.0–10.0, 面向中资游戏出海):
-  高风险 ≥9.0 — 概率公示处罚 / 应用商店下架 / PC反作弊隐私被诉
+  高风险 ≥9.0 — 概率公示处罚 / 应用商店下架 / 移动端平台强制政策(DMA/IDFA/IAP) / PC反作弊隐私被诉
   中风险 ≥7.0 — 跨平台数据限制 / 强制年龄验证
   核心市场 (北美/欧洲/日本/韩国/东南亚) 自动 +2.0
+  移动端优先：App Store/Google Play 政策变更 ≥ PC 合规风险（移动端是 Lilith/鹰角/米哈游营收主渠道）
 """
 
 import re
@@ -332,6 +333,23 @@ _HIGH_RISK_PATTERNS: list = [
         r"game\w*.*(?:remov|delist|banned)\w*.*(?:store|platform|market)",
         r"下架.*(?:应用商店|App\s*Store|Google\s*Play|Steam)",
         r"게임.*(?:삭제|퇴출).*(?:스토어|플랫폼)",
+    ]),
+    # (+1.5) 移动端平台政策强制执行 — App Store/Google Play 政策变更直接影响出海运营
+    # 涵盖：DMA 强制第三方支付、IDFA/GAID 隐私新规、SDK 合规、IAP 分成新规
+    # 这类动态对 Lilith/Hoyoverse/鹰角 移动端营收影响最直接，与下架风险同等优先级
+    (1.5, [
+        # DMA/反垄断强制要求平台开放第三方支付
+        r"(?:app.?store|google.?play|apple|google).*(?:third.?party|alternative).*pay\w*.*(?:mandator|compel|require|DMA|force|law)",
+        r"(?:mandator|compel|require|DMA|force|law)\w*.*(?:app.?store|google.?play).*(?:third.?party|alternative).*pay\w*",
+        # IDFA/GAID 等移动广告标识符隐私管制
+        r"\b(?:IDFA|GAID|advertising.?identifier|mobile.?tracking.?identifier)\b.*(?:restrict|ban|regulat|privac|fine|enforce)",
+        r"(?:restrict|ban|regulat|privac|fine|enforce)\w*.*\b(?:IDFA|GAID|advertising.?identifier)\b",
+        # 移动端 SDK 合规强制执行（影响 AppsFlyer/Adjust/Firebase 等分析 SDK）
+        r"mobile.*(?:analytics|advertising|attribution).*SDK.*(?:fine|ban|privac|regulat|comply)",
+        r"SDK.*(?:data.*collect|privac|consent).*(?:fine|regulat|ban|enforce).*(?:mobile|game|app)",
+        # IAP 强制规范（Apple/Google 抽成争议已立法/监管落地）
+        r"(?:in.?app.*purchas|IAP|app.*store.*commission).*(?:mandator|law|legislat|fine|ban|DMA)",
+        r"(?:法规|法律|监管|禁止|要求).*(?:应用.*内购|IAP|App\s*Store.*分成|移动端.*支付)",
     ]),
     # (+1.5) PC端反作弊程序被诉侵犯隐私 — 新兴PC合规风险
     (1.5, [

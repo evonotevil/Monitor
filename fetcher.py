@@ -85,6 +85,47 @@ def clean_html(html_text: str) -> str:
     return text[:500]
 
 
+# 标题乱码清洗 — 在 RSS/Google News 解析后、翻译前调用
+# 处理以下问题:
+#   1. Unicode 替换字符（U+FFFD）和控制字符
+#   2. 高密度非 ASCII 连续段（mojibake 特征）
+#   3. 媒体机构名称后缀（reporter.py 的 _clean_title 在渲染时也做，这里提前清洗入库数据）
+_MEDIA_SUFFIX_STRIP = re.compile(
+    r"\s*[-–|]\s*(?:GamesIndustry(?:\.biz)?|Eurogamer|Kotaku|IGN|Polygon"
+    r"|PC Gamer|GamesBeat|VentureBeat|Reuters|BBC|The Guardian|Forbes"
+    r"|TechCrunch|Bloomberg|Axios|Politico|The Verge|Ars Technica"
+    r"|Game Developer|Develop(?:er)?|MCV|Pocketgamer(?:\.biz)?|Pocket Gamer)\s*$",
+    re.IGNORECASE,
+)
+# 连续≥4个非 ASCII 非中日韩字符 → 疑似乱码段
+_GARBLED_SEGMENT = re.compile(r"[^\x00-\x7F\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7a3]{4,}")
+
+
+def _sanitize_title(title: str) -> str:
+    """
+    清洗 RSS/Google News 原始标题：
+    - 剔除 Unicode 替换字符和控制字符
+    - 剔除疑似 mojibake 乱码段（连续 ≥4 个非 ASCII/非中日韩字符）
+    - 剔除媒体机构名称后缀（ - GamesIndustry.biz 等）
+    - 折叠多余空白
+    """
+    if not title:
+        return ""
+    # 1. 替换字符 & 控制字符
+    t = title.replace("\ufffd", "").replace("\ufffe", "").replace("\ufffc", "")
+    t = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", t)
+    # 2. 乱码段检测：若单个连续非 ASCII 段 ≥8 字符，整个标题可能 mojibake → 返回截断安全版
+    garbled = _GARBLED_SEGMENT.findall(t)
+    if garbled and max(len(g) for g in garbled) >= 8:
+        # 保留 ASCII 和中日韩部分，其余删除
+        t = re.sub(r"[^\x20-\x7E\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7a3\s]", "", t)
+    # 3. 媒体机构后缀
+    t = _MEDIA_SUFFIX_STRIP.sub("", t)
+    # 4. 整理空白
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
 def fetch_rss_feed(feed_config: dict) -> List[dict]:
     url = feed_config["url"]
     resp = safe_get(url)
@@ -102,7 +143,7 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
             pub_date = item.findtext("pubDate", "")
             description = item.findtext("description", "")
             items.append({
-                "title": clean_html(title),
+                "title": _sanitize_title(clean_html(title)),
                 "url": link,
                 "date": parse_rss_date(pub_date),
                 "summary": clean_html(description),
@@ -118,7 +159,7 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
             updated = entry.findtext("atom:updated", "", ns) or entry.findtext("atom:published", "", ns)
             summary = entry.findtext("atom:summary", "", ns) or entry.findtext("atom:content", "", ns)
             items.append({
-                "title": clean_html(title),
+                "title": _sanitize_title(clean_html(title)),
                 "url": link,
                 "date": parse_rss_date(updated),
                 "summary": clean_html(summary or ""),
@@ -165,7 +206,7 @@ def fetch_google_news(query: str, region_key: str = "en_US") -> List[dict]:
                 source_name = parts[1] if len(parts) > 1 else source_name
 
             items.append({
-                "title": clean_html(title),
+                "title": _sanitize_title(clean_html(title)),
                 "url": link,
                 "date": parse_rss_date(pub_date),
                 "summary": clean_html(description),
