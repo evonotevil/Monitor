@@ -878,7 +878,6 @@ def _render_mobile_html(items: List[dict], exec_summary: str, grouped: dict,
     date_range = _date_range_str(items)
     total      = len(items)
     n_regions  = sum(1 for g in _GROUP_ORDER if grouped.get(g))
-    n_high     = sum(1 for i in items if float(i.get("impact_score", 1.0)) >= 9.0)
     period_esc = html_mod.escape(period_label)
     week_esc   = html_mod.escape(week_label)
     range_esc  = html_mod.escape(date_range)
@@ -964,7 +963,6 @@ def _render_mobile_html(items: List[dict], exec_summary: str, grouped: dict,
         f'<div class="stat-chips">'
         f'<span class="stat-chip">{total} 条动态</span>'
         f'<span class="stat-chip">{n_regions} 大区域</span>'
-        f'<span class="stat-chip">{n_high} 项高优先级</span>'
         f'</div></div>\n'
         f'{exec_html}'
         f'<div class="filter-bar" id="filterBar">'
@@ -990,7 +988,6 @@ def _render_pc_html(items: List[dict], exec_summary: str, grouped: dict,
     date_range = _date_range_str(items)
     total      = len(items)
     n_regions  = sum(1 for g in _GROUP_ORDER if grouped.get(g))
-    n_high     = sum(1 for i in items if float(i.get("impact_score", 1.0)) >= 9.0)
     period_esc = html_mod.escape(period_label)
     week_esc   = html_mod.escape(week_label)
     range_esc  = html_mod.escape(date_range)
@@ -1088,7 +1085,6 @@ def _render_pc_html(items: List[dict], exec_summary: str, grouped: dict,
         f'<div class="stat-row">'
         f'<span class="stat-chip">{total} 条动态</span>'
         f'<span class="stat-chip">{n_regions} 大区域</span>'
-        f'<span class="stat-chip">{n_high} 项高优先级</span>'
         f'</div></div>\n'
         f'{exec_html}'
         f'{sections_html}'
