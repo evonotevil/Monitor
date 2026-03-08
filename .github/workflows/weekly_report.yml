@@ -127,6 +127,9 @@ jobs:
           # 如果没有变化就跳过 commit（避免空提交报错）
           git diff --staged --quiet || \
             git commit -m "📊 周报存档 ${WEEK_ID} $(date -u +%Y-%m-%d) [skip ci]"
+
+          # rebase 后推送，避免并发 push 导致 rejected
+          git pull --rebase origin main
           git push
 
       # ── 9. 发送飞书卡片通知（文件已在仓库，链接可访问）──────────────
