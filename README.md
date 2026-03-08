@@ -8,14 +8,13 @@
 
 - **自动抓取**：从 30+ 个官方监管机构、法律媒体、行业资讯 RSS 源实时获取法规动态；同时通过 Google News 多语言搜索（英、日、韩、越、印尼、德、法、葡、西、泰、阿拉伯语等）覆盖本地语种媒体
 - **AI 翻译与提炼**：基于硅基流动 Qwen3-8B 批量处理，将原文转化为规范中文标题和合规摘要；专有名词（Loot Box、GDPR、FTC 等）自动保留英文；每批 3 条并发处理，效率比逐条提升 3 倍
-- **噪音过滤**：自动拦截硬件评测、电竞赛事、公司财报、Google/Apple 非合规相关新闻等无关内容，`impact_score = 0` 的条目不进入任何报告或通知
+- **噪音过滤**：自动拦截硬件评测（电池技术、芯片架构、Wi-Fi 标准等）、电竞赛事、公司财报、Google/Apple 非合规相关新闻；`impact_score = 0` 的条目不进入任何报告或通知
 - **智能分类**：按 5 大显示分组（北美 / 欧洲 / 日韩台 / 亚太区 / 其他）和 9 个合规类别自动归类，信源权威性（官方 > 法律 > 行业 > 媒体）作为展示主排序键
-- **三重去重**：URL 精确匹配 → Bigram 语义相似度（阈值 0.45）→ LLM 批量核验，同主题多源报道自动融合为一条摘要
-- **HTML 报告**：生成可交互的 HTML 报告，支持按地区、分类、状态筛选和关键词搜索；顶部展示 LLM 生成的 200-300 字上周动态总结
-- **PDF 报告**：每周自动生成 PDF 版本，文件名含日期范围，方便分发存档
+- **四重去重**：URL 精确匹配 → 事件指纹预筛（实体 + 议题匹配）→ Bigram 语义相似度 → LLM 批量核验，跨区域同一事件自动合并，官方来源优先覆盖媒体报道
+- **双端 HTML 报告**：每次生成移动端（`latest-mobile.html`）和 PC 端（`latest-pc.html`）两份报告，均含 LLM 上周动态总结、可交互地区筛选；通过 GitHub Pages 直接分发，加载 < 2 秒
 - **飞书通知**：
-  - **日报**：有昨日新增动态时推送执行级飞书卡片；按风险分级着色（🔴≥9.0 / 🟠≥7.0 / 🔵其他）；顶部附 AI 生成的 150 字综述；每条动态含机制变动摘要和全平台影响（移动端 + PC）；Google News 强制 `when:1d`，每查询限 10 条
-  - **周报**：每周一生成过去 7 天汇总，含区域分布统计、LLM 综述、精选重点条目，附完整报告链接
+  - **日报**：有昨日新增动态时推送执行级飞书卡片；按风险分级着色（🔴≥9.0 / 🟠≥7.0 / 🔵其他）；顶部附 AI 生成的 150 字综述；每条动态含机制变动摘要和全平台影响
+  - **周报**：生成过去 7 天汇总，飞书卡片仅含区域分布统计 + LLM 综述 + 两个报告直链按钮（详情在 HTML 报告中）
 
 ---
 
@@ -24,7 +23,7 @@
 | 任务 | 触发方式 | 说明 |
 |------|----------|------|
 | 每日日报 | 手动触发（Actions → Run workflow） | 抓取昨日数据（`when:1d`），有新增则推送飞书 |
-| 每周周报 | 每周一 09:47 SGT 自动运行 | 自行抓取近 7 天数据，生成 HTML + PDF 报告，发飞书，存档 |
+| 每周周报 | 手动触发（Actions → Run workflow） | 抓取近 7 天数据，生成双端 HTML 报告，发飞书，存档 |
 
 ---
 
@@ -64,22 +63,24 @@ Monitor/
 ├── fetcher.py          # RSS + Google News 多语言抓取，去重写入 DB
 ├── classifier.py       # 分类打标（地区 / 类别 / 状态 / 影响分值 / 信源层级）
 ├── translator.py       # AI 批量翻译 + 术语修正 + LLM 重复对核验 + 摘要融合 + 综述生成
-├── reporter.py         # HTML 报告生成（含区域推断、三重去重、信源排序）
+├── reporter.py         # 双端 HTML 报告生成（移动端 + PC 端，含事件指纹去重、信源排序）
 ├── models.py           # 数据模型（LegislationItem）+ SQLite 数据库操作
 ├── config.py           # 搜索关键词库、RSS 源、分类标签、输出配置
-├── utils.py            # 共享工具：区域分组映射、CAT_EMOJI、tier 排序、bigram 去重等
+├── utils.py            # 共享工具：区域分组映射、tier 排序、bigram 去重等
 ├── daily_check.py      # 日报脚本：查询昨日新增 → 构建飞书卡片 → 推送
 ├── feishu_notify.py    # 周报脚本：查询本周数据 → LLM 综述 → 构建飞书卡片 → 推送
-├── generate_pdf.py     # Playwright 截图：HTML 报告 → PDF（含日期范围命名）
+├── generate_pdf.py     # Playwright 截图：PC 端 HTML → PDF（含日期范围命名）
 ├── requirements.txt    # Python 依赖
 ├── data/
-│   └── monitor.db      # SQLite 数据库（法规条目）
+│   └── monitor.db      # SQLite 数据库（法规条目，随 CI 自动提交）
 ├── reports/
-│   ├── latest.html                    # 最新 HTML 报告（入库，供 htmlpreview 访问）
-│   ├── YYYY-MM-DD - YYYY-MM-DD 周报.pdf  # 带日期命名 PDF（入库，飞书链接使用）
-│   └── archive/                       # 历史周报（YYYY-WXX/weekly.html）
+│   ├── latest-mobile.html   # 最新移动端报告（GitHub Pages 分发）
+│   ├── latest-pc.html       # 最新 PC 端报告（GitHub Pages 分发）
+│   ├── latest.html          # 移动端别名（向后兼容）
+│   └── archive/             # 历史周报（YYYY-WXX/weekly-mobile.html 等）
 └── assets/
-    └── lilith-logo.png # 品牌 Logo
+    ├── lilith-logo.jpg      # 品牌 Logo
+    └── fonts/               # 自托管字体（Inter Variable + JetBrains Mono）
 ```
 
 ---
@@ -102,11 +103,19 @@ cd Monitor
 | `LLM_API_KEY` | 硅基流动 API Key（[免费申请](https://cloud.siliconflow.cn)） | ✅ 必填 |
 | `FEISHU_WEBHOOK_URL` | 飞书自定义机器人 Webhook 地址 | ✅ 必填（否则通知不发送） |
 
-### 3. 启用 GitHub Actions
+### 3. 启用 GitHub Pages
 
-进入 **Actions** 标签页，确认两个 workflow 已启用：
-- `每日合规动态检查`（`daily_check.yml`）：手动点击 **Run workflow** 触发
-- `全球游戏合规周报`（`weekly_report.yml`）：每周一 09:47 SGT 自动运行，也支持手动触发
+进入 **Settings → Pages**，Source 选择 `Deploy from a branch`，Branch 选 `main`，目录选 `/ (root)`，Save。
+
+报告 URL 格式：
+- 移动端：`https://<owner>.github.io/<repo>/reports/latest-mobile.html`
+- PC 端：`https://<owner>.github.io/<repo>/reports/latest-pc.html`
+
+### 4. 手动触发 Workflow
+
+进入 **Actions** 标签页，两个 workflow 均支持手动点击 **Run workflow** 触发：
+- `每日合规动态检查`（`daily_check.yml`）
+- `全球游戏合规周报`（`weekly_report.yml`）
 
 ---
 
@@ -124,20 +133,20 @@ export FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
 # 抓取昨日数据（日报模式：when:1d，每查询 10 条）
 python monitor.py run --period day
 
-# 抓取过去 7 天数据并生成 HTML 报告
+# 抓取过去 7 天数据并生成双端 HTML 报告
 python monitor.py run --period week
 
 # 仅生成报告（不抓取新数据）
 python monitor.py report --format html --period week
 
-# 仅生成 PDF（需先生成 HTML）
+# 仅生成 PDF（需先生成 HTML，使用 PC 端版本）
 python generate_pdf.py
 
-# 发送日报飞书通知（本地测试，含 AI 综述）
+# 发送日报飞书通知（本地测试）
 python daily_check.py
 
 # 发送周报飞书通知（本地测试）
-REPORT_HTML_URL=https://... python feishu_notify.py
+REPORT_MOBILE_URL=https://... REPORT_PC_URL=https://... python feishu_notify.py
 
 # 关键词搜索数据库
 python monitor.py query --keyword "loot box"
@@ -145,8 +154,8 @@ python monitor.py query --keyword "loot box"
 # 查看数据库统计
 python monitor.py stats
 
-# 重新翻译历史条目（更新 Prompt 后使用，每次最多 100 条）
-python monitor.py retranslate
+# 重新翻译历史条目（更新 Prompt 后使用，每次最多 60 条）
+python monitor.py retranslate --limit 60
 ```
 
 ---
@@ -159,8 +168,8 @@ python monitor.py retranslate
 | `LLM_BASE_URL` | LLM API 地址 | `https://api.siliconflow.cn/v1` |
 | `LLM_MODEL` | 使用的模型 | `Qwen/Qwen3-8B` |
 | `FEISHU_WEBHOOK_URL` | 飞书 Webhook 地址 | 必填（通知功能） |
-| `REPORT_HTML_URL` | 周报 HTML 公开链接（飞书卡片按钮用） | 可选 |
-| `REPORT_PDF_URL` | 周报 PDF 公开链接（飞书卡片按钮用） | 可选 |
+| `REPORT_MOBILE_URL` | 周报移动端 HTML 链接（飞书卡片按钮） | 可选 |
+| `REPORT_PC_URL` | 周报 PC 端 HTML 链接（飞书卡片按钮） | 可选 |
 
 ---
 
@@ -168,21 +177,22 @@ python monitor.py retranslate
 
 | 文件 | 说明 |
 |------|------|
-| [`reports/latest.html`](reports/latest.html) | 最新 HTML 交互报告（可在浏览器中打开） |
-| `reports/YYYY-MM-DD - YYYY-MM-DD 周报.pdf` | 带日期范围命名的 PDF（每周生成，飞书链接直接指向此文件） |
-| [`reports/archive/`](reports/archive/) | 历史周报 HTML 存档（按 ISO 周号归档） |
+| `reports/latest-mobile.html` | 最新移动端报告，GitHub Pages 直接访问 |
+| `reports/latest-pc.html` | 最新 PC 端报告，适合宽屏阅读和 PDF 打印 |
+| `reports/archive/YYYY-WXX/` | 历史周报 HTML 存档（按 ISO 周号归档） |
 
-> HTML 报告可通过 [htmlpreview.github.io](https://htmlpreview.github.io) 直接在线预览：
-> `https://htmlpreview.github.io/?https://raw.githubusercontent.com/evonotevil/Monitor/main/reports/latest.html`
+> PDF 仅在 Actions 运行时本地生成，不入库（避免 git 历史膨胀）。
 
 ---
 
 ## 技术说明
 
 - **LLM**：硅基流动免费层 `Qwen/Qwen3-8B`，每批 3 条并行处理，批间 4 秒冷却（遵守免费层限速）；Qwen3 系列默认关闭思维链（`enable_thinking: false`）以提速
+- **去重机制**：四重保障 —— URL 精确匹配（全局）→ 事件指纹预筛（实体 + 议题）→ Bigram 相似度（同区域 > 0.45，跨区域 > 0.40）→ LLM 批量核验（0.35~0.45 灰区）；官方来源（tier=4）与任何同指纹条目 bigram > 0.20 即自动合并
+- **字体**：Inter Variable + JetBrains Mono 自托管于 `assets/fonts/`，通过 GitHub Pages CDN 分发，无外链依赖
 - **数据库**：SQLite，存储在 `data/monitor.db`，每次 CI 运行后自动提交回仓库
-- **PDF 生成**：Playwright Chromium（GitHub Actions 已配置缓存，缓存命中时安装时间从 90 秒降至 5 秒）；`latest.pdf` 不入库（每周覆盖会堆积 git 历史），飞书通知使用带日期命名的 PDF（如 `2026-03-01 - 2026-03-08 周报.pdf`）
-- **Git 优化**：所有 workflow 使用 `fetch-depth: 1` 浅克隆，避免拉取含完整 DB 历史的大体积仓库
+- **PDF 生成**：Playwright Chromium 渲染 PC 端 HTML（A3 横向），GitHub Actions 已配置浏览器缓存
+- **Git 优化**：所有 workflow 使用 `fetch-depth: 1` 浅克隆；PDF 不入库；CI push 前执行 `git pull --rebase` 避免并发冲突
 
 ---
 
