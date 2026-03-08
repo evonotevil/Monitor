@@ -386,10 +386,12 @@ _HIGH_RISK_PATTERNS: list = [
 _HARDWARE_NOISE_PATTERNS = [
     # 电池/能耗
     r"\bbattery\s*optim\w+\b",                          # battery optimization
+    r"\bbattery\s+(?:tech\w*|standard\w*|guidelin\w*|requir\w*|charg\w*|sav\w*|effici\w*)\b",
     r"\benergy.?sav\w+\b",                              # energy saving
+    r"\benergy\s*(?:effici\w+|standard\w*|certif\w*|star\b|label\w*|consum\w*)\b",
     r"\bpower\s*(?:consumption|efficiency|management)\b",
     # 硬件性能
-    r"\bhardware\s*performance\b",
+    r"\bhardware\s*(?:performance|architect\w+|standard\w*|spec\w*)\b",
     r"\bdevice\s*performance\s*(?:test|benchmark|review)\b",
     # 无线标准
     r"\bwi-?fi\s*(?:\d+[a-z]*|standard\w*|protocol\w*)\b",  # Wi-Fi 6/7/standards
@@ -398,14 +400,14 @@ _HARDWARE_NOISE_PATTERNS = [
     # 处理器/芯片
     r"\bprocessor\s*architect\w+\b",
     r"\bchipset\s*(?:spec|feature|model|update|launch)\b",
-    r"\b(?:cpu|gpu)\s*(?:architect\w+|benchmark|overcloc\w+|spec\w*|driver\s*update)\b",
+    r"\b(?:cpu|gpu)\s*(?:architect\w+|benchmark|overcloc\w+|spec\w*|driver\s*update|standard\w*)\b",
     # 显示/内存
     r"\bdisplay\s*(?:refresh\s*rate|panel|resolution)\b",
     r"\bram\s*(?:speed|type|capacity)\b",
     # 设备评测/发布（英文）
     r"\b(?:pixel|macbook|iphone|ipad)\s*(?:\d+|pro|mini|air|max|review|spec|launch|release)\b",
     # 中文硬件噪音兜底
-    r"电池优化|续航优化|能效(?:评测|测试)|芯片性能|处理器架构|Wi-Fi标准|蓝牙标准|无线标准",
+    r"电池优化|电池技术|电池标准|续航优化|能效(?:评测|测试)|能耗标准|芯片性能|处理器架构|硬件架构|Wi-Fi标准|蓝牙标准|无线标准",
 ]
 
 # ── Google/Apple 核心合规话题白名单（命中则保留，否则视为噪音）──────────
