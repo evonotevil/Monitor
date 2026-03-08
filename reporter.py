@@ -1714,8 +1714,7 @@ function sortTable(col) {{
 </html>"""
 
 
-def save_html(items: List[dict], filename: Optional[str] = None,
-              period_label: str = "") -> tuple:
+def save_html(items: List[dict], period_label: str = "") -> tuple:
     """Generate mobile + PC HTML reports. Returns (mobile_path, pc_path)."""
     ensure_output_dir()
 

@@ -233,9 +233,7 @@ def _filter_valid_dates(items):
 
 def _period_label(period: str) -> str:
     if period == "week":
-        from datetime import datetime
-        now = datetime.utcnow()
-        return now.strftime("%G-W%V")
+        return datetime.utcnow().strftime("%G-W%V")
     labels = {"day": "日报（昨日）", "month": "月报（近30天）", "all": "全量报告"}
     return labels.get(period, "全量报告")
 
@@ -323,19 +321,17 @@ def cmd_run(args):
         if all_items:
             print_table(all_items)
 
-            if args.output:
-                if args.output.endswith(".html"):
-                    path = save_html(all_items, args.output, period_label=label)
-                else:
-                    path = save_markdown(all_items, args.output)
+            if args.output and not args.output.endswith(".html"):
+                path = save_markdown(all_items, args.output)
                 logger.info(f"报告已保存到: {path}")
             else:
                 ts = datetime.now().strftime('%Y%m%d_%H%M%S')
                 prefix = {"week": "weekly", "month": "monthly", "all": "report"}.get(args.period, "report")
                 md_path = save_markdown(all_items, f"{prefix}_{ts}.md")
-                html_path = save_html(all_items, f"{prefix}_{ts}.html", period_label=label)
+                mobile_path, pc_path = save_html(all_items, period_label=label)
                 logger.info(f"Markdown 报告: {md_path}")
-                logger.info(f"HTML 报告: {html_path}")
+                logger.info(f"移动端 HTML: {mobile_path}")
+                logger.info(f"PC 端 HTML:  {pc_path}")
 
     except Exception as e:
         logger.error(f"抓取执行失败: {e}", exc_info=True)
@@ -371,10 +367,7 @@ def cmd_report(args):
             path = save_markdown(items, args.output) if args.output else save_markdown(items)
             print(f"Markdown 报告已保存到: {path}")
         elif fmt == "html":
-            mobile_path, pc_path = (
-                save_html(items, args.output, period_label=label) if args.output
-                else save_html(items, period_label=label)
-            )
+            mobile_path, pc_path = save_html(items, period_label=label)
             print(f"移动端 HTML 已保存到: {mobile_path}")
             print(f"PC 端 HTML 已保存到:  {pc_path}")
         else:
