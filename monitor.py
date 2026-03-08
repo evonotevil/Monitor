@@ -367,9 +367,12 @@ def cmd_report(args):
             path = save_markdown(items, args.output) if args.output else save_markdown(items)
             print(f"Markdown 报告已保存到: {path}")
         elif fmt == "html":
-            path = (save_html(items, args.output, period_label=label) if args.output
-                    else save_html(items, period_label=label))
-            print(f"HTML 报告已保存到: {path}")
+            mobile_path, pc_path = (
+                save_html(items, args.output, period_label=label) if args.output
+                else save_html(items, period_label=label)
+            )
+            print(f"移动端 HTML 已保存到: {mobile_path}")
+            print(f"PC 端 HTML 已保存到:  {pc_path}")
         else:
             print_table(items)
 

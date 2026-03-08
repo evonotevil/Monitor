@@ -6,12 +6,15 @@
     FEISHU_WEBHOOK_URL   飞书自定义机器人的 Webhook 地址
 
 可选环境变量:
-    REPORT_HTML_URL      HTML 简报的公开访问 URL
+    REPORT_MOBILE_URL    移动端 HTML 周报 URL
+    REPORT_PC_URL        PC 端 HTML 周报 URL
+    REPORT_HTML_URL      HTML 简报 URL（兼容旧配置，指向移动端）
     REPORT_PDF_URL       PDF 报告的公开访问/下载 URL
 
 本地调试:
     FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx \
-    REPORT_HTML_URL=https://... \
+    REPORT_MOBILE_URL=https://... \
+    REPORT_PC_URL=https://... \
     python feishu_notify.py
 """
 
@@ -151,6 +154,8 @@ def build_card(
     exec_summary: str,
     html_url: str,
     pdf_url: str,
+    mobile_url: str = "",
+    pc_url: str = "",
 ) -> dict:
 
     # ── 日期范围文案 ─────────────────────────────────────────────────
@@ -261,19 +266,21 @@ def build_card(
     elements.append({"tag": "hr"})
 
     actions = []
-    if html_url:
+    # Prefer explicit mobile/PC URLs; fall back to legacy html_url
+    effective_mobile = mobile_url or html_url
+    if effective_mobile:
         actions.append({
             "tag": "button",
-            "text": {"tag": "plain_text", "content": "🌐 查看完整报告"},
+            "text": {"tag": "plain_text", "content": "📱 移动端周报"},
             "type": "primary",
-            "url": html_url,
+            "url": effective_mobile,
         })
-    if pdf_url:
+    if pc_url:
         actions.append({
             "tag": "button",
-            "text": {"tag": "plain_text", "content": "📄 下载 PDF 报告"},
+            "text": {"tag": "plain_text", "content": "🖥️ PC 端周报"},
             "type": "default",
-            "url": pdf_url,
+            "url": pc_url,
         })
     if actions:
         elements.append({"tag": "action", "actions": actions})
@@ -313,6 +320,8 @@ def send_card(webhook_url: str, card: dict) -> None:
 
 def main():
     webhook_url = os.environ.get("FEISHU_WEBHOOK_URL", "")
+    mobile_url  = os.environ.get("REPORT_MOBILE_URL", "") or os.environ.get("MOBILE_URL", "")
+    pc_url      = os.environ.get("REPORT_PC_URL", "") or os.environ.get("PC_URL", "")
     html_url    = os.environ.get("REPORT_HTML_URL", "")
     pdf_url     = os.environ.get("REPORT_PDF_URL", "")
 
@@ -333,6 +342,7 @@ def main():
     card = build_card(
         today, week_ago, total, by_cat, by_region_group, all_items,
         exec_summary, html_url, pdf_url,
+        mobile_url=mobile_url, pc_url=pc_url,
     )
     send_card(webhook_url, card)
 

@@ -25,6 +25,10 @@ REPORTS_DIR = Path(__file__).parent / "reports"
 
 
 def find_latest_html() -> Path:
+    # Prefer PC version for PDF (better for A3 landscape printing)
+    pc_latest = REPORTS_DIR / "latest-pc.html"
+    if pc_latest.exists():
+        return pc_latest
     candidates = sorted(
         list(REPORTS_DIR.glob("report_*.html")) + list(REPORTS_DIR.glob("weekly_*.html")),
         key=os.path.getmtime,
@@ -89,10 +93,15 @@ def main():
     shutil.copy2(pdf_path, latest_pdf)
     print(f"📌 同步写入: {latest_pdf}")
 
-    # 同时写一份 latest.html
+    # 同步 latest.html（mobile 版，供固定链接使用）
+    mobile_html = REPORTS_DIR / "latest-mobile.html"
     latest_html = REPORTS_DIR / "latest.html"
-    shutil.copy2(html_path, latest_html)
-    print(f"📌 同步写入: {latest_html}")
+    if mobile_html.exists():
+        shutil.copy2(mobile_html, latest_html)
+        print(f"📌 同步写入: {latest_html}")
+    elif html_path != latest_html:
+        shutil.copy2(html_path, latest_html)
+        print(f"📌 同步写入: {latest_html}")
 
 
 if __name__ == "__main__":

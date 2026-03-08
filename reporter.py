@@ -251,7 +251,11 @@ def _dedup_for_display(items: List[dict]) -> List[dict]:
 
 # ─── Lilith Legal Logo 嵌入 ─────────────────────────────────────────
 
-_LOGO_PATH = Path(__file__).parent / "assets" / "lilith-logo.png"
+_ASSETS_DIR = Path(__file__).parent / "assets"
+_LOGO_PATH = next(
+    (_ASSETS_DIR / f for f in ("lilith-logo.jpg", "lilith-logo.png") if (_ASSETS_DIR / f).exists()),
+    _ASSETS_DIR / "lilith-logo.jpg",
+)
 
 
 def _get_logo_html() -> str:
@@ -476,6 +480,539 @@ def _build_legend_html() -> str:
             f'{cat}</span>'
         )
     return f'<div class="legend">{items_html}</div>'
+
+
+# ─── New-style report helpers (mobile + PC card designs) ─────────────────────
+
+_ACCENT_BY_CAT = {
+    "数据隐私":        "blue",
+    "玩法合规":        "purple",
+    "未成年人保护":     "green",
+    "广告营销合规":     "orange",
+    "消费者保护":       "teal",
+    "经营合规":        "orange",
+    "平台政策":        "red",
+    "内容监管":        "magenta",
+    "市场准入":        "orange",
+    "PC & 跨平台合规":  "blue",
+}
+
+_ACCENT_HEX = {
+    "red":     "#E8443A",
+    "green":   "#27AE60",
+    "purple":  "#8B5CF6",
+    "magenta": "#DB2777",
+    "teal":    "#0D9488",
+    "blue":    "#2563EB",
+    "orange":  "#D97706",
+}
+
+
+def _get_accent(item: dict) -> str:
+    s = float(item.get("impact_score", 1.0))
+    if s >= 9.0:
+        return "red"
+    if s >= 7.0:
+        return "orange"
+    return _ACCENT_BY_CAT.get(item.get("category_l1", ""), "blue")
+
+
+def _week_cn(period_label: str) -> str:
+    try:
+        from math import ceil
+        y, w = period_label.split("-W")
+        d = datetime.strptime(f"{y}-W{int(w):02d}-1", "%G-W%V-%u")
+        return f"{y} 年 {d.month} 月第 {ceil(d.day / 7)} 周"
+    except Exception:
+        return period_label
+
+
+def _date_range_str(items: list) -> str:
+    dates = sorted({i.get("date", "") for i in items if i.get("date")})
+    return f"{dates[0]} ~ {dates[-1]}" if dates else ""
+
+
+def _dots_html(group_items: list) -> str:
+    seen: set = set()
+    out = []
+    for item in group_items:
+        a = _get_accent(item)
+        if a not in seen:
+            seen.add(a)
+            out.append(f'<div class="dot" style="background:{_ACCENT_HEX[a]};"></div>')
+    return "".join(out)
+
+
+def _risk_pills_html(items: list) -> str:
+    high = [i for i in items if float(i.get("impact_score", 1.0)) >= 9.0]
+    med  = [i for i in items if 7.0 <= float(i.get("impact_score", 1.0)) < 9.0]
+    pills = []
+    for item in high[:3]:
+        t = ((item.get("title_zh") or "").strip() or _truncate(_get_summary_zh(item), 12))[:14]
+        pills.append(f'<span class="risk-pill high">高优 · {html_mod.escape(t)}</span>')
+    for item in med[:2]:
+        t = ((item.get("title_zh") or "").strip() or _truncate(_get_summary_zh(item), 12))[:14]
+        pills.append(f'<span class="risk-pill medium">中优 · {html_mod.escape(t)}</span>')
+    return "".join(pills)
+
+
+def _sort_group(group_items: list) -> list:
+    return sorted(
+        group_items,
+        key=lambda x: (
+            _TIER_SORT.get(get_source_tier(x.get("source_name", "")), 1),
+            float(x.get("impact_score", 1.0)),
+            x.get("date", ""),
+        ),
+        reverse=True,
+    )
+
+
+def _prepare_report_data(items: List[dict]) -> tuple:
+    """Dedup, filter, generate exec summary, group by region. Returns (items, exec_summary, grouped)."""
+    items = _dedup_for_display(items)
+    items = [i for i in items if float(i.get("impact_score", 1.0)) > 0]
+    exec_summary = ""
+    try:
+        from translator import generate_executive_summary
+        exec_summary = generate_executive_summary(items)
+    except Exception:
+        pass
+    grouped: dict = defaultdict(list)
+    for item in items:
+        grouped[_resolve_group(item)].append(item)
+    return items, exec_summary, grouped
+
+
+# ── CSS / JS constants (plain strings, no f-string brace escaping needed) ─────
+
+_MOBILE_CSS = """
+        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+        :root {
+            --bg-canvas: #EBEBEB; --bg-main: #F9F9F7; --bg-card: #FFFFFF;
+            --text-primary: #1A1A1A; --text-secondary: #5A5A5A; --text-meta: #999999;
+            --line-color: rgba(0,0,0,0.08); --card-border: rgba(0,0,0,0.08);
+            --card-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.06);
+            --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08);
+            --header-bg: #1A1A1A;
+            --accent-red: #E8443A; --accent-green: #27AE60; --accent-purple: #8B5CF6;
+            --accent-magenta: #DB2777; --accent-teal: #0D9488; --accent-blue: #2563EB;
+            --accent-orange: #D97706;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: var(--bg-canvas); font-family: var(--font-sans); color: var(--text-primary); -webkit-font-smoothing: antialiased; display: flex; justify-content: center; min-height: 100vh; }
+        .app-view { width: 100%; max-width: 430px; min-height: 100vh; background-color: var(--bg-main); box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 8px 40px rgba(0,0,0,0.10); overflow-x: hidden; display: flex; flex-direction: column; }
+        .global-header { padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; background-color: var(--header-bg); position: sticky; top: 0; z-index: 20; }
+        .header-logo { height: 44px; width: auto; object-fit: contain; mix-blend-mode: screen; margin: -6px 0; }
+        .header-version { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.10em; color: rgba(255,255,255,0.30); text-transform: uppercase; }
+        .main-content { padding: 32px 0 80px; flex: 1; }
+        .page-title-block { padding: 0 20px 28px; margin-bottom: 20px; }
+        .page-week { font-size: 26px; font-weight: 500; letter-spacing: -0.03em; color: var(--text-primary); line-height: 1.1; margin-bottom: 6px; }
+        .page-subtitle { font-size: 13px; font-weight: 400; color: var(--text-secondary); margin-bottom: 12px; }
+        .stat-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+        .stat-chip { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; background: rgba(0,0,0,0.05); color: var(--text-meta); }
+        .exec-block { margin: 0 20px 24px; background: var(--bg-card); border-radius: 10px; box-shadow: var(--card-shadow); overflow: hidden; }
+        .exec-header { background: var(--header-bg); padding: 12px 16px; display: flex; align-items: center; gap: 8px; }
+        .exec-header-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(255,255,255,0.55); }
+        .exec-header-dot { width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,0.20); }
+        .exec-body { padding: 14px 16px; }
+        .exec-body p { font-size: 12px; line-height: 1.75; color: var(--text-secondary); }
+        .risk-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 12px; }
+        .risk-pill { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; border: 1px solid; }
+        .risk-pill.high   { color: #991B1B; background: #FEF2F2; border-color: #FECACA; }
+        .risk-pill.medium { color: #92400E; background: #FFFBEB; border-color: #FDE68A; }
+        .risk-pill.info   { color: #1E40AF; background: #EFF6FF; border-color: #BFDBFE; }
+        .filter-bar { position: sticky; top: 72px; z-index: 10; background: var(--bg-main); padding: 10px 20px; margin-bottom: 32px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+        .filter-bar::-webkit-scrollbar { display: none; }
+        .filter-btn { flex-shrink: 0; font-family: var(--font-sans); font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--card-border); background: var(--bg-card); color: var(--text-secondary); cursor: pointer; transition: all 0.15s ease; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .filter-btn:hover { border-color: rgba(0,0,0,0.16); color: var(--text-primary); }
+        .filter-btn.active { background: var(--header-bg); color: #FFFFFF; border-color: transparent; box-shadow: 0 1px 4px rgba(0,0,0,0.14); }
+        .section-group { margin-bottom: 40px; }
+        .section-group.hidden { display: none; }
+        .section-header { display: flex; align-items: center; gap: 10px; padding: 0 20px; margin-bottom: 14px; }
+        .section-title { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); }
+        .section-count { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; color: var(--text-meta); text-transform: uppercase; }
+        .section-dots { display: flex; gap: 3px; margin-left: auto; }
+        .dot { width: 5px; height: 5px; border-radius: 50%; }
+        .section-cats { padding: 0 20px; margin-bottom: 14px; display: flex; gap: 5px; flex-wrap: wrap; }
+        .cat-tag { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-meta); padding: 2px 7px; border-radius: 3px; border: 1px solid var(--card-border); }
+        .log-list { display: flex; flex-direction: column; padding: 0 20px; gap: 8px; }
+        .log-item { background: var(--bg-card); border-radius: 10px; box-shadow: var(--card-shadow); overflow: hidden; transition: box-shadow 0.18s ease, transform 0.18s ease; position: relative; }
+        .log-item::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+        .log-item[data-accent="red"]::before     { background: var(--accent-red); }
+        .log-item[data-accent="green"]::before   { background: var(--accent-green); }
+        .log-item[data-accent="purple"]::before  { background: var(--accent-purple); }
+        .log-item[data-accent="magenta"]::before { background: var(--accent-magenta); }
+        .log-item[data-accent="teal"]::before    { background: var(--accent-teal); }
+        .log-item[data-accent="blue"]::before    { background: var(--accent-blue); }
+        .log-item[data-accent="orange"]::before  { background: var(--accent-orange); }
+        .log-item:hover { box-shadow: var(--card-shadow-hover); transform: translateY(-1px); }
+        .log-inner { padding: 14px 14px 14px 18px; }
+        .log-tags { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+        .log-category { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-meta); }
+        .log-date { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.05em; color: var(--text-meta); margin-left: auto; }
+        .log-title { font-size: 13px; font-weight: 500; letter-spacing: -0.01em; color: var(--text-primary); line-height: 1.4; margin-bottom: 3px; }
+        .log-title a { color: inherit; text-decoration: none; }
+        .log-title a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+        .log-title-orig { font-style: italic; font-size: 10px; color: var(--text-meta); line-height: 1.4; margin-bottom: 10px; display: block; }
+        .log-summary { font-size: 11.5px; line-height: 1.75; color: var(--text-secondary); padding: 10px 12px; background: rgba(0,0,0,0.025); border-radius: 6px; border: 1px solid var(--line-color); }
+        .download-section { margin: 0 20px 40px; padding: 18px; border-radius: 10px; background: var(--bg-card); box-shadow: var(--card-shadow); }
+        .download-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-meta); margin-bottom: 12px; }
+        .download-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--bg-main); color: var(--text-primary); font-family: var(--font-sans); font-size: 13px; font-weight: 400; cursor: pointer; text-decoration: none; transition: background 0.15s, border-color 0.15s, box-shadow 0.15s; }
+        .download-btn:hover { background: #FFFFFF; border-color: rgba(0,0,0,0.14); box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+        .download-btn svg { flex-shrink: 0; opacity: 0.4; }
+        .download-btn-label { flex: 1; text-align: left; }
+        .download-btn-meta { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; color: var(--text-meta); text-transform: uppercase; }
+        .page-footer { text-align: center; padding: 0 20px; }
+        .page-footer-text { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-meta); }
+        @media (min-width: 600px) { .app-view { border-radius: 12px; margin: 24px auto; min-height: auto; } }
+        @media (min-width: 900px) { .app-view { max-width: 520px; } }
+"""
+
+_MOBILE_JS = """
+function filterRegion(region, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.section-group').forEach(section => {
+        if (region === 'all') {
+            section.classList.remove('hidden');
+        } else {
+            section.classList.toggle('hidden', section.getAttribute('data-region') !== region);
+        }
+    });
+}
+"""
+
+_PC_CSS = """
+        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+        :root {
+            --bg: #F9F9F7; --bg-card: #FFFFFF; --bg-note: #F5F5F3;
+            --border: rgba(0,0,0,0.08); --border-strong: rgba(0,0,0,0.13);
+            --text-primary: #111111; --text-secondary: #555555; --text-meta: #999999;
+            --header-bg: #1A1A1A;
+            --accent-red: #E5484D; --accent-green: #30A46C; --accent-purple: #8E4EC6;
+            --accent-magenta: #D6409F; --accent-teal: #00A2C7; --accent-blue: #3B82F6;
+            --accent-orange: #F76B15;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+            --radius: 10px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); font-family: var(--font-sans); color: var(--text-primary); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+        .global-header { background: var(--header-bg); position: sticky; top: 0; z-index: 100; }
+        .header-inner { max-width: 1160px; margin: 0 auto; padding: 0 40px; height: 56px; display: flex; align-items: center; justify-content: space-between; }
+        .header-logo { height: 40px; width: auto; object-fit: contain; mix-blend-mode: screen; margin: -4px 0; }
+        .header-badge { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: rgba(255,255,255,0.32); text-transform: uppercase; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 20px; }
+        .page-shell { max-width: 1160px; margin: 0 auto; padding: 48px 40px 80px; }
+        .hero { margin-bottom: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+        .eyebrow { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-meta); margin-bottom: 10px; }
+        h1 { font-size: 34px; font-weight: 600; letter-spacing: -0.04em; line-height: 1.1; color: var(--text-primary); margin-bottom: 6px; }
+        .page-subtitle { font-size: 14px; color: var(--text-secondary); font-weight: 400; }
+        .stat-row { display: flex; gap: 7px; flex-wrap: wrap; align-self: flex-end; padding-bottom: 4px; }
+        .stat-chip { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-meta); background: var(--bg-card); border: 1px solid var(--border-strong); padding: 5px 11px; border-radius: 20px; }
+        .exec-section { margin-bottom: 48px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .exec-inner { display: grid; grid-template-columns: 220px 1fr; }
+        .exec-sidebar { background: var(--header-bg); padding: 28px 24px; display: flex; flex-direction: column; justify-content: space-between; }
+        .exec-sidebar-label { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 16px; }
+        .exec-sidebar-title { font-size: 18px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.02em; line-height: 1.3; margin-bottom: 4px; }
+        .exec-sidebar-sub { font-size: 11px; color: rgba(255,255,255,0.4); }
+        .exec-body { padding: 28px 32px; }
+        .exec-body p { font-size: 13.5px; line-height: 1.75; color: var(--text-secondary); margin-bottom: 20px; }
+        .risk-row { display: flex; gap: 7px; flex-wrap: wrap; }
+        .risk-pill { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 11px; border-radius: 20px; border: 1px solid; }
+        .risk-pill.high   { color: #9B1C1C; background: #FEF2F2; border-color: #FECACA; }
+        .risk-pill.medium { color: #92400E; background: #FFFBEB; border-color: #FDE68A; }
+        .risk-pill.info   { color: #1E40AF; background: #EFF6FF; border-color: #BFDBFE; }
+        .section { margin-bottom: 52px; }
+        .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+        .section-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+        .dot-cluster { display: flex; gap: 4px; align-items: center; }
+        .dot { width: 7px; height: 7px; border-radius: 50%; }
+        .section-meta { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-meta); margin-bottom: 16px; }
+        .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 20px 20px 0; display: grid; grid-template-columns: 44px 1fr; transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s; overflow: hidden; }
+        .card.span-2 { grid-column: 1 / -1; }
+        .card:hover { border-color: var(--border-strong); box-shadow: 0 4px 20px rgba(0,0,0,0.07); transform: translateY(-1px); }
+        .card[data-accent="red"]     { box-shadow: inset 3px 0 0 var(--accent-red); }
+        .card[data-accent="green"]   { box-shadow: inset 3px 0 0 var(--accent-green); }
+        .card[data-accent="purple"]  { box-shadow: inset 3px 0 0 var(--accent-purple); }
+        .card[data-accent="magenta"] { box-shadow: inset 3px 0 0 var(--accent-magenta); }
+        .card[data-accent="teal"]    { box-shadow: inset 3px 0 0 var(--accent-teal); }
+        .card[data-accent="blue"]    { box-shadow: inset 3px 0 0 var(--accent-blue); }
+        .card[data-accent="orange"]  { box-shadow: inset 3px 0 0 var(--accent-orange); }
+        .card[data-accent="red"]:hover     { box-shadow: 0 4px 20px rgba(0,0,0,0.07), inset 3px 0 0 var(--accent-red); }
+        .card[data-accent="green"]:hover   { box-shadow: 0 4px 20px rgba(0,0,0,0.07), inset 3px 0 0 var(--accent-green); }
+        .card[data-accent="purple"]:hover  { box-shadow: 0 4px 20px rgba(0,0,0,0.07), inset 3px 0 0 var(--accent-purple); }
+        .card[data-accent="magenta"]:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.07), inset 3px 0 0 var(--accent-magenta); }
+        .card[data-accent="teal"]:hover    { box-shadow: 0 4px 20px rgba(0,0,0,0.07), inset 3px 0 0 var(--accent-teal); }
+        .card[data-accent="blue"]:hover    { box-shadow: 0 4px 20px rgba(0,0,0,0.07), inset 3px 0 0 var(--accent-blue); }
+        .card[data-accent="orange"]:hover  { box-shadow: 0 4px 20px rgba(0,0,0,0.07), inset 3px 0 0 var(--accent-orange); }
+        .card-indicator { display: flex; justify-content: center; padding-top: 3px; }
+        .accent-bar { width: 3px; height: 20px; border-radius: 2px; opacity: 0.9; }
+        .card-body { display: flex; flex-direction: column; }
+        .card-title { font-size: 13.5px; font-weight: 500; line-height: 1.4; letter-spacing: -0.01em; margin-bottom: 3px; }
+        .card-title a { color: inherit; text-decoration: none; }
+        .card-title a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+        .card-orig { font-style: italic; font-size: 10.5px; color: var(--text-meta); line-height: 1.4; margin-bottom: 8px; }
+        .card-meta { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-meta); margin-bottom: 10px; }
+        .card-note { display: grid; grid-template-columns: 14px 1fr; gap: 8px; align-items: start; background: var(--bg-note); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+        .icon-doc { width: 11px; height: 11px; stroke: var(--text-meta); stroke-width: 1.5; fill: none; margin-top: 2px; flex-shrink: 0; }
+        .card-note p { font-size: 12px; line-height: 1.7; color: var(--text-secondary); }
+        .download-section { border-top: 1px solid var(--border); padding-top: 36px; margin-bottom: 40px; }
+        .download-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-meta); margin-bottom: 14px; }
+        .download-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+        .download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 7px; font-family: var(--font-sans); font-size: 13px; color: var(--text-primary); text-decoration: none; transition: background 0.12s, box-shadow 0.12s; }
+        .download-btn:hover { background: var(--bg); box-shadow: 0 1px 6px rgba(0,0,0,0.07); }
+        .download-btn svg { opacity: 0.4; flex-shrink: 0; }
+        .btn-badge { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-meta); background: var(--bg); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; }
+        .page-footer { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-meta); text-align: center; }
+        @media (max-width: 900px) { .header-inner { padding: 0 24px; } .page-shell { padding: 32px 24px 60px; } .hero { flex-direction: column; align-items: flex-start; gap: 16px; } .exec-inner { grid-template-columns: 1fr; } .exec-sidebar { padding: 20px 24px; } .card-grid { grid-template-columns: 1fr; } .card.span-2 { grid-column: auto; } h1 { font-size: 26px; } }
+        @media (max-width: 560px) { .header-inner { padding: 0 16px; } .header-badge { display: none; } .page-shell { padding: 24px 16px 60px; } }
+"""
+
+_ICON_DOC = '<svg class="icon-doc" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'
+_ICON_DL   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
+
+
+def _render_mobile_html(items: List[dict], exec_summary: str, grouped: dict,
+                        period_label: str = "") -> str:
+    logo_html  = _get_logo_html()
+    week_label = _week_cn(period_label) if "-W" in period_label else period_label
+    date_range = _date_range_str(items)
+    total      = len(items)
+    n_regions  = sum(1 for g in _GROUP_ORDER if grouped.get(g))
+    n_high     = sum(1 for i in items if float(i.get("impact_score", 1.0)) >= 9.0)
+    period_esc = html_mod.escape(period_label)
+    week_esc   = html_mod.escape(week_label)
+    range_esc  = html_mod.escape(date_range)
+
+    # Exec summary block
+    if exec_summary:
+        pills     = _risk_pills_html(items)
+        risk_html = f'<div class="risk-row">{pills}</div>' if pills else ""
+        exec_html = (
+            f'<div class="exec-block">'
+            f'<div class="exec-header">'
+            f'<span class="exec-header-label">上周动态摘要</span>'
+            f'<div class="exec-header-dot"></div>'
+            f'<span class="exec-header-label">{period_esc}</span>'
+            f'</div>'
+            f'<div class="exec-body"><p>{html_mod.escape(exec_summary)}</p>{risk_html}</div>'
+            f'</div>\n'
+        )
+    else:
+        exec_html = ""
+
+    # Sections
+    sections_html = ""
+    for group in _GROUP_ORDER:
+        group_items = grouped.get(group, [])
+        if not group_items:
+            continue
+        cats = list(dict.fromkeys(i.get("category_l1", "") for i in group_items if i.get("category_l1")))
+        cats_html  = "".join(f'<span class="cat-tag">{html_mod.escape(c)}</span>' for c in cats[:5])
+        dots       = _dots_html(group_items)
+        group_esc  = html_mod.escape(group)
+
+        items_html = ""
+        for item in _sort_group(group_items):
+            accent  = _get_accent(item)
+            cat     = html_mod.escape(item.get("category_l1", ""))
+            status  = html_mod.escape(normalize_status(item.get("status", "")))
+            date_s  = html_mod.escape(item.get("date", ""))
+            raw_zh  = (item.get("title_zh") or "").strip()
+            raw_sum = _get_summary_zh(item)
+            zh      = html_mod.escape(raw_zh if raw_zh else _truncate(raw_sum, 80))
+            orig    = html_mod.escape(_clean_title(item.get("title", "")))
+            summ    = html_mod.escape(_truncate(raw_sum, 200))
+            url     = html_mod.escape(item.get("source_url", ""))
+            cat_status = f"{cat}{' · ' + status if status else ''}"
+            title_tag  = (f'<a href="{url}" target="_blank" rel="noopener">{zh}</a>' if url else zh)
+            items_html += (
+                f'<article class="log-item" data-accent="{accent}">'
+                f'<div class="log-inner">'
+                f'<div class="log-tags"><span class="log-category">{cat_status}</span>'
+                f'<span class="log-date">{date_s}</span></div>'
+                f'<div class="log-title">{title_tag}</div>'
+                f'<span class="log-title-orig">{orig}</span>'
+                f'<div class="log-summary">{summ}</div>'
+                f'</div></article>\n'
+            )
+
+        sections_html += (
+            f'<div class="section-group" data-region="{group_esc}">'
+            f'<div class="section-header">'
+            f'<span class="section-title">{group_esc}</span>'
+            f'<span class="section-count">{len(group_items)} 条</span>'
+            f'<div class="section-dots">{dots}</div>'
+            f'</div>'
+            f'<div class="section-cats">{cats_html}</div>'
+            f'<div class="log-list">{items_html}</div>'
+            f'</div>\n'
+        )
+
+    return (
+        f'<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n'
+        f'<meta charset="UTF-8">\n'
+        f'<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+        f'<title>游戏监管周报 · {period_esc}</title>\n'
+        f'<style>{_MOBILE_CSS}</style>\n</head>\n<body>\n'
+        f'<div class="app-view">\n'
+        f'<header class="global-header">{logo_html}'
+        f'<div class="header-version">{range_esc}</div></header>\n'
+        f'<main class="main-content">\n'
+        f'<div class="page-title-block">'
+        f'<div class="page-week">{week_esc}</div>'
+        f'<div class="page-subtitle">全球游戏合规动态周报</div>'
+        f'<div class="stat-chips">'
+        f'<span class="stat-chip">{total} 条动态</span>'
+        f'<span class="stat-chip">{n_regions} 大区域</span>'
+        f'<span class="stat-chip">{n_high} 项高优先级</span>'
+        f'</div></div>\n'
+        f'{exec_html}'
+        f'<div class="filter-bar" id="filterBar">'
+        f'<button class="filter-btn active" data-filter="all" onclick="filterRegion(\'all\', this)">全部</button>'
+        f'<button class="filter-btn" data-filter="北美" onclick="filterRegion(\'北美\', this)">北美</button>'
+        f'<button class="filter-btn" data-filter="欧洲" onclick="filterRegion(\'欧洲\', this)">欧洲</button>'
+        f'<button class="filter-btn" data-filter="日韩台" onclick="filterRegion(\'日韩台\', this)">日韩台</button>'
+        f'<button class="filter-btn" data-filter="亚太区" onclick="filterRegion(\'亚太区\', this)">亚太区</button>'
+        f'<button class="filter-btn" data-filter="其他" onclick="filterRegion(\'其他\', this)">其他</button>'
+        f'</div>\n'
+        f'{sections_html}'
+        f'<div class="download-section">'
+        f'<div class="download-label">下载报告</div>'
+        f'<a href="weekly.pdf" download class="download-btn">'
+        f'{_ICON_DL}<span class="download-btn-label">下载 PDF 完整版</span>'
+        f'<span class="download-btn-meta">PDF</span></a></div>\n'
+        f'<div class="page-footer"><div class="page-footer-text">{period_esc} · LILITH LEGAL</div></div>\n'
+        f'</main></div>\n'
+        f'<script>{_MOBILE_JS}</script>\n'
+        f'</body>\n</html>'
+    )
+
+
+def _render_pc_html(items: List[dict], exec_summary: str, grouped: dict,
+                    period_label: str = "") -> str:
+    logo_html  = _get_logo_html()
+    week_label = _week_cn(period_label) if "-W" in period_label else period_label
+    date_range = _date_range_str(items)
+    total      = len(items)
+    n_regions  = sum(1 for g in _GROUP_ORDER if grouped.get(g))
+    n_high     = sum(1 for i in items if float(i.get("impact_score", 1.0)) >= 9.0)
+    period_esc = html_mod.escape(period_label)
+    week_esc   = html_mod.escape(week_label)
+    range_esc  = html_mod.escape(date_range)
+
+    # Exec summary section
+    if exec_summary:
+        pills     = _risk_pills_html(items)
+        risk_html = f'<div class="risk-row">{pills}</div>' if pills else ""
+        exec_html = (
+            f'<div class="exec-section"><div class="exec-inner">'
+            f'<div class="exec-sidebar">'
+            f'<div><div class="exec-sidebar-label">上周动态摘要</div>'
+            f'<div class="exec-sidebar-title">本周监管<br>环境概览</div></div>'
+            f'<div class="exec-sidebar-sub">{range_esc}</div>'
+            f'</div>'
+            f'<div class="exec-body">'
+            f'<p>{html_mod.escape(exec_summary)}</p>'
+            f'{risk_html}'
+            f'</div></div></div>\n'
+        )
+    else:
+        exec_html = ""
+
+    # Sections
+    sections_html = ""
+    for group in _GROUP_ORDER:
+        group_items = grouped.get(group, [])
+        if not group_items:
+            continue
+        cats = list(dict.fromkeys(i.get("category_l1", "") for i in group_items if i.get("category_l1")))
+        cats_str  = " · ".join(cats[:4]) + f" · {len(group_items)} 条"
+        dots      = "".join(
+            f'<div class="dot" style="background:{_ACCENT_HEX[a]};"></div>'
+            for a in list(dict.fromkeys(_get_accent(i) for i in group_items))[:5]
+        )
+        group_esc = html_mod.escape(group)
+        sorted_items = _sort_group(group_items)
+        n = len(sorted_items)
+
+        cards_html = ""
+        for idx, item in enumerate(sorted_items):
+            accent   = _get_accent(item)
+            hex_col  = _ACCENT_HEX[accent]
+            cat      = html_mod.escape(item.get("category_l1", ""))
+            status   = html_mod.escape(normalize_status(item.get("status", "")))
+            date_s   = html_mod.escape(item.get("date", ""))
+            raw_zh   = (item.get("title_zh") or "").strip()
+            raw_sum  = _get_summary_zh(item)
+            zh       = html_mod.escape(raw_zh if raw_zh else _truncate(raw_sum, 80))
+            orig     = html_mod.escape(_clean_title(item.get("title", "")))
+            summ     = html_mod.escape(_truncate(raw_sum, 200))
+            url      = html_mod.escape(item.get("source_url", ""))
+            span_cls = " span-2" if (n % 2 == 1 and idx == n - 1) else ""
+            meta_parts = [p for p in [cat, status, date_s] if p]
+            meta = " · ".join(meta_parts)
+            title_tag = (f'<a href="{url}" target="_blank" rel="noopener">{zh}</a>' if url else zh)
+            cards_html += (
+                f'<div class="card{span_cls}" data-accent="{accent}">'
+                f'<div class="card-indicator"><div class="accent-bar" style="background:{hex_col}"></div></div>'
+                f'<div class="card-body">'
+                f'<div class="card-title">{title_tag}</div>'
+                f'<div class="card-orig">{orig}</div>'
+                f'<div class="card-meta">{meta}</div>'
+                f'<div class="card-note">{_ICON_DOC}<p>{summ}</p></div>'
+                f'</div></div>\n'
+            )
+
+        sections_html += (
+            f'<div class="section">'
+            f'<div class="section-header">'
+            f'<span class="section-title">{group_esc}</span>'
+            f'<div class="dot-cluster">{dots}</div>'
+            f'</div>'
+            f'<div class="section-meta">{html_mod.escape(cats_str)}</div>'
+            f'<div class="card-grid">{cards_html}</div>'
+            f'</div>\n'
+        )
+
+    return (
+        f'<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n'
+        f'<meta charset="UTF-8">\n'
+        f'<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+        f'<title>游戏监管周报（PC 版）· {period_esc}</title>\n'
+        f'<style>{_PC_CSS}</style>\n</head>\n<body>\n'
+        f'<header class="global-header"><div class="header-inner">'
+        f'{logo_html}'
+        f'<div class="header-badge">{range_esc}</div>'
+        f'</div></header>\n'
+        f'<div class="page-shell">\n'
+        f'<div class="hero"><div class="hero-left">'
+        f'<div class="eyebrow">全球游戏合规动态周报</div>'
+        f'<h1>{week_esc}</h1>'
+        f'<div class="page-subtitle">Game Compliance Weekly · {period_esc}</div>'
+        f'</div>'
+        f'<div class="stat-row">'
+        f'<span class="stat-chip">{total} 条动态</span>'
+        f'<span class="stat-chip">{n_regions} 大区域</span>'
+        f'<span class="stat-chip">{n_high} 项高优先级</span>'
+        f'</div></div>\n'
+        f'{exec_html}'
+        f'{sections_html}'
+        f'<div class="download-section">'
+        f'<div class="download-label">下载报告</div>'
+        f'<div class="download-btns">'
+        f'<a href="weekly.pdf" download class="download-btn">'
+        f'{_ICON_DL} 下载 PDF 完整版 <span class="btn-badge">PDF</span></a>'
+        f'<a href="weekly-mobile.html" class="download-btn">'
+        f'{_ICON_DL} 移动端版本 <span class="btn-badge">HTML</span></a>'
+        f'</div></div>\n'
+        f'<div class="page-footer">{period_esc} · LILITH LEGAL</div>\n'
+        f'</div>\n</body>\n</html>'
+    )
 
 
 def generate_html(items: List[dict], title: str = "全球游戏行业立法动态监控报告",
@@ -1096,12 +1633,27 @@ function sortTable(col) {{
 
 
 def save_html(items: List[dict], filename: Optional[str] = None,
-              period_label: str = "") -> str:
+              period_label: str = "") -> tuple:
+    """Generate mobile + PC HTML reports. Returns (mobile_path, pc_path)."""
     ensure_output_dir()
-    if not filename:
-        filename = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-    filepath = os.path.join(OUTPUT_DIR, filename)
-    content = generate_html(items, period_label=period_label)
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(content)
-    return filepath
+
+    # Process data once (dedup, filter, exec summary, grouping)
+    prepared, exec_summary, grouped = _prepare_report_data(items)
+
+    mobile_html = _render_mobile_html(prepared, exec_summary, grouped, period_label)
+    pc_html     = _render_pc_html(prepared, exec_summary, grouped, period_label)
+
+    mobile_path = os.path.join(OUTPUT_DIR, "latest-mobile.html")
+    pc_path     = os.path.join(OUTPUT_DIR, "latest-pc.html")
+
+    with open(mobile_path, "w", encoding="utf-8") as f:
+        f.write(mobile_html)
+    with open(pc_path, "w", encoding="utf-8") as f:
+        f.write(pc_html)
+
+    # Keep latest.html as mobile for backward compatibility with generate_pdf.py
+    latest_path = os.path.join(OUTPUT_DIR, "latest.html")
+    with open(latest_path, "w", encoding="utf-8") as f:
+        f.write(mobile_html)
+
+    return mobile_path, pc_path

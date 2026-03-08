@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏监管周报 · 2026-W10</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg-canvas: #EBEBEB;
+            --bg-main: #F9F9F7;
+            --bg-card: #FFFFFF;
+            --text-primary: #1A1A1A;
+            --text-secondary: #5A5A5A;
+            --text-meta: #999999;
+            --line-color: rgba(0,0,0,0.08);
+            --card-border: rgba(0,0,0,0.08);
+            --card-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.06);
+            --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08);
+            --header-bg: #1A1A1A;
+
+            --accent-red: #E8443A;
+            --accent-green: #27AE60;
+            --accent-purple: #8B5CF6;
+            --accent-magenta: #DB2777;
+            --accent-teal: #0D9488;
+            --accent-blue: #2563EB;
+            --accent-orange: #D97706;
+
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: var(--font-sans);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .app-view {
+            width: 100%;
+            max-width: 430px;
+            min-height: 100vh;
+            background-color: var(--bg-main);
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 8px 40px rgba(0,0,0,0.10);
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Header ── */
+        .global-header {
+            padding: 14px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--header-bg);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .global-header img {
+            height: 44px;
+            width: auto;
+            object-fit: contain;
+            mix-blend-mode: screen;
+            margin: -6px 0;
+        }
+
+        .header-version {
+            font-family: var(--font-mono);
+            font-size: 9px;
+            letter-spacing: 0.10em;
+            color: rgba(255,255,255,0.30);
+            text-transform: uppercase;
+        }
+
+        /* ── Region filter bar ── */
+        .filter-bar {
+            position: sticky;
+            top: 72px; /* header height */
+            z-index: 10;
+            background: var(--bg-main);
+            padding: 10px 20px;
+            margin-bottom: 32px;
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .filter-bar::-webkit-scrollbar { display: none; }
+
+        .filter-btn {
+            flex-shrink: 0;
+            font-family: var(--font-sans);
+            font-size: 12px;
+            font-weight: 500;
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1px solid var(--card-border);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+
+        .filter-btn:hover {
+            border-color: rgba(0,0,0,0.16);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--header-bg);
+            color: #FFFFFF;
+            border-color: transparent;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.14);
+        }
+
+        /* ── Main content ── */
+        .main-content { padding: 32px 0 80px; flex: 1; }
+
+        /* ── Page title block ── */
+        .page-title-block {
+            padding: 0 20px 28px;
+            margin-bottom: 20px;
+        }
+
+        .page-week {
+            font-size: 26px;
+            font-weight: 500;
+            letter-spacing: -0.03em;
+            color: var(--text-primary);
+            line-height: 1.1;
+            margin-bottom: 6px;
+        }
+
+        .page-subtitle {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .stat-chips {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .stat-chip {
+            font-family: var(--font-mono);
+            font-size: 9px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.05);
+            color: var(--text-meta);
+        }
+
+        /* ── Executive summary ── */
+        .exec-block {
+            margin: 0 20px 24px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+
+        .exec-header {
+            background: var(--header-bg);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .exec-header-label {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.55);
+        }
+
+        .exec-header-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.20);
+        }
+
+        .exec-body {
+            padding: 14px 16px;
+        }
+
+        .exec-body p {
+            font-size: 12px;
+            line-height: 1.75;
+            color: var(--text-secondary);
+        }
+
+        .risk-row {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .risk-pill {
+            font-family: var(--font-mono);
+            font-size: 8px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid;
+        }
+        .risk-pill.high   { color: #991B1B; background: #FEF2F2; border-color: #FECACA; }
+        .risk-pill.medium { color: #92400E; background: #FFFBEB; border-color: #FDE68A; }
+        .risk-pill.info   { color: #1E40AF; background: #EFF6FF; border-color: #BFDBFE; }
+
+        /* ── Section group ── */
+        .section-group { margin-bottom: 40px; }
+        .section-group.hidden { display: none; }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 20px;
+            margin-bottom: 14px;
+        }
+
+        .section-title {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .section-count {
+            font-family: var(--font-mono);
+            font-size: 9px;
+            letter-spacing: 0.06em;
+            color: var(--text-meta);
+            text-transform: uppercase;
+        }
+
+        .section-dots {
+            display: flex;
+            gap: 3px;
+            margin-left: auto;
+        }
+
+        .dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+        }
+
+        .section-cats {
+            padding: 0 20px;
+            margin-bottom: 14px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .cat-tag {
+            font-family: var(--font-mono);
+            font-size: 8.5px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-meta);
+            padding: 2px 7px;
+            border-radius: 3px;
+            border: 1px solid var(--card-border);
+        }
+
+        /* ── Log items ── */
+        .log-list {
+            display: flex;
+            flex-direction: column;
+            padding: 0 20px;
+            gap: 8px;
+        }
+
+        .log-item {
+            background: var(--bg-card);
+            border-radius: 10px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            transition: box-shadow 0.18s ease, transform 0.18s ease;
+            position: relative;
+        }
+
+        .log-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            border-radius: 0;
+        }
+
+        .log-item[data-accent="red"]::before     { background: var(--accent-red); }
+        .log-item[data-accent="green"]::before   { background: var(--accent-green); }
+        .log-item[data-accent="purple"]::before  { background: var(--accent-purple); }
+        .log-item[data-accent="magenta"]::before { background: var(--accent-magenta); }
+        .log-item[data-accent="teal"]::before    { background: var(--accent-teal); }
+        .log-item[data-accent="blue"]::before    { background: var(--accent-blue); }
+        .log-item[data-accent="orange"]::before  { background: var(--accent-orange); }
+
+        .log-item:hover {
+            box-shadow: var(--card-shadow-hover);
+            transform: translateY(-1px);
+        }
+
+        .log-inner {
+            padding: 14px 14px 14px 18px;
+        }
+
+        .log-tags {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 7px;
+        }
+
+        .log-category {
+            font-family: var(--font-mono);
+            font-size: 8.5px;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: var(--text-meta);
+        }
+
+        .log-date {
+            font-family: var(--font-mono);
+            font-size: 8.5px;
+            letter-spacing: 0.05em;
+            color: var(--text-meta);
+            margin-left: auto;
+        }
+
+        .log-title {
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            color: var(--text-primary);
+            line-height: 1.4;
+            margin-bottom: 3px;
+        }
+
+        .log-title a {
+            color: inherit;
+            text-decoration: none;
+        }
+        .log-title a:hover {
+            text-decoration: underline;
+            text-decoration-thickness: 1px;
+            text-underline-offset: 2px;
+        }
+
+        .log-title-orig {
+            font-family: var(--font-sans);
+            font-style: italic;
+            font-size: 10px;
+            color: var(--text-meta);
+            line-height: 1.4;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .log-summary {
+            font-size: 11.5px;
+            line-height: 1.75;
+            color: var(--text-secondary);
+            padding: 10px 12px;
+            background: rgba(0,0,0,0.025);
+            border-radius: 6px;
+            border: 1px solid var(--line-color);
+        }
+
+        /* ── PDF Download ── */
+        .download-section {
+            margin: 0 20px 40px;
+            padding: 18px;
+            border-radius: 10px;
+            background: var(--bg-card);
+            box-shadow: var(--card-shadow);
+        }
+
+        .download-label {
+            font-family: var(--font-mono);
+            font-size: 9px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-meta);
+            margin-bottom: 12px;
+        }
+
+        .download-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            background: var(--bg-main);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 13px;
+            font-weight: 400;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .download-btn:hover {
+            background: #FFFFFF;
+            border-color: rgba(0,0,0,0.14);
+            box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+        }
+
+        .download-btn svg { flex-shrink: 0; opacity: 0.4; }
+        .download-btn-label { flex: 1; text-align: left; }
+        .download-btn-meta {
+            font-family: var(--font-mono);
+            font-size: 9px;
+            letter-spacing: 0.08em;
+            color: var(--text-meta);
+            text-transform: uppercase;
+        }
+
+        /* ── Footer ── */
+        .page-footer {
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .page-footer-text {
+            font-family: var(--font-mono);
+            font-size: 9px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-meta);
+        }
+
+        /* ── Responsive ── */
+        @media (min-width: 600px) {
+            .app-view {
+                border-radius: 12px;
+                margin: 24px auto;
+                min-height: auto;
+            }
+            body {
+                align-items: flex-start;
+                padding: 0;
+            }
+        }
+
+        @media (min-width: 900px) {
+            .app-view { max-width: 520px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-view">
+
+    <header class="global-header">
+        <img src="assets/lilith-logo.jpg" alt="Lilith Games">
+        <div class="header-version">2026-03-02 ~ 2026-03-08</div>
+    </header>
+
+    <main class="main-content">
+
+        <!-- 标题块 -->
+        <div class="page-title-block">
+            <div class="page-week">2026 年 3 月第 1 周</div>
+            <div class="page-subtitle">全球游戏合规动态周报</div>
+            <div class="stat-chips">
+                <span class="stat-chip">37 条动态</span>
+                <span class="stat-chip">4 大区域</span>
+                <span class="stat-chip">3 项高优先级</span>
+            </div>
+        </div>
+
+        <!-- 上周动态摘要 -->
+        <div class="exec-block">
+            <div class="exec-header">
+                <span class="exec-header-label">上周动态摘要</span>
+                <div class="exec-header-dot"></div>
+                <span class="exec-header-label">W10</span>
+            </div>
+            <div class="exec-body">
+                <p>本周全球游戏监管环境波动显著。英国正式启动未成年人在线福祉咨询，要求平台强化年龄验证及宵禁机制，对移动端 IAP 流程构成实质性压力；韩国出台强制性游戏服务迁移数据传输新法，跨境数据处理若违反 GDPR 将引发法律纠纷。全球范围内未成年人保护与数据隐私合规要求持续强化。</p>
+                <div class="risk-row">
+                    <span class="risk-pill high">高优 · 英国年龄验证</span>
+                    <span class="risk-pill high">高优 · 韩国数据迁移</span>
+                    <span class="risk-pill medium">中优 · 欧盟 DSA</span>
+                    <span class="risk-pill info">关注 · Google 支付</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 区域筛选器 -->
+        <div class="filter-bar" id="filterBar">
+            <button class="filter-btn active" data-filter="all" onclick="filterRegion('all', this)">全部</button>
+            <button class="filter-btn" data-filter="北美" onclick="filterRegion('北美', this)">北美</button>
+            <button class="filter-btn" data-filter="欧洲" onclick="filterRegion('欧洲', this)">欧洲</button>
+            <button class="filter-btn" data-filter="日韩台" onclick="filterRegion('日韩台', this)">日韩台</button>
+            <button class="filter-btn" data-filter="亚太区" onclick="filterRegion('亚太区', this)">亚太区</button>
+            <button class="filter-btn" data-filter="其他" onclick="filterRegion('其他', this)">其他</button>
+        </div>
+
+        <!-- SECTION: 北美 -->
+        <div class="section-group" data-region="北美">
+            <div class="section-header">
+                <span class="section-title">北美</span>
+                <span class="section-count">5 条</span>
+                <div class="section-dots">
+                    <div class="dot" style="background: var(--accent-red);"></div>
+                    <div class="dot" style="background: var(--accent-green);"></div>
+                    <div class="dot" style="background: var(--accent-teal);"></div>
+                    <div class="dot" style="background: var(--accent-purple);"></div>
+                    <div class="dot" style="background: var(--accent-orange);"></div>
+                </div>
+            </div>
+            <div class="section-cats">
+                <span class="cat-tag">执法动态</span>
+                <span class="cat-tag">平台政策</span>
+                <span class="cat-tag">未成年人保护</span>
+            </div>
+
+            <div class="log-list">
+
+                <article class="log-item" data-accent="red">
+                    <div class="log-inner">
+                        <div class="log-tags">
+                            <span class="log-category">执法动态</span>
+                            <span class="log-date">2026-03-02</span>
+                        </div>
+                        <div class="log-title"><a href="https://news.google.com/rss/articles/CBMi0AFBVV95cUxOcExoMGphQ1dqMWQ5VkRiRUJRQnlxekhQZzUteTlCUzE3RzJMNUZ5RXlpbEp5eWxyalh6WWh0QzRSdjdkQjRncmVRbVlXWDVucTk4aXNZdkhzZWxvTlpzZGpkY0FKUFNHNG9IazhrRlFOcmx6NkYyZGZOS2JBRkctLWRjQnJ6SklwMjJCUktHWWFXSFdoeHdhN1JqN20wWmV4RzB3bEttc0x1TmZCdlZNQXk4VV9ob0YyVmZMSmpaVFhxWmt2NDdkQy1mWDc2S2x6?oc=5" target="_blank" rel="noopener">北达科他州对游戏公司启动执法行动</a></div>
+                        <span class="log-title-orig">ATTORNEY GENERAL WRIGLEY ANNOUNCES ENFORCEMENT ACTION AGAINST BEULAH CVB FOLLOWING GAMING INVESTIGATION</span>
+                        <div class="log-summary">总检察长 Wrigley 针对 Beulah CVB 的游戏违规行为采取执法行动，强化内容监管力度。需评估北达科他州运营合规性，关注内容分级及消费者权益保护要求。</div>
+                    </div>
+                </article>
+
+                <article class="log-item" data-accent="green">
+                    <div class="log-inner">
+                        <div class="log-tags">
+                            <span class="log-category">立法动态</span>
+                            <span class="log-date">2026-03-02</span>
+                        </div>
+                        <div class="log-title"><a href="https://news.google.com/rss/articles/CBMisAFBVV95cUxNc2ZYM25nTWRlTWFmVlBoREhyR0Z4dnktcTRiSXpnanpzLXNtTHRDVV9uRFlUdVh1T3MtaEp2cHZGQ3VEVDdDSUJXdGg0U0t3cGtYajhEYTkxM1NBUnlwV1lGUHdlRFI2MXhFN21kNjlPajFSM1VLWU1mekgxd21iNUtMbHJFZ25LSmVFdlRUU2tfSEJTT3RIX0hVZ0tlemN3R2NyMmw5VW5sOXU3RVJuNQ?oc=5" target="_blank" rel="noopener">爱荷华州拟扩大赌博监管机构对抽奖赌场管辖权</a></div>
+                        <span class="log-title-orig">Iowa Bill Would Expand Gaming Regulator's Authority Over Sweepstakes Casinos</span>
+                        <div class="log-summary">拟通过法案扩大监管权限，涵盖运营规则、合规审查及消费者权益保护。可能影响游戏公司与抽奖赌场的合作模式，需评估移动端及 PC 端涉及赌博机制的设计与运营合规风险。</div>
+                    </div>
+                </article>
+
+                <article class="log-item" data-accent="teal">
+                    <div class="log-inner">
+                        <div class="log-tags">
+                            <span class="log-category">平台政策</span>
+                            <span class="log-date">2026-03-05</span>
+                        </div>
+                        <div class="log-title"><a href="https://news.google.com/rss/articles/CBMi1wFBVV95cUxPbVFQa2p5aVlLdXUtQTRuWUVtSnh3VE9fUXI4SnVJaHVEejVHQmE5Z3B6N1JfLWdvSGl3NkxOSXcwcXY3RGJvdnlRZEVQM2tEX0Exd0RBTHAzN1ZtTzBka3ZyWFpzTXFRaXJFWjMtSmRvODNyU1JRYjJ4bG8wMHJoYjU4VXBpY0g2VVpqNHpxbDM0RGx3R1BKcFZCS3pKbEVfVVk3YU1rNVU4Rng3eS16QnBRYjdReHJaUURzblAzNnFtcURsR1MtMnFQUlQ1RjEzQVJISGtlQdIB3wFBVV95cUxQY1ByeXREZm9yVDctX1FES1lDb2k5RzJnUzlUOHl2aE9iT21VNHN4RUdEZy12VnF6UFhYSTdNd19RbDljOHJBa1JZMW96b1hucHA1MzBCMjZYTjltTU1FSVhGaG1RLXBVQTk1Y0xqUUFoVmZMNE12aE5pTU9QWncxcjVPNUh2TDJlaHdHR0hINHRiVk9qZ01ZakFyTUVfNE9kS1hWZkphUTNUUGlRLVZtTEJfTWlvQmFhQjVUdzM2dnNXTS1oVXMwQ2xmZXh0NVpOZWRRTkdJTkZUZkZnNHVj?oc=5" target="_blank" rel="noopener">Google App Store 扩大支付选项并降低开发者抽成</a></div>
+                        <span class="log-title-orig">Google Revamps App Store Policy, Expands Billing Options and Cuts Developer Fees as Fortnite Returns</span>
+                        <div class="log-summary">Google 更新 App Store 政策，拓展支付方式并减少开发者抽成。对移动端 IAP 体系构成直接影响，同时可能波及 PC 端 D2C 支付流程。建议优先评估移动端支付系统合规性。</div>
+                    </div>
+                </article>
+
+                <article class="log-item" data-accent="purple">
+                    <div class="log-inner">
+                        <div class="log-tags">
+                            <span class="log-category">未成年人保护</span>
+                            <span class="log-date">2026-03-05</span>
+                        </div>
+                        <div class="log-title"><a href="https://news.google.com/rss/articles/CBMiiwFBVV95cUxQczRJN3VwOVlEREdtdGJUQjhkN2ZaekpLTFo1d2Z3Q0c0N1ZsTkJKQU5vRTY3Rk56ZUJqUXVZT1BySDNsZDVrWU4wQmF3eEczbXI5c21rY2Rwc1RYVnYwMkhHZmdDN2VXUGVwWnNEUHk0bU5EMGllVno4cjhGT3ROeUlMRkxzSWhRRGs4?oc=5" target="_blank" rel="noopener">美国推动应用商店年龄验证立法</a></div>
+                        <span class="log-title-orig">Lawmakers just advanced online safety laws that require age verification at the app store</span>
+                        <div class="log-summary">法案要求应用商店实施年龄验证机制以提升在线安全性。移动端 IAP 需新增年龄校验流程，PC 端官网支付页面亦需同步评估合规影响。建议重点关注法案进展及年龄验证技术方案准备。</div>
+                    </div>
+                </article>
+
+                <article class="log-item" data-accent="orange">
+                    <div class="log-inner">
+                        <div class="log-tags">
+                            <span class="log-category">内容监管</span>
+                            <span class="log-date">2026-03-02</span>
+                        </div>
+                        <div class="log-title"><a href="https://news.google.com/rss/articles/CBMijwFBVV95cUxPNU9UM3JSR1lzNldKd0JmQUc0OFN1OGtuWW1qXzJWcFYzWUJZeXNGVVdveXlLVXphZ20yUDNKNWdicy1kckR5T3BvRXFsUkZmNjRqVlBrR18yLURvMlNtdWtVY2RRU1hZbVRBbDIyWFNvNDdxYlRfakhpZUFqbG52bXRXbDJVcWhXQnRpU04wcw?oc=5" target="_blank" rel="noopener">加拿大魁北克在线游戏联盟推动监管立法</a></div>
+                        <span class="log-title-orig">Quebec Online Gaming Coalition Pushes for Online Gaming Regulation</span>
+                        <div class="log-summary">魁北克地区正推进游戏内容监管立法，涉及运营规范与用户权益保护。将直接影响移动端 IAP 抽成结构，同时需关注对 PC 官网充值页面的合规影响。</div>
+                    </div>
+                </article>
+
+            </div>
+        </div>
+
+        <!-- SECTION: 欧洲 -->
+        <div class="section-group" data-region="欧洲">
+            <div class="section-header">
+                <span class="section-title">欧洲</span>
+                <span class="section-count">4 条</span>
+                <div class="section-dots">
+                    <div class="dot" style="background: var(--accent-purple);"></div>
+                    <div class="dot" style="background: var(--accent-magenta);"></div>
+                    <div class="dot" style="background: var(--accent-teal);"></div>
+                </div>
+            </div>
+            <div class="section-cats">
+                <span class="cat-tag">未成年人保护</span>
+                <span class="cat-tag">内容监管</span>
+            </div>
+
+            <div class="log-list">
+
+                <article class="log-item" data-accent="purple">
+                    <div class="log-inner">
+                        <div class="log-tags">
+                            <span class="log-category">草案征询 · 高优先级</span>
+                            <span class="log-date">2026-03-02</span>
+                        </div>
+                        <div class="log-title"><a href="https://www.gov.uk/government/news/landmark-consultation-seeks-views-on-major-measures-to-protect-children-on-social-media-gaming-platforms-and-ai-chatbots" target="_blank" rel="noopener">英国启动未成年人在线福祉咨询</a></div>
+                        <span class="log-title-orig">Landmark consultation seeks views on major measures to protect children on social media, gaming platforms and AI chatbots</span>
+                        <div class="log-summary">英国政府发起为期两个月的咨询，拟对社交媒体、游戏平台和 AI 聊天机器人实施年龄限制、宵禁等措施。移动端需强化年龄验证和内容分级机制，建议法务与技术部优先处理年龄验证 SDK 升级。</div>
+                    </div>
+                </article>
+
+                <article class="log-item" data-accent="magenta">
+                    <div class="log-inner">
+                        <div class="log-tags">
+                            <span class="log-category">内容监管</span>
+                            <span class="log-date">2026-03-06</span>
+                        </div>
+                        <div class="log-title"><a href="https://www.pocketgamer.biz/uk-online-safety-consultation-raises-questions-for-games-and-pokmons-10bn-mobile-success-week-in-views/" target="_blank" rel="noopener">英国在线安全咨询引发游戏监管疑问</a></div>
+                        <span class="log-title-orig">UK online safety consultation raises questions for games, and Pokémon's $10bn mobile success | Week in Views</span>
+                        <div class="log-summary">咨询要求游戏提供更严格的内容与用户数据保护措施。PC 端需关注 Launcher 权限与反作弊合规，移动端面临 App Store 及 IAP 政策调整压力。建议法务与技术部优先处理用户数据收集合规，优先级：高。</div>
+                    </div>
+                </article>
+
+                <article class="log-item" data-accent="magenta">
+                    <div class="log-inner">
+                        <div class="log-tags">
+                            <span class="log-category">内容监管</span>
+                            <span class="log-date">2026-03-04</span>
+                        </div>
+                        <div class="log-title"><a href="https://news.google.com/rss/articles/CBMinwFBVV95cUxNbHcwSUVMUUYzWldfSXVfTGVXWU00bk5KM0ZpTGUwSXU3eHVuWHo1TjZUQkdhbW1RRERSRnI4ZDUzVENUeFpBYTBYdmMyU3hWN1pIM1pFX19xb1dUdnZmblRqTFRlcU1wNnczM2JLMnNObXJueEl5Z3gtVmx6Z29WYnJ6UE1rRldiTTNZbXlSM3lLY3ZOU2VKZnR4M3hkRk0?oc=5" target="_blank" rel="noopener">瑞典当局严令禁止未授权游戏平台运营</a></div>
+                        <span class="log-title-orig">Swedish Authorities Enforce Strict Ban on Unlicensed Gaming Platform</span>
+                        <div class="log-summary">政策已全面实施，要求所有游戏平台必须获得合法授权。移动端需确保分发渠道合规，PC 端需检查 D2C 服务是否符合当地法规。建议立即核查平台资质并调整运营策略。</div>
+                    </div>
+                </article>
+
+                <article class="log-item" data-accent="teal">
+                    <div class="log-inner">
+                        <div class="log-tags">
+                            <span class="log-category">立法进行中</span>
+                            <span class="log-date">2026-03-04</span>
+                        </div>
+                        <div class="log-title"><a href="https://news.google.com/rss/articles/CBMiggFBVV95cUxOWDhrTG5aVjFiZTQzR1IzeVBRUWJtWXU2QXZPTFhOSTFTT3RxS3VhRmxvMk84MFhuVzJQYV9wVGktZjRHdW5RU25WSmpKbnhQbHQxTEpNcThJZzlBNi1XNHVzUEFfRTFGaWZxSXQ1dFJKdDA0alBHdnZiZ2FsMF90TGZ3?oc=5" target="_blank" rel="noopener">欧盟拟将游戏平台纳入数字服务法案监管</a></div>
+                        <span class="log-title-orig">European Commission Mulls Bringing Gaming Platforms Under Its Digital Rules</span>
+                        <div class="log-summary">欧盟委员会考虑将游戏平台纳入 DSA 监管范围，以加强内容审核和用户保护措施。法规仍处于立法阶段，尚未正式生效，但预示着游戏行业将面临更严格的内容合规要求。</div>
+                    </div>
+                </article>
+
+            </div>
+        </div>
+
+        <!-- SECTION: 日韩台 -->
+        <div class="section-group" data-region="日韩台">
+            <div class="section-header">
+                <span class="section-title">日韩台</span>
+                <span class="section-count">1 条</span>
+                <div class="section-dots">
+                    <div class="dot" style="background: var(--accent-blue);"></div>
+                </div>
+            </div>
+            <div class="section-cats">
+                <span class="cat-tag">数据合规</span>
+            </div>
+
+            <div class="log-list">
+
+                <article class="log-item" data-accent="blue">
+                    <div class="log-inner">
+                        <div class="log-tags">
+                            <span class="log-category">立法动态 · 高优先级</span>
+                            <span class="log-date"></span>
+                        </div>
+                        <div class="log-title"><a href="https://news.google.com/rss/articles/CBMiWEFVX3lxTE4wWmQ2TVBMRnRnWGRnMmt0UVFDWlZTYy1IejdUWDlfWnRDNTA0X0N5aHA5bDRYeW83NEtycmxzd21uVHZCVnRlZ1RDVmlFME50bVdnamJJbG_SAVlBVV95cUxNd1VZX19UaW5MSS1ualdmUnBQdzFCVFMwbngtc0hzUF9zdHRsMVlPRjlzVDRoREtyV0lSdV9Tb3ctTUhFNWVEUmlDcU00Vm9JN1hWWjZ6MENHS1FN?oc=5" target="_blank" rel="noopener">韩国出台游戏服务迁移强制数据传输新法</a></div>
+                        <span class="log-title-orig">서비스 이전 시 유저 정보 넘기도록 의무화하는 법안 발의</span>
+                        <div class="log-summary">要求企业在服务迁移过程中完整传输用户信息，跨境数据处理若违反 GDPR 等法规将引发法律纠纷。对 PC 端及移动端的数据合规体系提出更高要求，建议合规部立即启动评估。</div>
+                    </div>
+                </article>
+
+            </div>
+        </div>
+
+        <!-- PDF 下载 -->
+        <div class="download-section">
+            <div class="download-label">下载报告</div>
+            <a href="reports/archive/2026-W10/weekly.pdf" download class="download-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span class="download-btn-label">下载 PDF 完整版</span>
+                <span class="download-btn-meta">PDF</span>
+            </a>
+        </div>
+
+        <div class="page-footer">
+            <div class="page-footer-text">2026-W10 · LILITH LEGAL</div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+    function filterRegion(region, btn) {
+        // Update button states
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Show/hide sections
+        document.querySelectorAll('.section-group').forEach(section => {
+            if (region === 'all') {
+                section.classList.remove('hidden');
+            } else {
+                const sectionRegion = section.getAttribute('data-region');
+                if (sectionRegion === region) {
+                    section.classList.remove('hidden');
+                } else {
+                    section.classList.add('hidden');
+                }
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
