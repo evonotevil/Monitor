@@ -21,7 +21,6 @@
 import os
 import sqlite3
 import sys
-from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -30,8 +29,8 @@ import requests
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
 from utils import (
-    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status,
-    CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items,
+    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group,
+    CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim,
 )
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
@@ -138,11 +137,6 @@ def _get_exec_summary(items: list) -> str:
 
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
 
-# 每个区域分组最多展示条目数（避免卡片过长）
-_MAX_PER_GROUP = 3
-# 全局条目上限
-_MAX_TOTAL_ITEMS = 12
-
 
 def build_card(
     today: datetime,
@@ -179,88 +173,28 @@ def build_card(
             region_parts.append(f"{emoji} {group} **{cnt}**")
     region_line = "　".join(region_parts) if region_parts else "暂无数据"
 
-    # ── 将条目按区域分组，每组 bigram 去重后限 _MAX_PER_GROUP 条 ──────
-    raw_grouped: dict = defaultdict(list)
-    for item in all_items:
-        group = _get_region_group(item.get("region", "其他"))
-        raw_grouped[group].append(item)
-
-    grouped = {g: _pick_group_items(v, _MAX_PER_GROUP) for g, v in raw_grouped.items()}
-
     # ── 组装卡片 elements ────────────────────────────────────────────
     elements: list = []
 
-    # 副标题
+    # 日期 + 总量
     elements.append({
         "tag": "markdown",
-        "content": f"📅 **上周合规动态回顾** | {date_range}",
+        "content": f"📅 **上周合规动态回顾** | {date_range}\n共监测到 **{total}** 条合规动态",
     })
 
-    # 引用块：综述（有内容才展示，不带标题直接显示正文）
+    # 区域分布
+    elements.append({
+        "tag": "markdown",
+        "content": f"**🗺️ 按地区**\n{region_line}",
+    })
+
+    # 引用块：综述
     if exec_summary:
+        elements.append({"tag": "hr"})
         elements.append({
             "tag": "markdown",
             "content": "\n".join(f"> {line}" for line in exec_summary.splitlines()),
         })
-
-    # 统计数据
-    elements.append({
-        "tag": "markdown",
-        "content": (
-            f"共监测到 **{total}** 条合规动态\n\n"
-            f"**🗺️ 按地区**\n{region_line}"
-        ),
-    })
-
-    # ── 分区域展示重点条目 ───────────────────────────────────────────
-    total_shown = 0
-    for group in _GROUP_ORDER:
-        items_in_group = grouped.get(group, [])
-        if not items_in_group:
-            continue
-
-        elements.append({"tag": "hr"})
-
-        group_emoji = _GROUP_EMOJI.get(group, "🌐")
-        group_cnt   = by_region_group.get(group, 0)
-        elements.append({
-            "tag": "markdown",
-            "content": f"**{group_emoji} {group}** · 本周 {group_cnt} 条",
-        })
-
-        for item in items_in_group:
-            if total_shown >= _MAX_TOTAL_ITEMS:
-                break
-
-            score   = float(item.get("impact_score", 1.0))
-            risk_em = _impact_emoji(score)
-            cat     = item.get("category_l1", "")
-            cat_em  = CAT_EMOJI.get(cat, "")
-            status  = normalize_status(item.get("status", ""))
-            region  = item.get("region", "")
-
-            # 使用清洗后的中文标题
-            title_zh = (item.get("title_zh") or "").strip()
-            url      = item.get("source_url", "")
-            title_md = f"[{title_zh}]({url})" if url else title_zh
-
-            # 摘要（优先中文，截断至 90 字）
-            summary = (item.get("summary_zh") or item.get("summary") or "").strip()
-            if len(summary) > 90:
-                summary = summary[:90] + "…"
-
-            date_tag = item.get("date", "")
-
-            elements.append({
-                "tag": "markdown",
-                "content": (
-                    f"{risk_em} **[{region}]** {status} · {cat_em} {cat}\n"
-                    f"{title_md}\n"
-                    f"_{summary}_\n"
-                    f"「{date_tag}」"
-                ),
-            })
-            total_shown += 1
 
     # ── 底部按钮 ─────────────────────────────────────────────────────
     elements.append({"tag": "hr"})
