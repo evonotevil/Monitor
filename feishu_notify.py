@@ -29,8 +29,7 @@ import requests
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
 from utils import (
-    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group,
-    CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim,
+    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, _TIER_SORT,
 )
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
@@ -63,13 +62,6 @@ def get_weekly_data():
         f"SELECT COUNT(*) FROM legislation WHERE date >= ? AND {NOISE_GUARD}",
         (since,),
     ).fetchone()[0]
-
-    by_cat = conn.execute(
-        f"""SELECT category_l1, COUNT(*) AS cnt
-            FROM legislation WHERE date >= ? AND {NOISE_GUARD}
-            GROUP BY category_l1 ORDER BY cnt DESC""",
-        (since,),
-    ).fetchall()
 
     by_region_raw = conn.execute(
         f"""SELECT region, COUNT(*) AS cnt
@@ -120,7 +112,7 @@ def get_weekly_data():
         items.append(d)
     items.sort(key=lambda x: (x["_tier"], float(x.get("impact_score", 1.0))), reverse=True)
 
-    return today, week_ago, total, [dict(r) for r in by_cat], by_region_group, items
+    return today, week_ago, total, by_region_group, items
 
 
 # ── 执行摘要（复用 HTML 报告同一 LLM 函数）───────────────────────────
@@ -142,12 +134,9 @@ def build_card(
     today: datetime,
     week_ago: datetime,
     total: int,
-    by_cat: list,
     by_region_group: dict,
-    all_items: list,
     exec_summary: str,
     html_url: str,
-    pdf_url: str,
     mobile_url: str = "",
     pc_url: str = "",
 ) -> dict:
@@ -156,13 +145,6 @@ def build_card(
     date_range = (
         f"{week_ago.strftime('%Y/%m/%d')} – {today.strftime('%Y/%m/%d')}"
     )
-
-    # ── 分类统计行 ───────────────────────────────────────────────────
-    cat_parts = [
-        f"{CAT_EMOJI.get(r['category_l1'], '•')} {r['category_l1']} **{r['cnt']}**"
-        for r in by_cat if r.get("category_l1")
-    ]
-    cat_line = "　".join(cat_parts) if cat_parts else "暂无数据"
 
     # ── 区域分组统计行（按 _GROUP_ORDER 排序）──────────────────────
     region_parts = []
@@ -257,13 +239,12 @@ def main():
     mobile_url  = os.environ.get("REPORT_MOBILE_URL", "") or os.environ.get("MOBILE_URL", "")
     pc_url      = os.environ.get("REPORT_PC_URL", "") or os.environ.get("PC_URL", "")
     html_url    = os.environ.get("REPORT_HTML_URL", "")
-    pdf_url     = os.environ.get("REPORT_PDF_URL", "")
 
     if not webhook_url:
         print("❌ 未设置 FEISHU_WEBHOOK_URL 环境变量")
         sys.exit(1)
 
-    today, week_ago, total, by_cat, by_region_group, all_items = get_weekly_data()
+    today, week_ago, total, by_region_group, all_items = get_weekly_data()
     print(f"本周数据: {total} 条（噪音过滤后），区域分布: {by_region_group}，展示条目: {len(all_items)}")
 
     # 综述生成（LLM，失败不阻断）
@@ -274,8 +255,8 @@ def main():
         print("综述生成跳过（无 API Key 或调用失败）")
 
     card = build_card(
-        today, week_ago, total, by_cat, by_region_group, all_items,
-        exec_summary, html_url, pdf_url,
+        today, week_ago, total, by_region_group,
+        exec_summary, html_url,
         mobile_url=mobile_url, pc_url=pc_url,
     )
     send_card(webhook_url, card)
