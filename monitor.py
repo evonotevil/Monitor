@@ -232,7 +232,11 @@ def _filter_valid_dates(items):
 
 
 def _period_label(period: str) -> str:
-    labels = {"day": "日报（昨日）", "week": "周报（近7天）", "month": "月报（近30天）", "all": "全量报告"}
+    if period == "week":
+        from datetime import datetime
+        now = datetime.utcnow()
+        return now.strftime("%G-W%V")
+    labels = {"day": "日报（昨日）", "month": "月报（近30天）", "all": "全量报告"}
     return labels.get(period, "全量报告")
 
 
