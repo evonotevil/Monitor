@@ -86,7 +86,9 @@ jobs:
           REPO="${{ github.repository }}"
           CACHE_BUST=$(date -u +%Y%m%d%H%M)
           BASE="https://raw.githubusercontent.com/${REPO}/main/reports"
-          echo "HTML_URL=https://htmlpreview.github.io/?${BASE}/latest.html?v=${CACHE_BUST}" >> $GITHUB_ENV
+          echo "MOBILE_URL=https://htmlpreview.github.io/?${BASE}/latest-mobile.html?v=${CACHE_BUST}" >> $GITHUB_ENV
+          echo "PC_URL=https://htmlpreview.github.io/?${BASE}/latest-pc.html?v=${CACHE_BUST}" >> $GITHUB_ENV
+          echo "HTML_URL=https://htmlpreview.github.io/?${BASE}/latest-mobile.html?v=${CACHE_BUST}" >> $GITHUB_ENV
           # PDF 文件名含空格和中文，整块交给 Python 生成并直接写入 GITHUB_ENV
           python -c "
           from datetime import datetime, timedelta
@@ -111,13 +113,16 @@ jobs:
           ARCHIVE_DIR="reports/archive/${WEEK_ID}"
           mkdir -p "${ARCHIVE_DIR}"
 
-          # 将本周 HTML 存入归档（HTML 约 70KB，适合文本分析；PDF 1.8MB 太大不归档）
-          cp reports/latest.html "${ARCHIVE_DIR}/weekly.html"
+          # 将本周 HTML 存入归档（HTML 约 70~150KB，适合文本分析；PDF 太大不归档）
+          cp reports/latest-mobile.html "${ARCHIVE_DIR}/weekly-mobile.html"
+          cp reports/latest-pc.html     "${ARCHIVE_DIR}/weekly-pc.html"
+          # 保留 weekly.html 兼容旧链接（指向移动端）
+          cp reports/latest-mobile.html "${ARCHIVE_DIR}/weekly.html"
 
-          # 更新 latest HTML + DB + 本周存档（latest.pdf 不入库，体积大；飞书用带日期命名 PDF）
-          git add reports/latest.html data/monitor.db
+          # 更新 latest HTML + DB + 本周存档
+          git add reports/latest-mobile.html reports/latest-pc.html reports/latest.html data/monitor.db
           git add "reports/${PDF_FILENAME}" 2>/dev/null || true
-          git add "${ARCHIVE_DIR}/weekly.html"
+          git add "${ARCHIVE_DIR}/weekly-mobile.html" "${ARCHIVE_DIR}/weekly-pc.html" "${ARCHIVE_DIR}/weekly.html"
 
           # 如果没有变化就跳过 commit（避免空提交报错）
           git diff --staged --quiet || \
@@ -128,6 +133,8 @@ jobs:
       - name: Send Feishu notification
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          REPORT_MOBILE_URL:  ${{ env.MOBILE_URL }}
+          REPORT_PC_URL:      ${{ env.PC_URL }}
           REPORT_HTML_URL:    ${{ env.HTML_URL }}
           REPORT_PDF_URL:     ${{ env.PDF_URL }}
           LLM_API_KEY:        ${{ secrets.LLM_API_KEY }}
