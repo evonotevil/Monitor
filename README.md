@@ -18,12 +18,12 @@
 
 ---
 
-## 自动化调度
+## 工作流
 
-| 任务 | 触发方式 | 说明 |
-|------|----------|------|
-| 每日日报 | 手动触发（Actions → Run workflow） | 抓取昨日数据（`when:1d`），有新增则推送飞书 |
-| 每周周报 | 手动触发（Actions → Run workflow） | 抓取近 7 天数据，生成双端 HTML 报告，发飞书，存档 |
+| 任务 | Workflow 文件 | 说明 |
+|------|--------------|------|
+| 每日日报 | `daily_check.yml` | 抓取昨日数据，有新增则推送飞书卡片 |
+| 每周周报 | `weekly_report.yml` | 抓取近 7 天数据，生成双端 HTML 报告，发飞书，存档 |
 
 ---
 
@@ -111,12 +111,6 @@ cd Monitor
 - 移动端：`https://<owner>.github.io/<repo>/reports/latest-mobile.html`
 - PC 端：`https://<owner>.github.io/<repo>/reports/latest-pc.html`
 
-### 4. 手动触发 Workflow
-
-进入 **Actions** 标签页，两个 workflow 均支持手动点击 **Run workflow** 触发：
-- `每日合规动态检查`（`daily_check.yml`）
-- `全球游戏合规周报`（`weekly_report.yml`）
-
 ---
 
 ## 本地调试
@@ -130,7 +124,7 @@ playwright install chromium      # 仅 PDF 生成需要
 export LLM_API_KEY=sk-xxx
 export FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
 
-# 抓取昨日数据（日报模式：when:1d，每查询 10 条）
+# 抓取昨日数据（日报模式）
 python monitor.py run --period day
 
 # 抓取过去 7 天数据并生成双端 HTML 报告
