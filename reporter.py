@@ -74,6 +74,61 @@ def _get_summary_zh(item: dict) -> str:
     return item.get("summary_zh") or item.get("summary", "")
 
 
+# ─── 事件指纹（跨来源/跨区域快速候选匹配）─────────────────────────────
+
+_FP_ENTITIES = re.compile(
+    r"\b(google|alphabet|apple|microsoft|meta|facebook|amazon|epic|valve|steam"
+    r"|sony|nintendo|bytedance|tencent|netflix|spotify"
+    r"|ftc|doj|dma|cma|accc|pcc|ofcom|cnil|bfdi|agcm)\b",
+    re.IGNORECASE,
+)
+_FP_TOPICS = [
+    (re.compile(r"pay(?:ment|out)?|commission|fee\b|iap\b|抽成|分成", re.I), "payment"),
+    (re.compile(r"privacy|data.?protect|gdpr|ccpa|隐私|数据保护", re.I), "privacy"),
+    (re.compile(r"\bminor|child(?:ren)?|coppa|未成年|儿童", re.I), "minor"),
+    (re.compile(r"antitrust|anti.?trust|monopol|反垄断|垄断", re.I), "antitrust"),
+    (re.compile(r"loot.?box|gacha|probabil|抽卡|开箱|概率", re.I), "gacha"),
+    (re.compile(r"\bbattery\b|电池", re.I), "battery"),
+    (re.compile(r"fine|penalt|enforce|sanction|罚款|处罚|执法", re.I), "enforcement"),
+    (re.compile(r"distribut|sideload|分发|侧载", re.I), "distribution"),
+    (re.compile(r"adverti[sz]|广告", re.I), "ads"),
+    (re.compile(r"age.?verif|rating|分级|年龄验证", re.I), "rating"),
+    (re.compile(r"refund|退款", re.I), "refund"),
+]
+
+
+def _calculate_event_fingerprint(item: dict) -> frozenset:
+    """
+    计算事件指纹：{R:区域, E:实体, T:议题}
+    用于在 LLM 语义检查前识别"候选合并池"。
+    两条新闻共享同一实体 + 同一议题，视为同一事件候选对。
+    """
+    text = " ".join(filter(None, [
+        item.get("title", ""),
+        item.get("title_zh", ""),
+        item.get("summary_zh", ""),
+    ]))
+    parts: set = set()
+    group = _get_region_group(item.get("region", "其他"))
+    if group != "其他":
+        parts.add(f"R:{group}")
+    for m in _FP_ENTITIES.findall(text):
+        parts.add(f"E:{m.lower()}")
+    for pattern, topic in _FP_TOPICS:
+        if pattern.search(text):
+            parts.add(f"T:{topic}")
+    return frozenset(parts)
+
+
+def _fp_same_event(fp_a: frozenset, fp_b: frozenset) -> bool:
+    """指纹重叠：共享至少 1 个实体 AND 至少 1 个议题 → 视为同一事件候选。"""
+    shared = fp_a & fp_b
+    return (
+        any(t.startswith("E:") for t in shared)
+        and any(t.startswith("T:") for t in shared)
+    )
+
+
 # ─── 基于标题文本的分组推断（修复 region='其他' 条目）────────────────────
 
 _TEXT_GROUP_PATTERNS = [
@@ -172,6 +227,9 @@ def _dedup_for_display(items: List[dict]) -> List[dict]:
     extra_items: dict = {}  # kept_idx → 被合并的重复条目列表（用于 LLM 深度摘要融合）
     borderline: list  = []  # [(kidx, idx)] 需 LLM 验证的模糊重复对
 
+    # 预计算事件指纹（用于跨区域/跨来源候选匹配）
+    fps: dict = {i: _calculate_event_fingerprint(items[i]) for i in range(len(items))}
+
     for idx in sorted_idx:
         item    = items[idx]
         group   = _resolve_group(item)
@@ -181,24 +239,45 @@ def _dedup_for_display(items: List[dict]) -> List[dict]:
 
         for kidx in kept_idx:
             kitem = items[kidx]
-            if _resolve_group(kitem) != group:
-                continue
+            same_group = (_resolve_group(kitem) == group)
 
-            # ① URL 精确去重
+            # ① URL 精确去重（全局，不限区域）
             url_kept = (kitem.get("source_url") or "").strip()
             if url_item and url_kept and url_item == url_kept:
                 extra_items.setdefault(kidx, []).append(dict(items[idx]))
                 is_dup = True
                 break
 
-            # ② Bigram 相似度
+            if not same_group:
+                # 跨区域：只在指纹重叠时才进一步比较，避免误合并
+                if not _fp_same_event(fps[idx], fps[kidx]):
+                    continue
+                t_kept = (kitem.get("title_zh") or kitem.get("title") or "")
+                sim = _bigram_sim(t_item, t_kept)
+                tier_kept = TIER_PRIORITY.get(get_source_tier(kitem.get("source_name", "")), 1)
+                tier_curr = TIER_PRIORITY.get(get_source_tier(item.get("source_name", "")), 1)
+                # ② 权威源覆盖：任一方为 official（tier=4）时，bigram > 0.20 即合并
+                if max(tier_kept, tier_curr) >= 4 and sim > 0.20:
+                    extra_items.setdefault(kidx, []).append(dict(items[idx]))
+                    is_dup = True
+                    _logger.info(f"[dedup fp] 权威源覆盖跨区域重复: {item.get('title_zh','')[:40]}")
+                    break
+                # ③ 普通跨区域：指纹预筛后，bigram > 0.40 合并
+                if sim > 0.40:
+                    extra_items.setdefault(kidx, []).append(dict(items[idx]))
+                    is_dup = True
+                    _logger.info(f"[dedup fp] 跨区域去重合并: {item.get('title_zh','')[:40]}")
+                    break
+                continue  # 指纹匹配但 bigram 不足，不合并
+
+            # ④ 同区域 Bigram 相似度（原有逻辑）
             t_kept = (kitem.get("title_zh") or kitem.get("title") or "")
             sim = _bigram_sim(t_item, t_kept)
             if sim > 0.45:          # 确定重复
                 extra_items.setdefault(kidx, []).append(dict(items[idx]))
                 is_dup = True
                 break
-            if sim > 0.35:          # 模糊，记录待 LLM 验证（阈值从 0.25 提高至 0.35，避免误合并）
+            if sim > 0.35:          # 模糊，记录待 LLM 验证
                 borderline.append((kidx, idx))
 
         if not is_dup:
