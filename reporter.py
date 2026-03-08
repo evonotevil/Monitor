@@ -665,8 +665,25 @@ def _prepare_report_data(items: List[dict]) -> tuple:
 
 # ── CSS / JS constants (plain strings, no f-string brace escaping needed) ─────
 
-_MOBILE_CSS = """
-        /* 使用系统字体，避免外链加载延迟 */
+_FONT_FACE = """
+        @font-face {
+            font-family: 'Inter';
+            src: url('../assets/fonts/inter-variable.woff2') format('woff2-variations');
+            font-weight: 100 900; font-style: normal; font-display: swap;
+        }
+        @font-face {
+            font-family: 'JetBrains Mono';
+            src: url('../assets/fonts/jetbrains-mono-400.woff2') format('woff2');
+            font-weight: 400; font-style: normal; font-display: swap;
+        }
+        @font-face {
+            font-family: 'JetBrains Mono';
+            src: url('../assets/fonts/jetbrains-mono-500.woff2') format('woff2');
+            font-weight: 500; font-style: normal; font-display: swap;
+        }
+"""
+
+_MOBILE_CSS = _FONT_FACE + """
         :root {
             --bg-canvas: #EBEBEB; --bg-main: #F9F9F7; --bg-card: #FFFFFF;
             --text-primary: #1A1A1A; --text-secondary: #5A5A5A; --text-meta: #999999;
@@ -677,8 +694,8 @@ _MOBILE_CSS = """
             --accent-red: #E8443A; --accent-green: #27AE60; --accent-purple: #8B5CF6;
             --accent-magenta: #DB2777; --accent-teal: #0D9488; --accent-blue: #2563EB;
             --accent-orange: #D97706;
-            --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif;
-            --font-mono: 'SF Mono', ui-monospace, "Cascadia Code", Consolas, monospace;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, "Cascadia Code", Consolas, monospace;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background-color: var(--bg-canvas); font-family: var(--font-sans); color: var(--text-primary); -webkit-font-smoothing: antialiased; display: flex; justify-content: center; min-height: 100vh; }
@@ -764,8 +781,7 @@ function filterRegion(region, btn) {
 }
 """
 
-_PC_CSS = """
-        /* 使用系统字体，避免外链加载延迟 */
+_PC_CSS = _FONT_FACE + """
         :root {
             --bg: #F9F9F7; --bg-card: #FFFFFF; --bg-note: #F5F5F3;
             --border: rgba(0,0,0,0.08); --border-strong: rgba(0,0,0,0.13);
@@ -774,8 +790,8 @@ _PC_CSS = """
             --accent-red: #E5484D; --accent-green: #30A46C; --accent-purple: #8E4EC6;
             --accent-magenta: #D6409F; --accent-teal: #00A2C7; --accent-blue: #3B82F6;
             --accent-orange: #F76B15;
-            --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif;
-            --font-mono: 'SF Mono', ui-monospace, "Cascadia Code", Consolas, monospace;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, "Cascadia Code", Consolas, monospace;
             --radius: 10px;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }

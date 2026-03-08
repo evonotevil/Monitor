@@ -84,11 +84,12 @@ jobs:
       - name: Set report URLs
         run: |
           REPO="${{ github.repository }}"
-          CACHE_BUST=$(date -u +%Y%m%d%H%M)
-          BASE="https://raw.githubusercontent.com/${REPO}/main/reports"
-          echo "MOBILE_URL=https://htmlpreview.github.io/?${BASE}/latest-mobile.html?v=${CACHE_BUST}" >> $GITHUB_ENV
-          echo "PC_URL=https://htmlpreview.github.io/?${BASE}/latest-pc.html?v=${CACHE_BUST}" >> $GITHUB_ENV
-          echo "HTML_URL=https://htmlpreview.github.io/?${BASE}/latest-mobile.html?v=${CACHE_BUST}" >> $GITHUB_ENV
+          REPO_NAME="${REPO##*/}"
+          OWNER="${REPO%%/*}"
+          PAGES_BASE="https://${OWNER}.github.io/${REPO_NAME}/reports"
+          echo "MOBILE_URL=${PAGES_BASE}/latest-mobile.html" >> $GITHUB_ENV
+          echo "PC_URL=${PAGES_BASE}/latest-pc.html" >> $GITHUB_ENV
+          echo "HTML_URL=${PAGES_BASE}/latest-mobile.html" >> $GITHUB_ENV
           # PDF 文件名含空格和中文，整块交给 Python 生成并直接写入 GITHUB_ENV
           python -c "
           from datetime import datetime, timedelta
