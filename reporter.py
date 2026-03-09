@@ -144,34 +144,37 @@ _TEXT_GROUP_PATTERNS = [
                r'|poland|polish'
                r'|sweden|swedish'
                r'|norway|norwegian'
+               r'|russia[n]?|ukraine|ukrainian|belarus|belarusian'
                r'|eu\b|european union|european commission|european parliament'
                r'|gdpr\b|dsa\b|dma\b|ai act|asa\b)\b'
-               r'|英国|德国|法国|荷兰|比利时|奥地利|意大利|西班牙|波兰|瑞典|挪威|欧盟|欧洲'),
+               r'|英国|德国|法国|荷兰|比利时|奥地利|意大利|西班牙|波兰|瑞典|挪威|欧盟|欧洲'
+               r'|俄罗斯|乌克兰|白俄罗斯'),
     ("北美",   r'(?i)\b(usa\b|united states|american?|ftc\b|federal trade commission'
                r'|congress\b|senate\b|california|new york|virginia|texas|florida'
                r'|connecticut|nevada|pennsylvania|attorney general'
                r'|canada|canadian|pipeda\b'
+               r'|mexico|mexican'
                r'|ccpa\b|cpra\b|coppa\b|kids act)\b'
-               r'|美国|加拿大|纽约|加利福尼亚|德克萨斯'),
-    # 亚太区：东南亚 + 南亚 + 大洋洲合并（与 utils.py _GROUP_ORDER 保持一致）
-    ("亚太区", r'(?i)\b(india[n]?|dpdpa\b|meity\b|vaishnaw|pakistan|bangladesh'
-               r'|australia[n]?|new zealand|esafety\b|accc\b'
-               r'|vietnam[ese]?|việt|indonesi[a]?[n]?|kominfo\b|igac\b'
+               r'|美国|加拿大|纽约|加利福尼亚|德克萨斯|墨西哥'),
+    # 亚太区：仅含东南亚十一国（与 utils.py _REGION_GROUP_MAP 定义一致）
+    ("亚太区", r'(?i)\b(vietnam[ese]?|việt|indonesi[a]?[n]?|kominfo\b|igac\b'
                r'|thailand|thai\b|pdpa\b'
                r'|philippine[s]?|malaysia[n]?|mcmc\b'
-               r'|singapore|imda\b)\b'
-               r'|印度|巴基斯坦|孟加拉|澳大利亚|新西兰'
-               r'|越南|印度尼西亚|印尼|泰国|菲律宾|马来西亚|新加坡'),
+               r'|singapore|imda\b|brunei|myanmar|cambodia|laos|timor)\b'
+               r'|越南|印度尼西亚|印尼|泰国|菲律宾|马来西亚|新加坡|缅甸|柬埔寨|文莱'),
     ("日韩台", r'(?i)\b(japan[ese]?|korea[n]?|south korea|grac\b|kca\b|cero\b'
                r'|nintendo\b)\b'
                r'|台湾|韓[国國]?|日本|韩国|ゲーム|게임|확률형'),
-    # 中东 / 南美 均归入"其他"大类（与 utils.py 一致）
+    # 其他：南美 / 非洲 / 南亚 / 大洋洲 / 中东（与 utils.py 一致）
     ("其他",   r'(?i)\b(saudi|uae\b|united arab emirates|turkey|turkish|türkiye'
                r'|nigeria[n]?|south africa'
-               r'|brazil[ian]?|lgpd\b|mexico|mexican|argentina[n]?'
+               r'|india[n]?|dpdpa\b|meity\b|pakistan|bangladesh'
+               r'|australia[n]?|new zealand|esafety\b|accc\b|oaic\b'
+               r'|brazil[ian]?|lgpd\b|argentina[n]?'
                r'|chile[an]?|colombia[n]?)\b'
                r'|沙特|阿联酋|土耳其|尼日利亚|南非'
-               r'|巴西|墨西哥|阿根廷|智利|哥伦比亚'),
+               r'|印度|巴基斯坦|孟加拉|澳大利亚|新西兰'
+               r'|巴西|阿根廷|智利|哥伦比亚'),
 ]
 
 
