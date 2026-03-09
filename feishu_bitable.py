@@ -34,6 +34,17 @@ from typing import List, Optional
 
 import requests
 
+from utils import _get_region_group
+
+# 将内部分组名映射到多维表格单选选项名（亚太区 → 东南亚）
+_BITABLE_REGION_LABEL = {
+    "北美":  "北美",
+    "欧洲":  "欧洲",
+    "日韩台": "日韩台",
+    "亚太区": "东南亚",
+    "其他":  "其他",
+}
+
 # ── 本地去重文件（记录已写入的 source_url，最多保留 5000 条）─────────────
 _SYNCED_FILE = Path(__file__).parent / "data" / "bitable_synced_urls.json"
 _MAX_SYNCED  = 5000
@@ -156,7 +167,8 @@ def _build_record(item: dict) -> dict:
     }
 
     if region:
-        fields["国家/地区"] = region
+        group = _get_region_group(region)
+        fields["国家/地区"] = _BITABLE_REGION_LABEL.get(group, "其他")
 
     # 合规类别为多选字段，API 需传列表
     if cat:
