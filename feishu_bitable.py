@@ -280,12 +280,13 @@ def sync_items_to_bitable(items: List[dict]) -> None:
         written = write_to_bitable(new_items, app_token, table_id, token)
         print(f"✅ 飞书多维表格写入成功：{written} 条")
 
-        # 更新去重记录
-        for item in new_items:
-            url = item.get("source_url")
-            if url:
-                synced_urls.add(url)
-        _save_synced_urls(synced_urls)
+        # 只有实际写入成功才更新去重记录
+        if written > 0:
+            for item in new_items:
+                url = item.get("source_url")
+                if url:
+                    synced_urls.add(url)
+            _save_synced_urls(synced_urls)
 
     except Exception as e:
         print(f"⚠️  飞书多维表格写入失败（不阻断主流程）: {e}")
