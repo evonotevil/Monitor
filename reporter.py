@@ -825,14 +825,14 @@ _MOBILE_CSS = _FONT_FACE + """
         .filter-btn.active { background: var(--header-bg); color: #FFFFFF; border-color: transparent; box-shadow: 0 1px 4px rgba(0,0,0,0.14); }
         .section-group { margin-bottom: 40px; }
         .section-group.hidden { display: none; }
-        .section-header { display: flex; align-items: center; gap: 10px; padding: 0 20px; margin-bottom: 14px; }
-        .section-title { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); }
+        .section-header { display: flex; align-items: baseline; gap: 8px; padding: 0 20px; margin-bottom: 6px; }
+        .section-title { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); }
         .section-count { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; color: var(--text-meta); text-transform: uppercase; }
-        .section-dots { display: flex; gap: 3px; margin-left: auto; }
+        .section-dots { display: flex; gap: 3px; margin-left: auto; align-items: center; }
         .dot { width: 5px; height: 5px; border-radius: 50%; }
-        .section-cats { padding: 0 20px; margin-bottom: 14px; display: flex; gap: 5px; flex-wrap: wrap; }
-        .cat-tag { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-meta); padding: 2px 7px; border-radius: 3px; border: 1px solid var(--card-border); }
-        .log-list { display: flex; flex-direction: column; padding: 0 20px; gap: 8px; }
+        .section-cats { padding: 0 20px 12px; margin-bottom: 16px; border-bottom: 1px solid rgba(0,0,0,0.06); display: flex; gap: 5px; flex-wrap: wrap; }
+        .cat-tag { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-meta); }
+        .log-list { display: flex; flex-direction: column; padding: 0 20px; gap: 10px; }
         .log-item { background: var(--bg-card); border-radius: 10px; box-shadow: var(--card-shadow); overflow: hidden; transition: box-shadow 0.18s ease, transform 0.18s ease; position: relative; }
         .log-item::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
         .log-item[data-accent="red"]::before     { background: var(--accent-red); }
@@ -843,15 +843,15 @@ _MOBILE_CSS = _FONT_FACE + """
         .log-item[data-accent="blue"]::before    { background: var(--accent-blue); }
         .log-item[data-accent="orange"]::before  { background: var(--accent-orange); }
         .log-item:hover { box-shadow: var(--card-shadow-hover); transform: translateY(-1px); }
-        .log-inner { padding: 14px 14px 14px 18px; }
-        .log-tags { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+        .log-inner { padding: 16px 16px 16px 20px; }
+        .log-tags { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
         .log-category { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-meta); }
         .log-date { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.05em; color: var(--text-meta); margin-left: auto; }
-        .log-title { font-size: 13px; font-weight: 500; letter-spacing: -0.01em; color: var(--text-primary); line-height: 1.4; margin-bottom: 3px; }
+        .log-title { font-size: 13.5px; font-weight: 500; letter-spacing: -0.01em; color: var(--text-primary); line-height: 1.45; margin-bottom: 6px; }
         .log-title a { color: inherit; text-decoration: none; }
         .log-title a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
         .log-title-orig { font-style: italic; font-size: 10px; color: var(--text-meta); line-height: 1.4; margin-bottom: 10px; display: block; }
-        .log-summary { font-size: 11.5px; line-height: 1.75; color: var(--text-secondary); padding: 10px 12px; background: rgba(0,0,0,0.025); border-radius: 6px; border: 1px solid var(--line-color); }
+        .log-summary { font-size: 11.5px; line-height: 1.8; color: var(--text-secondary); padding: 10px 12px; background: #F8F8F6; border-radius: 6px; border: 1px solid rgba(0,0,0,0.05); }
         .download-section { margin: 0 20px 40px; padding: 18px; border-radius: 10px; background: var(--bg-card); box-shadow: var(--card-shadow); }
         .download-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-meta); margin-bottom: 12px; }
         .download-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--bg-main); color: var(--text-primary); font-family: var(--font-sans); font-size: 13px; font-weight: 400; cursor: pointer; text-decoration: none; transition: background 0.15s, border-color 0.15s, box-shadow 0.15s; }
@@ -1111,21 +1111,7 @@ def _render_mobile_html(action_items: List[dict], news_items: List[dict],
     week_esc   = html_mod.escape(week_label)
     range_esc  = html_mod.escape(date_range)
 
-    # Exec summary block（按 BP 分组展示本周工作任务）
-    if action_items:
-        bp_html   = _render_bp_breakdown_html(action_items)
-        exec_html = (
-            f'<div class="exec-block">'
-            f'<div class="exec-header">'
-            f'<span class="exec-header-label">本周工作摘要</span>'
-            f'<div class="exec-header-dot"></div>'
-            f'<span class="exec-header-label">{period_esc}</span>'
-            f'</div>'
-            f'<div class="exec-body">{bp_html}</div>'
-            f'</div>\n'
-        )
-    else:
-        exec_html = ""
+    exec_html = ""
 
     # 过滤按钮（只显示有数据的地区）
     active_regions = [g for g in _GROUP_ORDER if action_grouped.get(g) or news_grouped.get(g)]
@@ -1293,84 +1279,18 @@ def _render_pc_html(action_items: List[dict], news_items: List[dict],
     week_esc   = html_mod.escape(week_label)
     range_esc  = html_mod.escape(date_range)
 
-    # Exec summary（按 BP 分组展示本周工作任务）
-    if action_items:
-        bp_html   = _render_bp_breakdown_html(action_items)
-        exec_html = (
-            f'<div class="exec-section"><div class="exec-inner">'
-            f'<div class="exec-sidebar">'
-            f'<div><div class="exec-sidebar-label">本周工作摘要</div>'
-            f'<div class="exec-sidebar-title">本周重点<br>合规工作</div></div>'
-            f'<div class="exec-sidebar-sub">{range_esc}</div>'
-            f'</div>'
-            f'<div class="exec-body">{bp_html}</div>'
-            f'</div></div>\n'
-        )
-    else:
-        exec_html = ""
-
-    # ── 区块一：本周重点合规工作 ──
-    if action_items:
-        action_sections = _render_region_sections_pc(action_grouped, is_action=True)
-        action_zone = (
-            f'<div class="zone-banner zone-banner-action">'
-            f'<div class="zone-banner-inner">'
-            f'<div class="zone-banner-icon">🎯</div>'
-            f'<div class="zone-banner-info">'
-            f'<div class="zone-banner-title-action">本周重点合规工作</div>'
-            f'<div class="zone-banner-sub-action">Action Items · 需团队跟进</div>'
-            f'</div>'
-            f'<div class="zone-banner-count-action">{n_action} 条</div>'
-            f'</div></div>\n'
-            f'{action_sections}'
-        )
-    else:
-        action_zone = ""
-
-    # ── 区块二：全球合规动态 ──
-    if news_items:
-        news_sections = _render_region_sections_pc(news_grouped, is_action=False)
-        news_zone = (
-            f'<div class="zone-banner zone-banner-news">'
-            f'<div class="zone-banner-inner">'
-            f'<div class="zone-banner-icon">🌐</div>'
-            f'<div class="zone-banner-info">'
-            f'<div class="zone-banner-title-news">全球合规动态</div>'
-            f'<div class="zone-banner-sub-news">FYI · 态势感知，无需立即行动</div>'
-            f'</div>'
-            f'<div class="zone-banner-count-news">{n_news} 条</div>'
-            f'</div></div>\n'
-            f'{news_sections}'
-        )
-    else:
-        news_zone = ""
-
-    return (
-        f'<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n'
-        f'<meta charset="UTF-8">\n'
-        f'<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-        f'<title>Lilith Legal 全球合规动态周报</title>\n'
-        f'<style>{_PC_CSS}</style>\n</head>\n<body>\n'
-        f'<header class="global-header"><div class="header-inner">'
-        f'{logo_html}'
-        f'<div class="header-badge">{range_esc}</div>'
-        f'</div></header>\n'
-        f'<div class="page-shell">\n'
-        f'<div class="hero"><div class="hero-left">'
-        f'<div class="eyebrow">全球游戏合规动态周报</div>'
-        f'<h1>{week_esc}</h1>'
-        f'<div class="page-subtitle">Game Compliance Weekly · {range_esc}</div>'
-        f'</div>'
-        f'<div class="stat-row">'
-        f'<span class="stat-chip">{total} 条动态</span>'
-        f'<span class="stat-chip">{n_regions} 大区域</span>'
-        f'</div></div>\n'
-        f'{exec_html}'
-        f'{action_zone}'
-        f'{news_zone}'
-        f'<div class="page-footer">{period_esc} · LILITH LEGAL</div>\n'
-        f'</div>\n</body>\n</html>'
+    # PC 端复用 mobile 渲染，仅注入更宽的容器尺寸
+    mobile_html = _render_mobile_html(
+        action_items, news_items, exec_summary,
+        action_grouped, news_grouped, period_label
     )
+    pc_override = (
+        "<style>"
+        "@media(min-width:600px){.app-view{max-width:700px;}}"
+        "@media(min-width:1000px){.app-view{max-width:780px;}}"
+        "</style>"
+    )
+    return mobile_html.replace("</head>", f"{pc_override}\n</head>", 1)
 
 
 def generate_html(items: List[dict], title: str = "全球游戏行业立法动态监控报告",
