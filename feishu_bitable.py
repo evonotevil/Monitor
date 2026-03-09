@@ -93,7 +93,7 @@ def resolve_wiki_app_token(wiki_token: str, access_token: str) -> str:
     """
     resp = requests.get(
         _WIKI_NODE_URL,
-        params={"token": wiki_token, "obj_type": "wiki"},
+        params={"token": wiki_token},
         headers={"Authorization": f"Bearer {access_token}"},
         timeout=10,
     )
