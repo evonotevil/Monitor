@@ -147,14 +147,11 @@ def _build_record(item: dict) -> dict:
     url     = (item.get("source_url") or "").strip()
     region  = (item.get("region") or "").strip()
     cat     = (item.get("category_l1") or "").strip()
-    status  = (item.get("status") or "").strip()
     source  = (item.get("source_name") or "").strip()
-    score   = float(item.get("impact_score") or 1.0)
 
     fields: dict = {
         "动态标题":   title,
         "摘要":       summary,
-        "影响": round(score, 1),
         "处理状态":   "待阅读",
     }
 
@@ -164,9 +161,6 @@ def _build_record(item: dict) -> dict:
     # 合规类别为多选字段，API 需传列表
     if cat:
         fields["合规类别"] = [cat]
-
-    if status:
-        fields["立法状态"] = status
 
     if source:
         fields["信源名称"] = source
