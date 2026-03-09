@@ -21,11 +21,11 @@ MONITORED_REGIONS = {
         "focus": ["GDPR", "DSA", "DMA", "AI法案", "Loot Box", "Online Safety Act", "消费者保护"],
     },
     "北美": {
-        "countries": ["美国", "加拿大"],
+        "countries": ["美国", "加拿大", "墨西哥"],
         "focus": ["FTC执法", "COPPA", "CCPA", "KIDS Act", "Loot Box", "各州隐私法", "未成年保护"],
     },
     "南美": {
-        "countries": ["巴西", "阿根廷", "墨西哥", "智利", "哥伦比亚"],
+        "countries": ["巴西", "阿根廷", "智利", "哥伦比亚"],
         "focus": ["LGPD", "消费者保护", "游戏税务", "内容分级", "广告合规"],
     },
     "东南亚": {
