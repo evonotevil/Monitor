@@ -152,7 +152,7 @@ def _build_record(item: dict) -> dict:
     fields: dict = {
         "动态标题":   title,
         "摘要":       summary,
-        "处理状态":   "待阅读",
+        "处理状态":   "🤖 待初筛",
     }
 
     if region:
