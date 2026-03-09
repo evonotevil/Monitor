@@ -1,6 +1,9 @@
 name: 周数据抓取（写入飞书多维表格）
 
 on:
+  # 每天北京时间 08:00（UTC 00:00）自动抓取，7x24 不间断写入飞书待初筛
+  schedule:
+    - cron: '0 0 * * *'
   # 手动触发（Settings → Actions → Run workflow）
   workflow_dispatch:
 
