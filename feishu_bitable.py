@@ -97,13 +97,33 @@ def resolve_wiki_app_token(wiki_token: str, access_token: str) -> str:
         headers={"Authorization": f"Bearer {access_token}"},
         timeout=10,
     )
-    resp.raise_for_status()
-    data = resp.json()
-    if data.get("code") != 0:
-        raise RuntimeError(f"Wiki 节点解析失败: code={data.get('code')} msg={data.get('msg')}")
-    obj_token = data.get("data", {}).get("node", {}).get("obj_token", "")
+    # 先读取响应体，再判断状态码，确保能看到飞书的具体错误信息
+    try:
+        data = resp.json()
+    except Exception:
+        resp.raise_for_status()
+        raise
+
+    if resp.status_code != 200 or data.get("code") != 0:
+        raise RuntimeError(
+            f"Wiki 节点解析失败: HTTP {resp.status_code}, "
+            f"code={data.get('code')}, msg={data.get('msg')}, "
+            f"完整响应={data}"
+        )
+
+    node = data.get("data", {}).get("node", {})
+    obj_type  = node.get("obj_type", "")
+    obj_token = node.get("obj_token", "")
+
+    print(f"   节点类型: {obj_type}, obj_token: {obj_token}")
+
+    if obj_type != "bitable":
+        raise RuntimeError(
+            f"Wiki 节点类型为 '{obj_type}'，不是多维表格（bitable），"
+            f"请确认打开的是正确的知识库页面"
+        )
     if not obj_token:
-        raise RuntimeError(f"Wiki 节点返回的 obj_token 为空，请确认应用已加入知识库协作者: {data}")
+        raise RuntimeError(f"obj_token 为空，完整节点信息: {node}")
     return obj_token
 
 
