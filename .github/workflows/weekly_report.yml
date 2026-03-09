@@ -65,5 +65,7 @@ jobs:
           git diff --staged --quiet || \
             git commit -m "🔄 每日数据更新 $(date -u +%Y-%m-%d) [skip ci]"
 
+          git stash --include-untracked
           git pull --rebase origin main
+          git stash pop || true
           git push
