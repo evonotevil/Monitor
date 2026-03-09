@@ -271,11 +271,11 @@ def sync_items_to_bitable(items: List[dict]) -> None:
     try:
         token = get_tenant_access_token(app_id, app_secret)
 
-        # 知识库形式：先解析 wiki_token → 实际 app_token
+        # 知识库形式：先尝试用 wiki_token 直接调用 Bitable API（无需 wiki 权限），
+        # 若飞书拒绝（非 0 返回码），再降级走 Wiki node API 解析 obj_token。
         if wiki_token:
-            print(f"🔍 正在解析知识库 token → 多维表格 app_token ...")
-            app_token = resolve_wiki_app_token(wiki_token, token)
-            print(f"✅ 解析成功，app_token = {app_token}")
+            print(f"🔍 尝试以 wiki_token 直接写入 Bitable ...")
+            app_token = wiki_token
 
         written = write_to_bitable(new_items, app_token, table_id, token)
         print(f"✅ 飞书多维表格写入成功：{written} 条")
