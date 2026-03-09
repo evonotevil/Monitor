@@ -41,6 +41,7 @@ _BITABLE_REGION_LABEL = {
     "北美":  "北美",
     "欧洲":  "欧洲",
     "日韩台": "日韩台",
+    "港澳":  "港澳",
     "亚太区": "东南亚",
     "其他":  "其他",
 }
@@ -327,8 +328,8 @@ def _map_bitable_record(fields: dict) -> dict:
     - 合规类别  ：多选数组 ["数据隐私", ...]  → 取第一项
     - 原始链接  ：超链接对象 {"text": ..., "link": "https://..."} → 取 link
     - 发布日期  ：毫秒时间戳 → YYYY-MM-DD
-    - 国家/地区 ：单选字符串，已是分组标签（北美/欧洲/日韩台/东南亚/其他）
-                  reporter 内部通过 _get_region_group() 将"东南亚"映射回"亚太区"
+    - 国家/地区 ：单选字符串，已是分组标签（北美/欧洲/日韩台/港澳/东南亚/其他）
+                  reporter 内部通过 _get_region_group() 将"东南亚"映射回"亚太区"，"港澳"直通
     - 💡 核心结论：若存在则优先作为 summary_zh；否则使用「摘要」字段
     """
     # ── 合规类别（多选字段）────────────────────────────────────────────
@@ -355,18 +356,37 @@ def _map_bitable_record(fields: dict) -> dict:
     #    已有 "东南亚"→"亚太区" 的映射，无需额外转换 ─────────────────────
     region = str(fields.get("国家/地区") or "其他")
 
+    # ── 工作流状态（供 reporter 按 Action / News 分区）──────────────────
+    bitable_status = str(fields.get("处理状态") or "").strip()
+
+    # ── 跟进 BP（可能为人员字段 list，也可能为文本）─────────────────────
+    bp_raw = fields.get("跟进BP") or fields.get("跟进人") or ""
+    if isinstance(bp_raw, list):
+        assignee = "、".join(
+            (p.get("name") or p.get("cn_name") or "")
+            for p in bp_raw if isinstance(p, dict)
+        ).strip()
+    else:
+        assignee = str(bp_raw).strip()
+
+    # ── 法务结论（独立于「摘要」和「💡 核心结论」）──────────────────────
+    legal_conclusion = str(fields.get("法务结论") or fields.get("💡 法务结论") or "").strip()
+
     return {
-        "title":        "",             # Bitable 无原文标题字段（英文）
-        "title_zh":     str(fields.get("动态标题") or "").strip(),
-        "summary_zh":   summary_zh,
-        "summary":      "",
-        "region":       region,
-        "status":       "",             # Bitable 的「处理状态」是工作流状态，非法规状态，不传入
-        "category_l1":  category,
-        "source_url":   source_url,
-        "date":         date_str,
-        "impact_score": 5.0,            # 人工筛选后统一中等优先级，reporter 仍可正常排序
-        "source_name":  str(fields.get("信源名称") or "").strip(),
+        "title":            "",             # Bitable 无原文标题字段（英文）
+        "title_zh":         str(fields.get("动态标题") or "").strip(),
+        "summary_zh":       summary_zh,
+        "summary":          "",
+        "region":           region,
+        "status":           "",             # 法规生命周期状态（Bitable 未单独维护，留空）
+        "bitable_status":   bitable_status, # 工作流状态：用于 Action / News 分区
+        "assignee":         assignee,       # 跟进 BP
+        "legal_conclusion": legal_conclusion,
+        "category_l1":      category,
+        "source_url":       source_url,
+        "date":             date_str,
+        "impact_score":     5.0,            # 人工筛选后统一中等优先级，reporter 仍可正常排序
+        "source_name":      str(fields.get("信源名称") or "").strip(),
     }
 
 

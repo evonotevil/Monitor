@@ -149,13 +149,22 @@ _TEXT_GROUP_PATTERNS = [
                r'|gdpr\b|dsa\b|dma\b|ai act|asa\b)\b'
                r'|英国|德国|法国|荷兰|比利时|奥地利|意大利|西班牙|波兰|瑞典|挪威|欧盟|欧洲'
                r'|俄罗斯|乌克兰|白俄罗斯'),
-    ("北美",   r'(?i)\b(usa\b|united states|american?|ftc\b|federal trade commission'
-               r'|congress\b|senate\b|california|new york|virginia|texas|florida'
-               r'|connecticut|nevada|pennsylvania|attorney general'
-               r'|canada|canadian|pipeda\b'
+    # 港澳：香港/澳门（须在日韩台之前）
+    ("港澳",   r'(?i)\b(hong kong|hongkong|hksar\b|hk\b|pcpd\b|hkcma\b|hkma\b|sfc\b'
+               r'|macau|macao|dicj\b)\b'
+               r'|香港|澳门|港澳'),
+    ("北美",   r'(?i)\b(usa\b|united states|america[n]?|ftc\b|federal trade commission'
+               r'|fcc\b|federal communications commission'
+               r'|doj\b|department of justice|cisa\b|sec\b'
+               r'|congress\b|senate\b|house of representatives|white house'
+               r'|california|new york|virginia|texas|florida|illinois|georgia'
+               r'|connecticut|nevada|pennsylvania|colorado|washington\b|oregon'
+               r'|massachusetts|new jersey|ohio|michigan|north carolina|utah|delaware'
+               r'|attorney general|state ag\b'
+               r'|canada|canadian|pipeda\b|cppa\b|opc\b'
                r'|mexico|mexican'
-               r'|ccpa\b|cpra\b|coppa\b|kids act)\b'
-               r'|美国|加拿大|纽约|加利福尼亚|德克萨斯|墨西哥'),
+               r'|ccpa\b|cpra\b|coppa\b|kids act|kosa\b|shield act)\b'
+               r'|美国|加拿大|纽约|加利福尼亚|德克萨斯|墨西哥|联邦贸易委员会|美国国会|白宫'),
     # 亚太区：仅含东南亚十一国（与 utils.py _REGION_GROUP_MAP 定义一致）
     ("亚太区", r'(?i)\b(vietnam[ese]?|việt|indonesi[a]?[n]?|kominfo\b|igac\b'
                r'|thailand|thai\b|pdpa\b'
@@ -163,7 +172,7 @@ _TEXT_GROUP_PATTERNS = [
                r'|singapore|imda\b|brunei|myanmar|cambodia|laos|timor)\b'
                r'|越南|印度尼西亚|印尼|泰国|菲律宾|马来西亚|新加坡|缅甸|柬埔寨|文莱'),
     ("日韩台", r'(?i)\b(japan[ese]?|korea[n]?|south korea|grac\b|kca\b|cero\b'
-               r'|nintendo\b)\b'
+               r'|nintendo\b|taiwan[ese]?)\b'
                r'|台湾|韓[国國]?|日本|韩国|ゲーム|게임|확률형'),
     # 其他：南美 / 非洲 / 南亚 / 大洋洲 / 中东（与 utils.py 一致）
     ("其他",   r'(?i)\b(saudi|uae\b|united arab emirates|turkey|turkish|türkiye'
@@ -650,20 +659,58 @@ def _sort_group(group_items: list) -> list:
     )
 
 
+# ── 工作流状态分区常量 ─────────────────────────────────────────────────
+# bitable_status 属于 Bitable 工作流状态，不是法规生命周期状态
+_ACTION_STATUSES = {"👤 待研判", "🏃 处理/跟进中", "✅ 已合规/归档"}
+_NEWS_STATUSES   = {"📰 行业动态"}
+
+
+def _split_by_workflow_status(items: List[dict]) -> tuple:
+    """
+    按 bitable_status 将条目分为两类：
+    - action_items：需要跟进的合规任务（待研判 / 处理中 / 已归档）
+    - news_items：仅供阅读的合规资讯（行业动态）
+    无 bitable_status 的条目（SQLite 回退路径）归入 news_items。
+    """
+    action_items: List[dict] = []
+    news_items:   List[dict] = []
+    for item in items:
+        ws = item.get("bitable_status", "")
+        if ws in _ACTION_STATUSES:
+            action_items.append(item)
+        else:
+            news_items.append(item)
+    return action_items, news_items
+
+
 def _prepare_report_data(items: List[dict]) -> tuple:
-    """Dedup, filter, generate exec summary, group by region. Returns (items, exec_summary, grouped)."""
+    """
+    Dedup → filter → split by workflow status → exec summary → group by region.
+    Returns (action_items, news_items, exec_summary, action_grouped, news_grouped).
+    """
     items = _dedup_for_display(items)
     items = [i for i in items if float(i.get("impact_score", 1.0)) > 0]
+
+    action_items, news_items = _split_by_workflow_status(items)
+
+    # 综述以 action_items 为主（有跟进价值的内容），为空则退化到全量
     exec_summary = ""
+    summary_src  = action_items if action_items else items
     try:
         from translator import generate_executive_summary
-        exec_summary = generate_executive_summary(items)
+        exec_summary = generate_executive_summary(summary_src)
     except Exception:
         pass
-    grouped: dict = defaultdict(list)
-    for item in items:
-        grouped[_resolve_group(item)].append(item)
-    return items, exec_summary, grouped
+
+    action_grouped: dict = defaultdict(list)
+    for item in action_items:
+        action_grouped[_resolve_group(item)].append(item)
+
+    news_grouped: dict = defaultdict(list)
+    for item in news_items:
+        news_grouped[_resolve_group(item)].append(item)
+
+    return action_items, news_items, exec_summary, action_grouped, news_grouped
 
 
 # ── CSS / JS constants (plain strings, no f-string brace escaping needed) ─────
@@ -768,6 +815,24 @@ _MOBILE_CSS = _FONT_FACE + """
         .page-footer-text { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-meta); }
         @media (min-width: 600px) { .app-view { border-radius: 12px; margin: 24px auto; min-height: auto; } }
         @media (min-width: 900px) { .app-view { max-width: 520px; } }
+        /* ── 双区块分隔条 ── */
+        .zone-divider { margin: 8px 20px 28px; border-radius: 12px; overflow: hidden; }
+        .zone-divider-action { background: var(--header-bg); }
+        .zone-divider-news   { background: #EEF2FF; border: 1px solid #C7D7FD; }
+        .zone-inner { padding: 16px 18px; display: flex; align-items: center; gap: 12px; }
+        .zone-icon { font-size: 22px; flex-shrink: 0; line-height: 1; }
+        .zone-info { flex: 1; min-width: 0; }
+        .zone-title-action { font-size: 15px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.02em; line-height: 1.2; }
+        .zone-title-news   { font-size: 15px; font-weight: 600; color: #3730A3; letter-spacing: -0.02em; line-height: 1.2; }
+        .zone-sub-action { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-top: 4px; }
+        .zone-sub-news   { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #6366F1; margin-top: 4px; }
+        .zone-count-action { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.55); flex-shrink: 0; }
+        .zone-count-news   { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: #6366F1; flex-shrink: 0; }
+        /* ── 跟进 BP + 法务结论（仅 Action 卡片）── */
+        .log-bp-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+        .log-bp-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-meta); }
+        .log-bp-value { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
+        .log-conclusion { margin-top: 8px; font-size: 11px; line-height: 1.7; color: var(--text-secondary); padding: 8px 12px; background: rgba(99,102,241,0.06); border-radius: 6px; border: 1px solid rgba(99,102,241,0.14); border-left: 3px solid #6366F1; }
 """
 
 _MOBILE_JS = """
@@ -868,50 +933,41 @@ _PC_CSS = _FONT_FACE + """
         .page-footer { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-meta); text-align: center; }
         @media (max-width: 900px) { .header-inner { padding: 0 24px; } .page-shell { padding: 32px 24px 60px; } .hero { flex-direction: column; align-items: flex-start; gap: 16px; } .exec-inner { grid-template-columns: 1fr; } .exec-sidebar { padding: 20px 24px; } .card-grid { grid-template-columns: 1fr; } .card.span-2 { grid-column: auto; } h1 { font-size: 26px; } }
         @media (max-width: 560px) { .header-inner { padding: 0 16px; } .header-badge { display: none; } .page-shell { padding: 24px 16px 60px; } }
+        /* ── 双区块横幅 ── */
+        .zone-banner { border-radius: var(--radius); margin-bottom: 28px; overflow: hidden; }
+        .zone-banner-action { background: var(--header-bg); }
+        .zone-banner-news   { background: #EEF2FF; border: 1px solid #C7D7FD; }
+        .zone-banner-inner { display: flex; align-items: center; gap: 16px; padding: 18px 24px; }
+        .zone-banner-icon  { font-size: 26px; flex-shrink: 0; line-height: 1; }
+        .zone-banner-info  { flex: 1; min-width: 0; }
+        .zone-banner-title-action { font-size: 17px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.02em; }
+        .zone-banner-title-news   { font-size: 17px; font-weight: 600; color: #3730A3; letter-spacing: -0.02em; }
+        .zone-banner-sub-action { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(255,255,255,0.40); margin-top: 4px; }
+        .zone-banner-sub-news   { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: #6366F1; margin-top: 4px; }
+        .zone-banner-count-action { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.50); flex-shrink: 0; }
+        .zone-banner-count-news   { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #6366F1; flex-shrink: 0; }
+        /* ── 跟进 BP + 法务结论（仅 action 卡片）── */
+        .card-bp-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+        .card-bp-label { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-meta); }
+        .card-bp-value { font-size: 11.5px; font-weight: 500; color: var(--text-secondary); }
+        .card-conclusion { margin-top: 8px; font-size: 12px; line-height: 1.7; color: var(--text-secondary); padding: 8px 12px; background: rgba(99,102,241,0.06); border-radius: 6px; border: 1px solid rgba(99,102,241,0.14); border-left: 3px solid #6366F1; }
 """
 
 _ICON_DOC = '<svg class="icon-doc" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'
 _ICON_DL   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
 
 
-def _render_mobile_html(items: List[dict], exec_summary: str, grouped: dict,
-                        period_label: str = "") -> str:
-    logo_html  = _get_logo_html()
-    week_label = _week_cn(period_label) if "-W" in period_label else period_label
-    date_range = _date_range_str(items)
-    total      = len(items)
-    n_regions  = sum(1 for g in _GROUP_ORDER if grouped.get(g))
-    period_esc = html_mod.escape(period_label)
-    week_esc   = html_mod.escape(week_label)
-    range_esc  = html_mod.escape(date_range)
-
-    # Exec summary block
-    if exec_summary:
-        pills     = _risk_pills_html(items)
-        risk_html = f'<div class="risk-row">{pills}</div>' if pills else ""
-        exec_html = (
-            f'<div class="exec-block">'
-            f'<div class="exec-header">'
-            f'<span class="exec-header-label">上周动态摘要</span>'
-            f'<div class="exec-header-dot"></div>'
-            f'<span class="exec-header-label">{period_esc}</span>'
-            f'</div>'
-            f'<div class="exec-body"><p>{html_mod.escape(exec_summary)}</p>{risk_html}</div>'
-            f'</div>\n'
-        )
-    else:
-        exec_html = ""
-
-    # Sections
+def _render_region_sections_mobile(grouped: dict, is_action: bool) -> str:
+    """渲染一个区块内按地区分组的卡片列表（供 mobile action / news 两区块复用）。"""
     sections_html = ""
     for group in _GROUP_ORDER:
         group_items = grouped.get(group, [])
         if not group_items:
             continue
-        cats = list(dict.fromkeys(i.get("category_l1", "") for i in group_items if i.get("category_l1")))
-        cats_html  = "".join(f'<span class="cat-tag">{html_mod.escape(c)}</span>' for c in cats[:5])
-        dots       = _dots_html(group_items)
-        group_esc  = html_mod.escape(group)
+        cats      = list(dict.fromkeys(i.get("category_l1", "") for i in group_items if i.get("category_l1")))
+        cats_html = "".join(f'<span class="cat-tag">{html_mod.escape(c)}</span>' for c in cats[:5])
+        dots      = _dots_html(group_items)
+        group_esc = html_mod.escape(group)
 
         items_html = ""
         for item in _sort_group(group_items):
@@ -927,6 +983,22 @@ def _render_mobile_html(items: List[dict], exec_summary: str, grouped: dict,
             url     = html_mod.escape(item.get("source_url", ""))
             cat_status = f"{cat}{' · ' + status if status else ''}"
             title_tag  = (f'<a href="{url}" target="_blank" rel="noopener">{zh}</a>' if url else zh)
+
+            # 跟进 BP 和法务结论（仅 action 区块）
+            extra_html = ""
+            if is_action:
+                assignee   = html_mod.escape((item.get("assignee") or "").strip())
+                conclusion = html_mod.escape((item.get("legal_conclusion") or "").strip())
+                if assignee:
+                    extra_html += (
+                        f'<div class="log-bp-row">'
+                        f'<span class="log-bp-label">跟进</span>'
+                        f'<span class="log-bp-value">{assignee}</span>'
+                        f'</div>'
+                    )
+                if conclusion:
+                    extra_html += f'<div class="log-conclusion">{conclusion}</div>'
+
             items_html += (
                 f'<article class="log-item" data-accent="{accent}">'
                 f'<div class="log-inner">'
@@ -935,6 +1007,7 @@ def _render_mobile_html(items: List[dict], exec_summary: str, grouped: dict,
                 f'<div class="log-title">{title_tag}</div>'
                 f'<span class="log-title-orig">{orig}</span>'
                 f'<div class="log-summary">{summ}</div>'
+                f'{extra_html}'
                 f'</div></article>\n'
             )
 
@@ -949,6 +1022,85 @@ def _render_mobile_html(items: List[dict], exec_summary: str, grouped: dict,
             f'<div class="log-list">{items_html}</div>'
             f'</div>\n'
         )
+    return sections_html
+
+
+def _render_mobile_html(action_items: List[dict], news_items: List[dict],
+                        exec_summary: str,
+                        action_grouped: dict, news_grouped: dict,
+                        period_label: str = "") -> str:
+    logo_html  = _get_logo_html()
+    week_label = _week_cn(period_label) if "-W" in period_label else period_label
+    all_items  = action_items + news_items
+    date_range = _date_range_str(all_items)
+    total      = len(all_items)
+    n_action   = len(action_items)
+    n_news     = len(news_items)
+    n_regions  = len({g for g in _GROUP_ORDER if action_grouped.get(g) or news_grouped.get(g)})
+    period_esc = html_mod.escape(period_label)
+    week_esc   = html_mod.escape(week_label)
+    range_esc  = html_mod.escape(date_range)
+
+    # Exec summary block（基于 action_items）
+    if exec_summary and action_items:
+        pills     = _risk_pills_html(action_items)
+        risk_html = f'<div class="risk-row">{pills}</div>' if pills else ""
+        exec_html = (
+            f'<div class="exec-block">'
+            f'<div class="exec-header">'
+            f'<span class="exec-header-label">本周工作摘要</span>'
+            f'<div class="exec-header-dot"></div>'
+            f'<span class="exec-header-label">{period_esc}</span>'
+            f'</div>'
+            f'<div class="exec-body"><p>{html_mod.escape(exec_summary)}</p>{risk_html}</div>'
+            f'</div>\n'
+        )
+    else:
+        exec_html = ""
+
+    # 过滤按钮（只显示有数据的地区）
+    active_regions = [g for g in _GROUP_ORDER if action_grouped.get(g) or news_grouped.get(g)]
+    filter_btns = ''.join(
+        f'<button class="filter-btn" data-filter="{html_mod.escape(g)}" '
+        f'onclick="filterRegion(\'{html_mod.escape(g)}\', this)">{html_mod.escape(g)}</button>'
+        for g in active_regions
+    )
+
+    # ── 区块一：本周重点合规工作 ──
+    if action_items:
+        action_sections = _render_region_sections_mobile(action_grouped, is_action=True)
+        action_zone = (
+            f'<div class="zone-divider zone-divider-action">'
+            f'<div class="zone-inner">'
+            f'<div class="zone-icon">🎯</div>'
+            f'<div class="zone-info">'
+            f'<div class="zone-title-action">本周重点合规工作</div>'
+            f'<div class="zone-sub-action">Action Items · 需跟进事项</div>'
+            f'</div>'
+            f'<div class="zone-count-action">{n_action} 条</div>'
+            f'</div></div>\n'
+            f'{action_sections}'
+        )
+    else:
+        action_zone = ""
+
+    # ── 区块二：全球合规动态 ──
+    if news_items:
+        news_sections = _render_region_sections_mobile(news_grouped, is_action=False)
+        news_zone = (
+            f'<div class="zone-divider zone-divider-news">'
+            f'<div class="zone-inner">'
+            f'<div class="zone-icon">📰</div>'
+            f'<div class="zone-info">'
+            f'<div class="zone-title-news">全球合规动态</div>'
+            f'<div class="zone-sub-news">FYI · 态势感知</div>'
+            f'</div>'
+            f'<div class="zone-count-news">{n_news} 条</div>'
+            f'</div></div>\n'
+            f'{news_sections}'
+        )
+    else:
+        news_zone = ""
 
     return (
         f'<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n'
@@ -970,13 +1122,10 @@ def _render_mobile_html(items: List[dict], exec_summary: str, grouped: dict,
         f'{exec_html}'
         f'<div class="filter-bar" id="filterBar">'
         f'<button class="filter-btn active" data-filter="all" onclick="filterRegion(\'all\', this)">全部</button>'
-        f'<button class="filter-btn" data-filter="北美" onclick="filterRegion(\'北美\', this)">北美</button>'
-        f'<button class="filter-btn" data-filter="欧洲" onclick="filterRegion(\'欧洲\', this)">欧洲</button>'
-        f'<button class="filter-btn" data-filter="日韩台" onclick="filterRegion(\'日韩台\', this)">日韩台</button>'
-        f'<button class="filter-btn" data-filter="亚太区" onclick="filterRegion(\'亚太区\', this)">亚太区</button>'
-        f'<button class="filter-btn" data-filter="其他" onclick="filterRegion(\'其他\', this)">其他</button>'
+        f'{filter_btns}'
         f'</div>\n'
-        f'{sections_html}'
+        f'{action_zone}'
+        f'{news_zone}'
         f'<div class="page-footer"><div class="page-footer-text">{period_esc} · LILITH LEGAL</div></div>\n'
         f'</main></div>\n'
         f'<script>{_MOBILE_JS}</script>\n'
@@ -984,49 +1133,20 @@ def _render_mobile_html(items: List[dict], exec_summary: str, grouped: dict,
     )
 
 
-def _render_pc_html(items: List[dict], exec_summary: str, grouped: dict,
-                    period_label: str = "") -> str:
-    logo_html  = _get_logo_html()
-    week_label = _week_cn(period_label) if "-W" in period_label else period_label
-    date_range = _date_range_str(items)
-    total      = len(items)
-    n_regions  = sum(1 for g in _GROUP_ORDER if grouped.get(g))
-    period_esc = html_mod.escape(period_label)
-    week_esc   = html_mod.escape(week_label)
-    range_esc  = html_mod.escape(date_range)
-
-    # Exec summary section
-    if exec_summary:
-        pills     = _risk_pills_html(items)
-        risk_html = f'<div class="risk-row">{pills}</div>' if pills else ""
-        exec_html = (
-            f'<div class="exec-section"><div class="exec-inner">'
-            f'<div class="exec-sidebar">'
-            f'<div><div class="exec-sidebar-label">上周动态摘要</div>'
-            f'<div class="exec-sidebar-title">上周全球<br>动态概览</div></div>'
-            f'<div class="exec-sidebar-sub">{range_esc}</div>'
-            f'</div>'
-            f'<div class="exec-body">'
-            f'<p>{html_mod.escape(exec_summary)}</p>'
-            f'{risk_html}'
-            f'</div></div></div>\n'
-        )
-    else:
-        exec_html = ""
-
-    # Sections
+def _render_region_sections_pc(grouped: dict, is_action: bool) -> str:
+    """渲染一个区块内按地区分组的卡片网格（供 PC action / news 两区块复用）。"""
     sections_html = ""
     for group in _GROUP_ORDER:
         group_items = grouped.get(group, [])
         if not group_items:
             continue
-        cats = list(dict.fromkeys(i.get("category_l1", "") for i in group_items if i.get("category_l1")))
+        cats      = list(dict.fromkeys(i.get("category_l1", "") for i in group_items if i.get("category_l1")))
         cats_str  = " · ".join(cats[:4]) + f" · {len(group_items)} 条"
         dots      = "".join(
             f'<div class="dot" style="background:{_ACCENT_HEX[a]};"></div>'
             for a in list(dict.fromkeys(_get_accent(i) for i in group_items))[:5]
         )
-        group_esc = html_mod.escape(group)
+        group_esc    = html_mod.escape(group)
         sorted_items = _sort_group(group_items)
         n = len(sorted_items)
 
@@ -1047,6 +1167,22 @@ def _render_pc_html(items: List[dict], exec_summary: str, grouped: dict,
             meta_parts = [p for p in [cat, status, date_s] if p]
             meta = " · ".join(meta_parts)
             title_tag = (f'<a href="{url}" target="_blank" rel="noopener">{zh}</a>' if url else zh)
+
+            # 跟进 BP 和法务结论（仅 action 区块）
+            extra_html = ""
+            if is_action:
+                assignee   = html_mod.escape((item.get("assignee") or "").strip())
+                conclusion = html_mod.escape((item.get("legal_conclusion") or "").strip())
+                if assignee:
+                    extra_html += (
+                        f'<div class="card-bp-row">'
+                        f'<span class="card-bp-label">跟进</span>'
+                        f'<span class="card-bp-value">{assignee}</span>'
+                        f'</div>'
+                    )
+                if conclusion:
+                    extra_html += f'<div class="card-conclusion">{conclusion}</div>'
+
             cards_html += (
                 f'<div class="card{span_cls}" data-accent="{accent}">'
                 f'<div class="card-indicator"><div class="accent-bar" style="background:{hex_col}"></div></div>'
@@ -1054,12 +1190,13 @@ def _render_pc_html(items: List[dict], exec_summary: str, grouped: dict,
                 f'<div class="card-title">{title_tag}</div>'
                 f'<div class="card-orig">{orig}</div>'
                 f'<div class="card-meta">{meta}</div>'
+                f'{extra_html}'
                 f'<div class="card-note">{_ICON_DOC}<p>{summ}</p></div>'
                 f'</div></div>\n'
             )
 
         sections_html += (
-            f'<div class="section">'
+            f'<div class="section" data-region="{group_esc}">'
             f'<div class="section-header">'
             f'<span class="section-title">{group_esc}</span>'
             f'<div class="dot-cluster">{dots}</div>'
@@ -1068,6 +1205,79 @@ def _render_pc_html(items: List[dict], exec_summary: str, grouped: dict,
             f'<div class="card-grid">{cards_html}</div>'
             f'</div>\n'
         )
+    return sections_html
+
+
+def _render_pc_html(action_items: List[dict], news_items: List[dict],
+                    exec_summary: str,
+                    action_grouped: dict, news_grouped: dict,
+                    period_label: str = "") -> str:
+    logo_html  = _get_logo_html()
+    week_label = _week_cn(period_label) if "-W" in period_label else period_label
+    all_items  = action_items + news_items
+    date_range = _date_range_str(all_items)
+    total      = len(all_items)
+    n_action   = len(action_items)
+    n_news     = len(news_items)
+    n_regions  = len({g for g in _GROUP_ORDER if action_grouped.get(g) or news_grouped.get(g)})
+    period_esc = html_mod.escape(period_label)
+    week_esc   = html_mod.escape(week_label)
+    range_esc  = html_mod.escape(date_range)
+
+    # Exec summary（基于 action_items）
+    if exec_summary and action_items:
+        pills     = _risk_pills_html(action_items)
+        risk_html = f'<div class="risk-row">{pills}</div>' if pills else ""
+        exec_html = (
+            f'<div class="exec-section"><div class="exec-inner">'
+            f'<div class="exec-sidebar">'
+            f'<div><div class="exec-sidebar-label">本周工作摘要</div>'
+            f'<div class="exec-sidebar-title">本周重点<br>合规工作</div></div>'
+            f'<div class="exec-sidebar-sub">{range_esc}</div>'
+            f'</div>'
+            f'<div class="exec-body">'
+            f'<p>{html_mod.escape(exec_summary)}</p>'
+            f'{risk_html}'
+            f'</div></div></div>\n'
+        )
+    else:
+        exec_html = ""
+
+    # ── 区块一：本周重点合规工作 ──
+    if action_items:
+        action_sections = _render_region_sections_pc(action_grouped, is_action=True)
+        action_zone = (
+            f'<div class="zone-banner zone-banner-action">'
+            f'<div class="zone-banner-inner">'
+            f'<div class="zone-banner-icon">🎯</div>'
+            f'<div class="zone-banner-info">'
+            f'<div class="zone-banner-title-action">本周重点合规工作</div>'
+            f'<div class="zone-banner-sub-action">Action Items · 需团队跟进</div>'
+            f'</div>'
+            f'<div class="zone-banner-count-action">{n_action} 条</div>'
+            f'</div></div>\n'
+            f'{action_sections}'
+        )
+    else:
+        action_zone = ""
+
+    # ── 区块二：全球合规动态 ──
+    if news_items:
+        news_sections = _render_region_sections_pc(news_grouped, is_action=False)
+        news_zone = (
+            f'<div class="zone-banner zone-banner-news">'
+            f'<div class="zone-banner-inner">'
+            f'<div class="zone-banner-icon">📰</div>'
+            f'<div class="zone-banner-info">'
+            f'<div class="zone-banner-title-news">全球合规动态</div>'
+            f'<div class="zone-banner-sub-news">FYI · 态势感知，无需立即行动</div>'
+            f'</div>'
+            f'<div class="zone-banner-count-news">{n_news} 条</div>'
+            f'</div></div>\n'
+            f'{news_sections}'
+        )
+    else:
+        news_zone = ""
 
     return (
         f'<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n'
@@ -1090,7 +1300,8 @@ def _render_pc_html(items: List[dict], exec_summary: str, grouped: dict,
         f'<span class="stat-chip">{n_regions} 大区域</span>'
         f'</div></div>\n'
         f'{exec_html}'
-        f'{sections_html}'
+        f'{action_zone}'
+        f'{news_zone}'
         f'<div class="page-footer">{period_esc} · LILITH LEGAL</div>\n'
         f'</div>\n</body>\n</html>'
     )
@@ -1616,7 +1827,7 @@ td {{ padding: 9px 12px; font-size: 12px; vertical-align: top; }}
   }});
 
   // 按预设顺序填充地区下拉
-  const groupOrder = ["北美","欧洲","日韩台","亚太区","其他"];
+  const groupOrder = ["北美","欧洲","日韩台","港澳","亚太区","其他"];
   const fGroup = document.getElementById('fGroup');
   groupOrder.forEach(g => {{
     if (groups.has(g)) {{
@@ -1696,7 +1907,7 @@ function sortTable(col) {{
 
   // 把分组 header 和对应数据行重新排列
   const groupRows = [...tbody.querySelectorAll('.group-row')];
-  const groupOrder = ["北美","欧洲","日韩台","亚太区","其他"];
+  const groupOrder = ["北美","欧洲","日韩台","港澳","亚太区","其他"];
   tbody.innerHTML = '';
 
   groupOrder.forEach(grp => {{
@@ -1717,11 +1928,13 @@ def save_html(items: List[dict], period_label: str = "") -> tuple:
     """Generate mobile + PC HTML reports. Returns (mobile_path, pc_path)."""
     ensure_output_dir()
 
-    # Process data once (dedup, filter, exec summary, grouping)
-    prepared, exec_summary, grouped = _prepare_report_data(items)
+    # Process data once (dedup, filter, split, exec summary, grouping)
+    action_items, news_items, exec_summary, action_grouped, news_grouped = _prepare_report_data(items)
 
-    mobile_html = _render_mobile_html(prepared, exec_summary, grouped, period_label)
-    pc_html     = _render_pc_html(prepared, exec_summary, grouped, period_label)
+    mobile_html = _render_mobile_html(action_items, news_items, exec_summary,
+                                      action_grouped, news_grouped, period_label)
+    pc_html     = _render_pc_html(action_items, news_items, exec_summary,
+                                  action_grouped, news_grouped, period_label)
 
     mobile_path = os.path.join(OUTPUT_DIR, "latest-mobile.html")
     pc_path     = os.path.join(OUTPUT_DIR, "latest-pc.html")
