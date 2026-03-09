@@ -313,6 +313,13 @@ def cmd_run(args):
             new_count = db.bulk_upsert(items)
             logger.info(f"新增 {new_count} 条记录 (共处理 {len(items)} 条)")
             db.log_fetch("full_run", new_count, "ok")
+
+            # ── 写入飞书多维表格（待初筛）──────────────────────────────
+            try:
+                from feishu_bitable import sync_items_to_bitable
+                sync_items_to_bitable([item.to_dict() for item in items])
+            except Exception as bitable_err:
+                logger.warning(f"飞书多维表格写入失败（不影响主流程）: {bitable_err}")
         else:
             logger.info("本次抓取未获取到新数据")
             db.log_fetch("full_run", 0, "ok", "no new items")
