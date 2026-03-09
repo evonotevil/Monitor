@@ -7,7 +7,11 @@
     FEISHU_WEBHOOK_URL   飞书自定义机器人的 Webhook 地址
 
 可选环境变量:
-    LLM_API_KEY          用于生成 AI 综述（未设置时跳过综述）
+    LLM_API_KEY                  用于生成 AI 综述（未设置时跳过综述）
+    FEISHU_APP_ID                飞书自建应用 App ID（多维表格写入）
+    FEISHU_APP_SECRET            飞书自建应用 App Secret（多维表格写入）
+    FEISHU_BITABLE_APP_TOKEN     多维表格 app_token（多维表格写入）
+    FEISHU_BITABLE_TABLE_ID      多维表格 table_id（多维表格写入）
 
 本地调试:
     FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx \
@@ -303,6 +307,10 @@ def main():
 
     card = build_daily_card(items, exec_summary=exec_summary)
     send_card(webhook_url, card)
+
+    # ── 写入飞书多维表格（凭证缺失时自动跳过，不阻断主流程）──────────
+    from feishu_bitable import sync_items_to_bitable
+    sync_items_to_bitable(items)
 
 
 if __name__ == "__main__":

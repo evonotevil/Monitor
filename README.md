@@ -102,6 +102,10 @@ cd Monitor
 |-------------|------|---------|
 | `LLM_API_KEY` | 硅基流动 API Key（[免费申请](https://cloud.siliconflow.cn)） | ✅ 必填 |
 | `FEISHU_WEBHOOK_URL` | 飞书自定义机器人 Webhook 地址 | ✅ 必填（否则通知不发送） |
+| `FEISHU_APP_ID` | 飞书自建应用 App ID（多维表格写入） | 可选 |
+| `FEISHU_APP_SECRET` | 飞书自建应用 App Secret（多维表格写入） | 可选 |
+| `FEISHU_BITABLE_APP_TOKEN` | 多维表格 URL 中的 app_token（`BmXXX` 部分） | 可选 |
+| `FEISHU_BITABLE_TABLE_ID` | 多维表格 URL 中的 table_id（`tblXXX` 部分） | 可选 |
 
 ### 3. 启用 GitHub Pages
 
@@ -139,6 +143,11 @@ python generate_pdf.py
 # 发送日报飞书通知（本地测试）
 python daily_check.py
 
+# 测试写入飞书多维表格（取数据库最新 5 条）
+FEISHU_APP_ID=cli_xxx FEISHU_APP_SECRET=xxx \
+FEISHU_BITABLE_APP_TOKEN=BmXXX FEISHU_BITABLE_TABLE_ID=tblXXX \
+python feishu_bitable.py
+
 # 发送周报飞书通知（本地测试）
 REPORT_MOBILE_URL=https://... REPORT_PC_URL=https://... python feishu_notify.py
 
@@ -162,6 +171,10 @@ python monitor.py retranslate --limit 60
 | `LLM_BASE_URL` | LLM API 地址 | `https://api.siliconflow.cn/v1` |
 | `LLM_MODEL` | 使用的模型 | `Qwen/Qwen3-8B` |
 | `FEISHU_WEBHOOK_URL` | 飞书 Webhook 地址 | 必填（通知功能） |
+| `FEISHU_APP_ID` | 飞书自建应用 App ID | 可选（多维表格写入） |
+| `FEISHU_APP_SECRET` | 飞书自建应用 App Secret | 可选（多维表格写入） |
+| `FEISHU_BITABLE_APP_TOKEN` | 多维表格 app_token | 可选（多维表格写入） |
+| `FEISHU_BITABLE_TABLE_ID` | 多维表格 table_id | 可选（多维表格写入） |
 | `REPORT_MOBILE_URL` | 周报移动端 HTML 链接（飞书卡片按钮） | 可选 |
 | `REPORT_PC_URL` | 周报 PC 端 HTML 链接（飞书卡片按钮） | 可选 |
 
