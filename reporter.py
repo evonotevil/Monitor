@@ -647,6 +647,54 @@ def _risk_pills_html(items: list) -> str:
     return "".join(pills)
 
 
+_BP_STATUS_DOT: dict = {
+    "👤 待研判":       "#6366F1",
+    "🏃 处理/跟进中":  "#F59E0B",
+    "✅ 已合规/归档":  "#22C55E",
+}
+
+
+def _render_bp_breakdown_html(action_items: list) -> str:
+    """将 action_items 按 assignee 分组，渲染为逐 BP 任务清单 HTML。"""
+    from collections import defaultdict
+    bp_groups: dict = defaultdict(list)
+    for item in action_items:
+        bp = (item.get("assignee") or "").strip() or "未分配"
+        bp_groups[bp].append(item)
+    if not bp_groups:
+        return ""
+    rows = []
+    for bp, items in bp_groups.items():
+        bp_esc   = html_mod.escape(bp)
+        avatar   = html_mod.escape(bp[0]) if bp else "?"
+        count    = len(items)
+        items_html = ""
+        for item in items:
+            title  = html_mod.escape(((item.get("title_zh") or item.get("title") or "").strip())[:45])
+            region = html_mod.escape((item.get("region") or "").strip())
+            status = (item.get("bitable_status") or "").strip()
+            dot_c  = _BP_STATUS_DOT.get(status, "#94A3B8")
+            meta   = f'<span class="bp-item-meta">{region}</span>' if region else ""
+            items_html += (
+                f'<div class="bp-item">'
+                f'<span class="bp-dot" style="background:{dot_c}"></span>'
+                f'<span class="bp-item-text">{title}</span>'
+                f'{meta}'
+                f'</div>'
+            )
+        rows.append(
+            f'<div class="bp-row">'
+            f'<div class="bp-header-row">'
+            f'<span class="bp-avatar">{avatar}</span>'
+            f'<span class="bp-name">{bp_esc}</span>'
+            f'<span class="bp-tally">{count} 项</span>'
+            f'</div>'
+            f'<div class="bp-items">{items_html}</div>'
+            f'</div>'
+        )
+    return f'<div class="bp-breakdown">{"".join(rows)}</div>'
+
+
 def _sort_group(group_items: list) -> list:
     return sorted(
         group_items,
@@ -817,17 +865,28 @@ _MOBILE_CSS = _FONT_FACE + """
         @media (min-width: 900px) { .app-view { max-width: 520px; } }
         /* ── 双区块分隔条 ── */
         .zone-divider { margin: 8px 20px 28px; border-radius: 12px; overflow: hidden; }
-        .zone-divider-action { background: var(--header-bg); }
+        .zone-divider-action { background: linear-gradient(to right, #F59E0B 4px, #18181B 4px); border: 1px solid #3F3F46; }
         .zone-divider-news   { background: linear-gradient(to right, #94A3B8 3px, #F8FAFC 3px); border: 1px solid #E2E8F0; }
         .zone-inner { padding: 16px 18px; display: flex; align-items: center; gap: 12px; }
         .zone-icon { font-size: 22px; flex-shrink: 0; line-height: 1; }
         .zone-info { flex: 1; min-width: 0; }
-        .zone-title-action { font-size: 15px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.02em; line-height: 1.2; }
+        .zone-title-action { font-size: 15px; font-weight: 600; color: #FAFAFA; letter-spacing: -0.02em; line-height: 1.2; }
         .zone-title-news   { font-size: 15px; font-weight: 600; color: #1E293B; letter-spacing: -0.02em; line-height: 1.2; }
-        .zone-sub-action { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-top: 4px; }
+        .zone-sub-action { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(250,250,250,0.35); margin-top: 4px; }
         .zone-sub-news   { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; margin-top: 4px; }
-        .zone-count-action { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.55); flex-shrink: 0; }
+        .zone-count-action { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: #FCD34D; flex-shrink: 0; }
         .zone-count-news   { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: #94A3B8; flex-shrink: 0; }
+        /* ── BP 任务分解 ── */
+        .bp-breakdown { display: flex; flex-direction: column; gap: 12px; }
+        .bp-header-row { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+        .bp-avatar { width: 20px; height: 20px; border-radius: 50%; background: #1A1A1A; color: #FFF; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .bp-name { font-size: 12px; font-weight: 600; color: var(--text-primary); flex: 1; }
+        .bp-tally { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.08em; color: var(--text-meta); }
+        .bp-items { display: flex; flex-direction: column; gap: 5px; padding-left: 27px; }
+        .bp-item { display: flex; align-items: flex-start; gap: 6px; }
+        .bp-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+        .bp-item-text { font-size: 11.5px; line-height: 1.5; color: var(--text-secondary); flex: 1; }
+        .bp-item-meta { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.05em; color: var(--text-meta); white-space: nowrap; }
         /* ── 跟进 BP + 法务结论（仅 Action 卡片）── */
         .log-bp-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
         .log-bp-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-meta); }
@@ -935,17 +994,28 @@ _PC_CSS = _FONT_FACE + """
         @media (max-width: 560px) { .header-inner { padding: 0 16px; } .header-badge { display: none; } .page-shell { padding: 24px 16px 60px; } }
         /* ── 双区块横幅 ── */
         .zone-banner { border-radius: var(--radius); margin-bottom: 28px; overflow: hidden; }
-        .zone-banner-action { background: var(--header-bg); }
+        .zone-banner-action { background: linear-gradient(to right, #F59E0B 4px, #18181B 4px); border: 1px solid #3F3F46; }
         .zone-banner-news   { background: linear-gradient(to right, #94A3B8 4px, #F8FAFC 4px); border: 1px solid #E2E8F0; }
         .zone-banner-inner { display: flex; align-items: center; gap: 16px; padding: 18px 24px; }
         .zone-banner-icon  { font-size: 26px; flex-shrink: 0; line-height: 1; }
         .zone-banner-info  { flex: 1; min-width: 0; }
-        .zone-banner-title-action { font-size: 17px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.02em; }
+        .zone-banner-title-action { font-size: 17px; font-weight: 600; color: #FAFAFA; letter-spacing: -0.02em; }
         .zone-banner-title-news   { font-size: 17px; font-weight: 600; color: #1E293B; letter-spacing: -0.02em; }
-        .zone-banner-sub-action { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(255,255,255,0.40); margin-top: 4px; }
+        .zone-banner-sub-action { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(250,250,250,0.35); margin-top: 4px; }
         .zone-banner-sub-news   { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: #94A3B8; margin-top: 4px; }
-        .zone-banner-count-action { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.50); flex-shrink: 0; }
+        .zone-banner-count-action { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #FCD34D; flex-shrink: 0; }
         .zone-banner-count-news   { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #94A3B8; flex-shrink: 0; }
+        /* ── BP 任务分解 ── */
+        .bp-breakdown { display: flex; flex-direction: column; gap: 16px; }
+        .bp-header-row { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+        .bp-avatar { width: 24px; height: 24px; border-radius: 50%; background: #1A1A1A; color: #FFF; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .bp-name { font-size: 13.5px; font-weight: 600; color: var(--text-primary); flex: 1; }
+        .bp-tally { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.08em; color: var(--text-meta); }
+        .bp-items { display: flex; flex-direction: column; gap: 6px; padding-left: 33px; }
+        .bp-item { display: flex; align-items: flex-start; gap: 8px; }
+        .bp-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+        .bp-item-text { font-size: 13px; line-height: 1.6; color: var(--text-secondary); flex: 1; }
+        .bp-item-meta { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em; color: var(--text-meta); white-space: nowrap; }
         /* ── 跟进 BP + 法务结论（仅 action 卡片）── */
         .card-bp-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
         .card-bp-label { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-meta); }
@@ -1041,10 +1111,9 @@ def _render_mobile_html(action_items: List[dict], news_items: List[dict],
     week_esc   = html_mod.escape(week_label)
     range_esc  = html_mod.escape(date_range)
 
-    # Exec summary block（基于 action_items）
-    if exec_summary and action_items:
-        pills     = _risk_pills_html(action_items)
-        risk_html = f'<div class="risk-row">{pills}</div>' if pills else ""
+    # Exec summary block（按 BP 分组展示本周工作任务）
+    if action_items:
+        bp_html   = _render_bp_breakdown_html(action_items)
         exec_html = (
             f'<div class="exec-block">'
             f'<div class="exec-header">'
@@ -1052,7 +1121,7 @@ def _render_mobile_html(action_items: List[dict], news_items: List[dict],
             f'<div class="exec-header-dot"></div>'
             f'<span class="exec-header-label">{period_esc}</span>'
             f'</div>'
-            f'<div class="exec-body"><p>{html_mod.escape(exec_summary)}</p>{risk_html}</div>'
+            f'<div class="exec-body">{bp_html}</div>'
             f'</div>\n'
         )
     else:
@@ -1224,10 +1293,9 @@ def _render_pc_html(action_items: List[dict], news_items: List[dict],
     week_esc   = html_mod.escape(week_label)
     range_esc  = html_mod.escape(date_range)
 
-    # Exec summary（基于 action_items）
-    if exec_summary and action_items:
-        pills     = _risk_pills_html(action_items)
-        risk_html = f'<div class="risk-row">{pills}</div>' if pills else ""
+    # Exec summary（按 BP 分组展示本周工作任务）
+    if action_items:
+        bp_html   = _render_bp_breakdown_html(action_items)
         exec_html = (
             f'<div class="exec-section"><div class="exec-inner">'
             f'<div class="exec-sidebar">'
@@ -1235,10 +1303,8 @@ def _render_pc_html(action_items: List[dict], news_items: List[dict],
             f'<div class="exec-sidebar-title">本周重点<br>合规工作</div></div>'
             f'<div class="exec-sidebar-sub">{range_esc}</div>'
             f'</div>'
-            f'<div class="exec-body">'
-            f'<p>{html_mod.escape(exec_summary)}</p>'
-            f'{risk_html}'
-            f'</div></div></div>\n'
+            f'<div class="exec-body">{bp_html}</div>'
+            f'</div></div>\n'
         )
     else:
         exec_html = ""
