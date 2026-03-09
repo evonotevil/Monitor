@@ -154,7 +154,7 @@ def _build_record(item: dict) -> dict:
     fields: dict = {
         "动态标题":   title,
         "摘要":       summary,
-        "影响风险值": round(score, 1),
+        "影响": round(score, 1),
         "处理状态":   "待阅读",
     }
 
