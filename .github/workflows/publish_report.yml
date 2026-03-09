@@ -1,0 +1,140 @@
+name: 发布周报（从飞书多维表格读取已审条目）
+
+on:
+  # 手动触发：团队完成飞书多维表格初筛后，手动点击 Run workflow 发布报告
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. 拉取最新代码（含 daily_check / weekly_report 写入的 DB）──
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      # ── 2. Python 环境 ──────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install playwright
+
+      # ── Playwright 浏览器缓存 ────────────────────────────────────────
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('requirements.txt') }}
+
+      - name: Install Playwright Chromium (only if cache miss)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: playwright install --with-deps chromium
+
+      - name: Install Chromium system deps (always, fast if browsers cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: playwright install-deps chromium
+
+      # ── 3. 从飞书多维表格读取人工初筛后的有效条目，生成 HTML 报告 ───
+      #    数据源：飞书多维表格（SSOT），只含「处理状态」≠ 待初筛/噪音的记录
+      #    回退：Bitable 凭证未配置时自动回退 SQLite（向后兼容）
+      - name: Generate HTML report from Bitable
+        env:
+          LLM_API_KEY:                 ${{ secrets.LLM_API_KEY }}
+          FEISHU_APP_ID:               ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET:           ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_BITABLE_WIKI_TOKEN:   ${{ secrets.FEISHU_BITABLE_WIKI_TOKEN }}
+          FEISHU_BITABLE_APP_TOKEN:    ${{ secrets.FEISHU_BITABLE_APP_TOKEN }}
+          FEISHU_BITABLE_TABLE_ID:     ${{ secrets.FEISHU_BITABLE_TABLE_ID }}
+        run: python monitor.py report --format html --period week
+
+      # ── 4. 生成 PDF ─────────────────────────────────────────────────
+      - name: Generate PDF report
+        run: python generate_pdf.py
+
+      # ── 5. 计算报告公开 URL ─────────────────────────────────────────
+      - name: Set report URLs
+        run: |
+          REPO="${{ github.repository }}"
+          REPO_NAME="${REPO##*/}"
+          OWNER="${REPO%%/*}"
+          PAGES_BASE="https://${OWNER}.github.io/${REPO_NAME}/reports"
+          echo "MOBILE_URL=${PAGES_BASE}/latest-mobile.html" >> $GITHUB_ENV
+          echo "PC_URL=${PAGES_BASE}/latest-pc.html" >> $GITHUB_ENV
+          echo "HTML_URL=${PAGES_BASE}/latest-mobile.html" >> $GITHUB_ENV
+          python -c "
+          from datetime import datetime, timedelta
+          import urllib.parse, os
+          t = datetime.utcnow()
+          w = t - timedelta(days=7)
+          fn = f'{w.strftime(\"%Y-%m-%d\")} - {t.strftime(\"%Y-%m-%d\")} 周报.pdf'
+          base = 'https://raw.githubusercontent.com/${REPO}/main/reports'
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'PDF_FILENAME={fn}\n')
+              f.write(f'PDF_URL={base}/{urllib.parse.quote(fn)}\n')
+          "
+
+      # ── 6. 提交 HTML / PDF 报告并归档 ──────────────────────────────
+      - name: Commit reports back to repo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          WEEK_ID=$(date -u +%Y-W%V)
+          ARCHIVE_DIR="reports/archive/${WEEK_ID}"
+          mkdir -p "${ARCHIVE_DIR}"
+
+          cp reports/latest-mobile.html "${ARCHIVE_DIR}/weekly-mobile.html"
+          cp reports/latest-pc.html     "${ARCHIVE_DIR}/weekly-pc.html"
+          cp reports/latest-mobile.html "${ARCHIVE_DIR}/weekly.html"
+
+          git add reports/latest-mobile.html reports/latest-pc.html reports/latest.html
+          git add "reports/${PDF_FILENAME}" 2>/dev/null || true
+          git add "${ARCHIVE_DIR}/weekly-mobile.html" "${ARCHIVE_DIR}/weekly-pc.html" "${ARCHIVE_DIR}/weekly.html"
+
+          git diff --staged --quiet || \
+            git commit -m "📊 周报存档 ${WEEK_ID} $(date -u +%Y-%m-%d) [skip ci]"
+
+          git pull --rebase origin main
+          git push
+
+      # ── 7. 发送飞书卡片通知 ─────────────────────────────────────────
+      - name: Send Feishu notification
+        env:
+          FEISHU_WEBHOOK_URL:          ${{ secrets.FEISHU_WEBHOOK_URL }}
+          REPORT_MOBILE_URL:           ${{ env.MOBILE_URL }}
+          REPORT_PC_URL:               ${{ env.PC_URL }}
+          REPORT_HTML_URL:             ${{ env.HTML_URL }}
+          REPORT_PDF_URL:              ${{ env.PDF_URL }}
+          LLM_API_KEY:                 ${{ secrets.LLM_API_KEY }}
+          FEISHU_APP_ID:               ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET:           ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_BITABLE_WIKI_TOKEN:   ${{ secrets.FEISHU_BITABLE_WIKI_TOKEN }}
+          FEISHU_BITABLE_APP_TOKEN:    ${{ secrets.FEISHU_BITABLE_APP_TOKEN }}
+          FEISHU_BITABLE_TABLE_ID:     ${{ secrets.FEISHU_BITABLE_TABLE_ID }}
+        run: python feishu_notify.py
+
+      # ── 8. 提交多维表格去重记录（feishu_notify.py 可能写入新条目）──
+      - name: Commit bitable sync state
+        run: |
+          git add data/bitable_synced_urls.json 2>/dev/null || true
+          git diff --staged --quiet || \
+            git commit -m "🔄 周报多维表格同步记录更新 $(date -u +%Y-%m-%d) [skip ci]"
+          git push
