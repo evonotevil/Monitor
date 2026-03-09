@@ -818,16 +818,16 @@ _MOBILE_CSS = _FONT_FACE + """
         /* ── 双区块分隔条 ── */
         .zone-divider { margin: 8px 20px 28px; border-radius: 12px; overflow: hidden; }
         .zone-divider-action { background: var(--header-bg); }
-        .zone-divider-news   { background: #EEF2FF; border: 1px solid #C7D7FD; }
+        .zone-divider-news   { background: linear-gradient(to right, #94A3B8 3px, #F8FAFC 3px); border: 1px solid #E2E8F0; }
         .zone-inner { padding: 16px 18px; display: flex; align-items: center; gap: 12px; }
         .zone-icon { font-size: 22px; flex-shrink: 0; line-height: 1; }
         .zone-info { flex: 1; min-width: 0; }
         .zone-title-action { font-size: 15px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.02em; line-height: 1.2; }
-        .zone-title-news   { font-size: 15px; font-weight: 600; color: #3730A3; letter-spacing: -0.02em; line-height: 1.2; }
+        .zone-title-news   { font-size: 15px; font-weight: 600; color: #1E293B; letter-spacing: -0.02em; line-height: 1.2; }
         .zone-sub-action { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-top: 4px; }
-        .zone-sub-news   { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #6366F1; margin-top: 4px; }
+        .zone-sub-news   { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: #94A3B8; margin-top: 4px; }
         .zone-count-action { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.55); flex-shrink: 0; }
-        .zone-count-news   { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: #6366F1; flex-shrink: 0; }
+        .zone-count-news   { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: #94A3B8; flex-shrink: 0; }
         /* ── 跟进 BP + 法务结论（仅 Action 卡片）── */
         .log-bp-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
         .log-bp-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-meta); }
@@ -936,16 +936,16 @@ _PC_CSS = _FONT_FACE + """
         /* ── 双区块横幅 ── */
         .zone-banner { border-radius: var(--radius); margin-bottom: 28px; overflow: hidden; }
         .zone-banner-action { background: var(--header-bg); }
-        .zone-banner-news   { background: #EEF2FF; border: 1px solid #C7D7FD; }
+        .zone-banner-news   { background: linear-gradient(to right, #94A3B8 4px, #F8FAFC 4px); border: 1px solid #E2E8F0; }
         .zone-banner-inner { display: flex; align-items: center; gap: 16px; padding: 18px 24px; }
         .zone-banner-icon  { font-size: 26px; flex-shrink: 0; line-height: 1; }
         .zone-banner-info  { flex: 1; min-width: 0; }
         .zone-banner-title-action { font-size: 17px; font-weight: 600; color: #FFFFFF; letter-spacing: -0.02em; }
-        .zone-banner-title-news   { font-size: 17px; font-weight: 600; color: #3730A3; letter-spacing: -0.02em; }
+        .zone-banner-title-news   { font-size: 17px; font-weight: 600; color: #1E293B; letter-spacing: -0.02em; }
         .zone-banner-sub-action { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(255,255,255,0.40); margin-top: 4px; }
-        .zone-banner-sub-news   { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: #6366F1; margin-top: 4px; }
+        .zone-banner-sub-news   { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: #94A3B8; margin-top: 4px; }
         .zone-banner-count-action { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.50); flex-shrink: 0; }
-        .zone-banner-count-news   { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #6366F1; flex-shrink: 0; }
+        .zone-banner-count-news   { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #94A3B8; flex-shrink: 0; }
         /* ── 跟进 BP + 法务结论（仅 action 卡片）── */
         .card-bp-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
         .card-bp-label { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-meta); }
@@ -1090,7 +1090,7 @@ def _render_mobile_html(action_items: List[dict], news_items: List[dict],
         news_zone = (
             f'<div class="zone-divider zone-divider-news">'
             f'<div class="zone-inner">'
-            f'<div class="zone-icon">📰</div>'
+            f'<div class="zone-icon">🌐</div>'
             f'<div class="zone-info">'
             f'<div class="zone-title-news">全球合规动态</div>'
             f'<div class="zone-sub-news">FYI · 态势感知</div>'
@@ -1267,7 +1267,7 @@ def _render_pc_html(action_items: List[dict], news_items: List[dict],
         news_zone = (
             f'<div class="zone-banner zone-banner-news">'
             f'<div class="zone-banner-inner">'
-            f'<div class="zone-banner-icon">📰</div>'
+            f'<div class="zone-banner-icon">🌐</div>'
             f'<div class="zone-banner-info">'
             f'<div class="zone-banner-title-news">全球合规动态</div>'
             f'<div class="zone-banner-sub-news">FYI · 态势感知，无需立即行动</div>'
