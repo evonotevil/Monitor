@@ -42,11 +42,15 @@ jobs:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: python monitor.py run --period day
 
-      # ── 4. 检查昨日新增，有则推送飞书 ────────────────────────────
+      # ── 4. 检查昨日新增，有则推送飞书 + 写入多维表格 ──────────────
       - name: Check and notify daily updates
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_BITABLE_WIKI_TOKEN: ${{ secrets.FEISHU_BITABLE_WIKI_TOKEN }}
+          FEISHU_BITABLE_TABLE_ID: ${{ secrets.FEISHU_BITABLE_TABLE_ID }}
         run: python daily_check.py
 
       # ── 5. 将更新后的 DB 提交回仓库 ────────────────────────────────
@@ -54,7 +58,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/monitor.db
+          git add data/monitor.db data/bitable_synced_urls.json
           git diff --staged --quiet || \
             git commit -m "🔄 每日数据更新 $(date -u +%Y-%m-%d) [skip ci]"
           git push
