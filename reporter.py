@@ -870,9 +870,8 @@ _MOBILE_CSS = _FONT_FACE + """
         .zone-inner { padding: 16px 18px; display: flex; align-items: center; gap: 12px; }
         .zone-icon { font-size: 22px; flex-shrink: 0; line-height: 1; }
         .zone-info { flex: 1; min-width: 0; }
-        .zone-title-action { font-size: 15px; font-weight: 600; color: #FAFAFA; letter-spacing: -0.02em; line-height: 1.2; }
-        .zone-title-news   { font-size: 15px; font-weight: 600; color: #FAFAFA; letter-spacing: -0.02em; line-height: 1.2; }
-        .zone-sub-action { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(250,250,250,0.35); margin-top: 4px; }
+        .zone-title-action { font-family: var(--font-sans); font-size: 15px; font-weight: 600; color: #FAFAFA; letter-spacing: -0.02em; line-height: 1.2; }
+        .zone-title-news   { font-family: var(--font-sans); font-size: 15px; font-weight: 600; color: #FAFAFA; letter-spacing: -0.02em; line-height: 1.2; }
         .zone-count-action { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.65); flex-shrink: 0; }
         .zone-count-news   { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.65); flex-shrink: 0; }
         /* ── BP 任务分解 ── */
@@ -1129,7 +1128,6 @@ def _render_mobile_html(action_items: List[dict], news_items: List[dict],
             f'<div class="zone-icon">🎯</div>'
             f'<div class="zone-info">'
             f'<div class="zone-title-action">本周重点合规工作</div>'
-            f'<div class="zone-sub-action">Action Items · 需跟进事项</div>'
             f'</div>'
             f'<div class="zone-count-action">{n_action} 条</div>'
             f'</div></div>\n'
@@ -1144,7 +1142,7 @@ def _render_mobile_html(action_items: List[dict], news_items: List[dict],
         news_zone = (
             f'<div class="zone-divider zone-divider-news">'
             f'<div class="zone-inner">'
-            f'<div class="zone-icon">🌐</div>'
+            f'<div class="zone-icon">🌏</div>'
             f'<div class="zone-info">'
             f'<div class="zone-title-news">全球合规动态</div>'
             f'</div>'
