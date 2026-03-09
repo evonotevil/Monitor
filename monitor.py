@@ -343,38 +343,55 @@ def cmd_run(args):
 # ─── 命令: report ────────────────────────────────────────────────────
 
 def cmd_report(args):
-    """从数据库生成报告"""
-    days = _period_to_days(args.period)
+    """
+    生成 HTML / Markdown / 终端报告。
+
+    数据来源优先级：
+      1. 飞书多维表格（SSOT）——仅包含人工筛选过的有效记录
+         （「处理状态」≠ 待初筛 且 ≠ 噪音/不推送）
+      2. 本地 SQLite 数据库（回退）——Bitable 凭证未配置或返回空时启用
+    """
+    days  = _period_to_days(args.period)
     label = _period_label(args.period)
-    db = Database()
-    try:
-        items = db.query_items(
-            region=args.region,
-            category_l1=args.category,
-            status=args.status,
-            keyword=args.keyword,
-            days=days,
-        )
+    fmt   = args.format.lower()
 
-        if not items:
-            print(f"数据库中暂无 [{label}] 匹配数据。请先运行 `python monitor.py run` 抓取数据。")
-            return
+    # ── Step 1: 优先从飞书多维表格（SSOT）拉取经人工筛选的记录 ──────────
+    from feishu_bitable import fetch_valid_records_from_bitable
+    print(f"📋 尝试从飞书多维表格读取数据（{label}）…")
+    items = fetch_valid_records_from_bitable(days=days)
 
-        fmt = args.format.lower()
-        if fmt == "table":
-            print_table(items)
-        elif fmt in ("markdown", "md"):
-            path = save_markdown(items, args.output) if args.output else save_markdown(items)
-            print(f"Markdown 报告已保存到: {path}")
-        elif fmt == "html":
-            mobile_path, pc_path = save_html(items, period_label=label)
-            print(f"移动端 HTML 已保存到: {mobile_path}")
-            print(f"PC 端 HTML 已保存到:  {pc_path}")
-        else:
-            print_table(items)
+    # ── Step 2: Bitable 无数据时回退到 SQLite ────────────────────────────
+    if not items:
+        print("⚠️  Bitable 无有效数据，回退到本地 SQLite 数据库…")
+        db = Database()
+        try:
+            items = db.query_items(
+                region=getattr(args, "region", None),
+                category_l1=getattr(args, "category", None),
+                status=getattr(args, "status", None),
+                keyword=getattr(args, "keyword", None),
+                days=days,
+            )
+        finally:
+            db.close()
 
-    finally:
-        db.close()
+    if not items:
+        print(f"暂无 [{label}] 有效数据（飞书多维表格和数据库均无匹配记录）。")
+        return
+
+    print(f"📊 共获取 {len(items)} 条有效记录，开始生成 [{label}] 报告…")
+
+    if fmt == "table":
+        print_table(items)
+    elif fmt in ("markdown", "md"):
+        path = save_markdown(items, args.output) if args.output else save_markdown(items)
+        print(f"Markdown 报告已保存到: {path}")
+    elif fmt == "html":
+        mobile_path, pc_path = save_html(items, period_label=label)
+        print(f"移动端 HTML 已保存到: {mobile_path}")
+        print(f"PC 端 HTML 已保存到:  {pc_path}")
+    else:
+        print_table(items)
 
 
 # ─── 命令: query ─────────────────────────────────────────────────────
