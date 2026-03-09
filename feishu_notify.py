@@ -261,6 +261,10 @@ def main():
     )
     send_card(webhook_url, card)
 
+    # ── 写入飞书多维表格（凭证缺失时自动跳过，不阻断主流程）──────────
+    from feishu_bitable import sync_items_to_bitable
+    sync_items_to_bitable(all_items)
+
 
 if __name__ == "__main__":
     main()
