@@ -298,6 +298,198 @@ def sync_items_to_bitable(items: List[dict]) -> None:
         print(f"⚠️  飞书多维表格写入失败（不阻断主流程）: {e}")
 
 
+# ── 从多维表格读取数据（SSOT 链路）────────────────────────────────────
+
+_LIST_URL = (
+    "https://open.feishu.cn/open-apis/bitable/v1/apps"
+    "/{app_token}/tables/{table_id}/records"
+)
+
+# 过滤掉这两种状态：待初筛 = 未人工确认，噪音 = 明确不推送
+_EXCLUDE_STATUSES = {"🤖 待初筛", "🗑️ 噪音/不推送"}
+
+
+def _ms_to_date(ms) -> str:
+    """将飞书日期字段的毫秒时间戳转为 YYYY-MM-DD 字符串。"""
+    if not ms:
+        return ""
+    try:
+        return datetime.fromtimestamp(int(ms) / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+    except Exception:
+        return ""
+
+
+def _map_bitable_record(fields: dict) -> dict:
+    """
+    将飞书多维表格字段值映射为 reporter.py 所需的条目字典格式。
+
+    字段格式说明：
+    - 合规类别  ：多选数组 ["数据隐私", ...]  → 取第一项
+    - 原始链接  ：超链接对象 {"text": ..., "link": "https://..."} → 取 link
+    - 发布日期  ：毫秒时间戳 → YYYY-MM-DD
+    - 国家/地区 ：单选字符串，已是分组标签（北美/欧洲/日韩台/东南亚/其他）
+                  reporter 内部通过 _get_region_group() 将"东南亚"映射回"亚太区"
+    - 💡 核心结论：若存在则优先作为 summary_zh；否则使用「摘要」字段
+    """
+    # ── 合规类别（多选字段）────────────────────────────────────────────
+    cat_raw  = fields.get("合规类别", "")
+    category = cat_raw[0] if isinstance(cat_raw, list) and cat_raw else str(cat_raw or "")
+
+    # ── 原始链接（超链接字段）──────────────────────────────────────────
+    link_raw   = fields.get("原始链接", "")
+    if isinstance(link_raw, dict):
+        source_url = link_raw.get("link") or link_raw.get("url") or link_raw.get("text", "")
+    else:
+        source_url = str(link_raw) if link_raw else ""
+
+    # ── 发布日期（毫秒时间戳）──────────────────────────────────────────
+    date_raw = fields.get("发布日期")
+    date_str = _ms_to_date(date_raw) if isinstance(date_raw, (int, float)) else str(date_raw or "")
+
+    # ── 摘要：优先「💡 核心结论」，否则「摘要」──────────────────────────
+    core     = str(fields.get("💡 核心结论") or "").strip()
+    abstract = str(fields.get("摘要") or "").strip()
+    summary_zh = core if core else abstract
+
+    # ── 国家/地区：直接传 Bitable 显示标签，reporter 的 _get_region_group()
+    #    已有 "东南亚"→"亚太区" 的映射，无需额外转换 ─────────────────────
+    region = str(fields.get("国家/地区") or "其他")
+
+    return {
+        "title":        "",             # Bitable 无原文标题字段（英文）
+        "title_zh":     str(fields.get("动态标题") or "").strip(),
+        "summary_zh":   summary_zh,
+        "summary":      "",
+        "region":       region,
+        "status":       "",             # Bitable 的「处理状态」是工作流状态，非法规状态，不传入
+        "category_l1":  category,
+        "source_url":   source_url,
+        "date":         date_str,
+        "impact_score": 5.0,            # 人工筛选后统一中等优先级，reporter 仍可正常排序
+        "source_name":  str(fields.get("信源名称") or "").strip(),
+    }
+
+
+def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
+    """
+    从飞书多维表格拉取所有经人工初筛的有效记录，供 reporter.py 生成 HTML 报告。
+
+    过滤条件：「处理状态」不等于「🤖 待初筛」且不等于「🗑️ 噪音/不推送」。
+    自动处理分页（page_size=500），直到拉取完所有数据。
+
+    参数：
+        days: 可选，仅返回最近 N 天内的记录（按「发布日期」过滤）。
+              None 表示返回全部有效记录。
+
+    返回：
+        reporter.py 所需的 dict 列表（与 db.query_items() 格式相同）。
+        若凭证未配置或 API 失败，返回空列表并打印错误。
+
+    ⚠️  只读接口，不修改任何数据。写入链路（sync_items_to_bitable）保持不变。
+    """
+    app_id     = os.environ.get("FEISHU_APP_ID", "")
+    app_secret = os.environ.get("FEISHU_APP_SECRET", "")
+    wiki_token = os.environ.get("FEISHU_BITABLE_WIKI_TOKEN", "")
+    app_token  = os.environ.get("FEISHU_BITABLE_APP_TOKEN", "")
+    table_id   = os.environ.get("FEISHU_BITABLE_TABLE_ID", "")
+
+    if not all([app_id, app_secret, table_id]) or not (wiki_token or app_token):
+        print(
+            "⏭️  未配置飞书多维表格凭证（FEISHU_APP_ID / FEISHU_APP_SECRET / "
+            "FEISHU_BITABLE_TABLE_ID / WIKI_TOKEN 或 APP_TOKEN），跳过从 Bitable 读取"
+        )
+        return []
+
+    try:
+        token = get_tenant_access_token(app_id, app_secret)
+
+        if wiki_token:
+            print("🔍 通过 Wiki Node API 解析 app_token …")
+            app_token = resolve_wiki_app_token(wiki_token, token)
+            print(f"   解析成功，app_token: {app_token[:8]}…")
+
+        list_url = _LIST_URL.format(app_token=app_token, table_id=table_id)
+        headers  = {"Authorization": f"Bearer {token}"}
+
+        # ── 分页拉取全量记录 ────────────────────────────────────────────
+        all_records: list = []
+        page_token: Optional[str] = None
+
+        while True:
+            params: dict = {"page_size": 500}
+            if page_token:
+                params["page_token"] = page_token
+
+            resp = requests.get(list_url, headers=headers, params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+
+            if data.get("code") != 0:
+                raise RuntimeError(
+                    f"拉取记录失败: code={data.get('code')} msg={data.get('msg')}"
+                )
+
+            batch = data.get("data", {}).get("items", [])
+            all_records.extend(batch)
+            print(f"   已拉取 {len(all_records)} 条…")
+
+            has_more   = data.get("data", {}).get("has_more", False)
+            page_token = data.get("data", {}).get("page_token")
+            if not has_more or not page_token:
+                break
+
+        print(f"✅ 飞书多维表格共 {len(all_records)} 条记录，开始过滤…")
+
+        # ── 过滤 + 映射 ─────────────────────────────────────────────────
+        # 计算日期下限（若指定了 days）
+        date_cutoff = ""
+        if days:
+            from datetime import timedelta
+            date_cutoff = (
+                datetime.now(tz=timezone.utc) - timedelta(days=days)
+            ).strftime("%Y-%m-%d")
+
+        valid: List[dict] = []
+        skipped_status  = 0
+        skipped_empty   = 0
+        skipped_date    = 0
+
+        for rec in all_records:
+            fields = rec.get("fields", {})
+
+            # 过滤工作流状态
+            status_val = str(fields.get("处理状态", "")).strip()
+            if status_val in _EXCLUDE_STATUSES:
+                skipped_status += 1
+                continue
+
+            mapped = _map_bitable_record(fields)
+
+            # 过滤空记录（既无标题也无链接）
+            if not mapped["title_zh"] and not mapped["source_url"]:
+                skipped_empty += 1
+                continue
+
+            # 按日期过滤（仅当指定了 days 时）
+            if date_cutoff and mapped["date"] and mapped["date"] < date_cutoff:
+                skipped_date += 1
+                continue
+
+            valid.append(mapped)
+
+        print(
+            f"✅ 过滤完成：有效 {len(valid)} 条 "
+            f"（排除待初筛/噪音 {skipped_status} 条"
+            f"{f'、超期 {skipped_date} 条' if skipped_date else ''}"
+            f"{f'、空记录 {skipped_empty} 条' if skipped_empty else ''}）"
+        )
+        return valid
+
+    except Exception as exc:
+        print(f"❌ 从飞书多维表格读取失败: {exc}")
+        return []
+
+
 # ── 本地测试入口 ──────────────────────────────────────────────────────
 
 if __name__ == "__main__":
