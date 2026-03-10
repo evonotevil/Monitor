@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3.1 Safari/605.1.15" version="29.6.1">
   <diagram name="第 1 页" id="1WuVUvLnGHJAFxWFhhUj">
-    <mxGraphModel dx="2955" dy="1883" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0" adaptiveColors="auto">
+    <mxGraphModel dx="2364" dy="1506" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0" adaptiveColors="auto">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -136,6 +136,11 @@
         </mxCell>
         <mxCell id="rDnfR6qZHCb2xSL4p6gf-33" parent="1" style="rounded=1;whiteSpace=wrap;arcSize=50;strokeWidth=2;" value="团队人工审核" vertex="1">
           <mxGeometry height="39" width="121" x="570.5" y="1368" as="geometry" />
+        </mxCell>
+        <mxCell id="QBoqRET5lf4ArMtzp0Je-1" edge="1" parent="1" source="rDnfR6qZHCb2xSL4p6gf-34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="280" y="1496" as="targetPoint" />
+          </mxGeometry>
         </mxCell>
         <mxCell id="rDnfR6qZHCb2xSL4p6gf-34" parent="1" style="whiteSpace=wrap;strokeWidth=2;" value="状态更新 / 法务补充&#xa;分配负责人 (BP)" vertex="1">
           <mxGeometry height="78" width="260" x="501" y="1457" as="geometry" />
