@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3.1 Safari/605.1.15" version="29.6.1">
   <diagram name="第 1 页" id="1WuVUvLnGHJAFxWFhhUj">
-    <mxGraphModel dx="2955" dy="1883" grid="1" gridSize="1" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" background="none" math="0" shadow="0" adaptiveColors="auto">
+    <mxGraphModel dx="3377" dy="2151" grid="1" gridSize="1" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" background="none" math="0" shadow="0" adaptiveColors="auto">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -20,14 +20,6 @@
         </mxCell>
         <mxCell id="rDnfR6qZHCb2xSL4p6gf-53" parent="rDnfR6qZHCb2xSL4p6gf-1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;sketch=1;curveFitting=1;jiggle=2;" value="&lt;h2&gt;&lt;font&gt;&lt;span style=&quot;caret-color: rgb(255, 255, 255); font-size: 26px; color: rgb(102, 102, 102);&quot;&gt;报告 / Reports&lt;/span&gt;&lt;/font&gt;&lt;/h2&gt;" vertex="1">
           <mxGeometry height="30" width="387" x="114.5" y="9" as="geometry" />
-        </mxCell>
-        <mxCell id="W1fT3gZuFVtv_NSsmkMu-2" edge="1" parent="1" source="rDnfR6qZHCb2xSL4p6gf-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;hachureGap=4;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;sketch=1;curveFitting=1;jiggle=2;">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="248" y="1432" />
-            </Array>
-            <mxPoint x="247.5" y="1647" as="targetPoint" />
-          </mxGeometry>
         </mxCell>
         <mxCell id="rDnfR6qZHCb2xSL4p6gf-5" parent="1" style="whiteSpace=wrap;strokeWidth=2;fillColor=#b0e3e6;strokeColor=#0e8088;sketch=1;curveFitting=1;jiggle=2;" value="" vertex="1">
           <mxGeometry height="441" width="1154" x="430" y="1146" as="geometry" />
@@ -136,11 +128,14 @@
         <mxCell id="rDnfR6qZHCb2xSL4p6gf-30" parent="1" style="whiteSpace=wrap;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" value="GitHub Actions&#xa;每日 08:00 定时" vertex="1">
           <mxGeometry height="78" width="260" x="851" y="112" as="geometry" />
         </mxCell>
-        <mxCell id="W1fT3gZuFVtv_NSsmkMu-1" edge="1" parent="1" source="rDnfR6qZHCb2xSL4p6gf-31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;hachureGap=4;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;sketch=1;curveFitting=1;jiggle=2;" target="rDnfR6qZHCb2xSL4p6gf-5">
+        <mxCell id="QhOQ3GJX0Dh4-OPYtiIA-1" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;sketch=1;hachureGap=4;jiggle=2;curveFitting=1;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;" target="rDnfR6qZHCb2xSL4p6gf-34">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="248" y="1366" />
+              <mxPoint x="265" y="149" />
+              <mxPoint x="265" y="1476" />
             </Array>
+            <mxPoint x="184" y="149" as="sourcePoint" />
+            <mxPoint x="279" y="1474.4999999999995" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         <mxCell id="rDnfR6qZHCb2xSL4p6gf-31" parent="1" style="whiteSpace=wrap;strokeWidth=2;sketch=1;curveFitting=1;jiggle=2;" value="GitHub Actions&#xa;手动触发 (周报)" vertex="1">
@@ -196,6 +191,9 @@
               <mxPoint x="981" y="920" />
             </Array>
           </mxGeometry>
+        </mxCell>
+        <mxCell id="QhOQ3GJX0Dh4-OPYtiIA-2" edge="1" parent="1" source="rDnfR6qZHCb2xSL4p6gf-34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;sketch=1;hachureGap=4;jiggle=2;curveFitting=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=0.314;entryY=-0.022;entryDx=0;entryDy=0;entryPerimeter=0;fontFamily=Architects Daughter;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DArchitects%2BDaughter;" target="rDnfR6qZHCb2xSL4p6gf-1">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
