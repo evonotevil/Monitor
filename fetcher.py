@@ -250,6 +250,14 @@ REGULATORY_SIGNALS = [
     # 韩文
     r"규제", r"법안", r"법률", r"의무", r"제재", r"개정",
     r"게임산업진흥법",
+    # 越南语
+    r"quy định", r"nghị định", r"thông tư", r"luật",   # 规定/法令/通知/法律
+    # 泰语
+    r"กฎหมาย", r"ระเบียบ", r"ประกาศ",                   # 法律/法规/公告
+    # 印尼语
+    r"\bperaturan\b", r"\bundang-undang\b", r"\bregulasi\b",  # 法规/法律/监管
+    # 阿拉伯语
+    r"تنظيم", r"قانون", r"لوائح",                        # 监管/法律/法规
 ]
 
 # 必须包含至少一个「游戏/互动娱乐」信号词
@@ -302,6 +310,14 @@ GAME_SIGNALS = [
     # 韩文增强
     r"게임.*미성년|미성년.*게임",
     r"가챠.*확률|확률.*가챠",
+    # 越南语
+    r"trò chơi",                        # 游戏
+    # 印尼语
+    r"\bpermainan\b",                   # 游戏
+    # 泰语
+    r"เกม",                              # 游戏
+    # 阿拉伯语
+    r"ألعاب|لعبة",                       # 游戏/一个游戏
 ]
 
 # 排除词 - 即使匹配了上面的词，如果标题中大量出现这些词，基本可以判断不是法规新闻
@@ -746,6 +762,115 @@ def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool
     return all_items
 
 
+# ─── GDELT DOC API 抓取 ──────────────────────────────────────────────
+#
+# GDELT 补充 Google News 覆盖薄弱的两类来源：
+#   1. 东南亚/中东官方政府网站（越南 mic.gov.vn、印尼 Kominfo 等）
+#   2. theme:LEGISLATION / theme:REGULATION 预标注的全球立法类文章
+#
+# 文档: https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
+
+_GDELT_API = "https://api.gdeltproject.org/api/v2/doc/doc"
+
+_GDELT_LANG_MAP = {
+    "English": "en", "Vietnamese": "vi", "Indonesian": "id",
+    "Thai": "th", "Korean": "ko", "Japanese": "ja",
+    "Arabic": "ar", "German": "de", "French": "fr",
+    "Portuguese": "pt", "Spanish": "es",
+}
+
+# 查询列表：(query, 日志标签)
+# theme:LEGISLATION / theme:REGULATION 是 GDELT 预打的立法/监管主题标签，精准度最高
+# sourcecountry: 定向官方来源，补充 Google News 搜不到的本地政府公告
+_GDELT_QUERIES = [
+    (
+        'theme:LEGISLATION (game OR gaming OR "loot box" OR gacha'
+        ' OR "in-app purchase" OR "age verification")',
+        "全球-立法主题",
+    ),
+    (
+        'theme:REGULATION (game OR gaming)'
+        ' (minor OR children OR privacy OR "data protection" OR "age verification")',
+        "全球-监管主题",
+    ),
+    (
+        "(game OR gaming) (regulation OR law OR decree OR circular) sourcecountry:VN",
+        "越南",
+    ),
+    (
+        "(game OR gaming) (regulation OR law OR regulasi OR peraturan) sourcecountry:ID",
+        "印尼",
+    ),
+    (
+        "(game OR gaming) (regulation OR law) sourcecountry:TH",
+        "泰国",
+    ),
+    (
+        "(game OR gaming OR ألعاب) (regulation OR law OR تنظيم OR قانون) sourcecountry:SA",
+        "沙特",
+    ),
+    (
+        "(game OR gaming OR ألعاب) (regulation OR law OR تنظيم OR قانون) sourcecountry:AE",
+        "阿联酋",
+    ),
+]
+
+
+def _parse_gdelt_date(seendate: str) -> str:
+    """将 GDELT seendate (20260310T031000Z) 转为 YYYY-MM-DD。"""
+    try:
+        return datetime.strptime(seendate[:8], "%Y%m%d").strftime("%Y-%m-%d")
+    except Exception:
+        return datetime.now().strftime("%Y-%m-%d")
+
+
+def fetch_gdelt_all(daily_mode: bool = False) -> List[dict]:
+    """
+    通过 GDELT DOC API 补充抓取合规监管文章。
+    返回格式与 fetch_rss_feed / fetch_google_news 一致，直接进入下游过滤流水线。
+    """
+    timespan = "1d" if daily_mode else "7d"
+    all_items: List[dict] = []
+
+    for query, label in _GDELT_QUERIES:
+        try:
+            resp = requests.get(
+                _GDELT_API,
+                params={
+                    "query":      query,
+                    "mode":       "artlist",
+                    "maxrecords": 25,
+                    "timespan":   timespan,
+                    "format":     "json",
+                    "sort":       "DateDesc",
+                },
+                timeout=20,
+            )
+            resp.raise_for_status()
+            articles = resp.json().get("articles") or []
+            count = 0
+            for a in articles:
+                title = _sanitize_title(a.get("title", ""))
+                if not title:
+                    continue
+                all_items.append({
+                    "title":   title,
+                    "url":     a.get("url", ""),
+                    "date":    _parse_gdelt_date(a.get("seendate", "")),
+                    "summary": "",
+                    "source":  a.get("domain", "GDELT"),
+                    "region":  "",
+                    "lang":    _GDELT_LANG_MAP.get(a.get("language", ""), "en"),
+                })
+                count += 1
+            logger.info(f"[GDELT] {label}: 获取 {count} 条")
+            time.sleep(0.5)
+        except Exception as e:
+            logger.warning(f"[GDELT] {label} 请求失败: {e}")
+
+    return all_items
+
+
 # ─── 语言-地区一致性过滤 ──────────────────────────────────────────────
 #
 # 各语言文章"合理覆盖"的地区集合。
@@ -809,7 +934,10 @@ def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = F
     news_items = fetch_google_news_all(max_days, daily_mode=daily_mode)
     logger.info(f"Google News 抓取完成: {len(news_items)} 条原始数据")
 
-    all_raw = rss_items + news_items
+    gdelt_items = fetch_gdelt_all(daily_mode=daily_mode)
+    logger.info(f"GDELT 抓取完成: {len(gdelt_items)} 条原始数据")
+
+    all_raw = rss_items + news_items + gdelt_items
     logger.info(f"合计原始数据: {len(all_raw)} 条")
 
     # 2. 去重 (按 title 归一化)
