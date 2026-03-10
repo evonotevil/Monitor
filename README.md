@@ -1,57 +1,92 @@
-# 🌐 Lilith Legal · 全球游戏立法动态监控
+# 🌐 Lilith Legal · 全球游戏合规动态监控
 
-> 面向中资手游出海合规团队的自动化法规情报工具，持续追踪全球主要市场的游戏监管动态。
-
----
-
-## 功能概览
-
-- **自动抓取**：从 30+ 个官方监管机构、法律媒体、行业资讯 RSS 源实时获取法规动态；同时通过 Google News 多语言搜索（英、日、韩、越、印尼、德、法、葡、西、泰、阿拉伯语等）覆盖本地语种媒体
-- **AI 翻译与提炼**：基于硅基流动 Qwen3-8B 批量处理，将原文转化为规范中文标题和合规摘要；专有名词（Loot Box、GDPR、FTC 等）自动保留英文；每批 3 条并发处理，效率比逐条提升 3 倍
-- **噪音过滤**：自动拦截硬件评测（电池技术、芯片架构、Wi-Fi 标准等）、电竞赛事、公司财报、Google/Apple 非合规相关新闻；`impact_score = 0` 的条目不进入任何报告或通知
-- **智能分类**：按 5 大显示分组（北美 / 欧洲 / 日韩台 / 亚太区 / 其他）和 9 个合规类别自动归类，信源权威性（官方 > 法律 > 行业 > 媒体）作为展示主排序键
-- **四重去重**：URL 精确匹配 → 事件指纹预筛（实体 + 议题匹配）→ Bigram 语义相似度 → LLM 批量核验，跨区域同一事件自动合并，官方来源优先覆盖媒体报道
-- **双端 HTML 报告**：生成移动端（`latest-mobile.html`）和 PC 端（`latest-pc.html`）两份报告，均含 LLM 上周动态总结、可交互地区筛选；通过 GitHub Pages 直接分发，加载 < 2 秒
-- **飞书通知**：
-  - **日报**：有昨日新增动态时推送执行级飞书卡片（**周一至周五**）；按风险分级着色（🔴≥9.0 / 🟠≥7.0 / 🔵其他）；顶部附 AI 生成的 150 字综述；每条动态含机制变动摘要和全平台影响
-  - **周报**：团队完成飞书多维表格初筛后手动触发，飞书卡片含区域分布统计 + LLM 综述 + 两个报告直链按钮
+> 面向合规团队的自动化情报工具，每天自动追踪全球主要市场的游戏监管动态，翻译整理后推送到飞书，并沉淀为可查阅的周报。
 
 ---
 
-## 自动化工作流
+## 这个工具能帮你做什么
 
-| 任务 | Workflow 文件 | 触发方式 | 说明 |
-|------|--------------|----------|------|
-| 每日数据同步 | `daily_check.yml` | 每天 BJT 08:00 自动 | 抓取昨日数据 → AI 翻译分类 → 写入飞书多维表格（每天）→ 推送飞书日报（仅工作日） |
-| 发布周报 | `publish_report.yml` | 手动触发 | 从飞书多维表格读取已审条目 → 生成双端 HTML + PDF → 存档 → 发送飞书周报卡片 |
+你不需要每天手动搜索各国监管机构的网站或新闻。这套系统会自动完成以下工作：
 
-**数据流向**：
+1. **每天早上 8 点**，自动从全球 30+ 个官方监管机构、法律媒体和新闻平台抓取前一天的合规动态
+2. **AI 自动翻译**，将英语、日语、韩语、越南语等多语言原文整理成规范的中文标题和摘要
+3. **过滤噪音**，自动排除硬件评测、电竞赛事、公司财报等无关内容
+4. **工作日推送飞书日报**，按地区分类展示当日最重要的合规动态
+5. **写入飞书多维表格**，供团队人工标注和筛选
+6. **每周手动发布周报**，生成可在手机和电脑上查看的 HTML 报告页面
+
+---
+
+## 日常使用流程
+
+### 每天（自动，无需操作）
 
 ```
-每天 BJT 08:00
-    monitor.py run --period day
-        ↓ 抓取 + 翻译 + 分类
-    daily_check.py
-        ↓ 质量过滤（impact_score > 0 + title_zh 非空）
-        ├── 写入飞书多维表格（每天，含周末）
-        └── 推送飞书日报卡片（仅周一至周五）
-
-手动触发"发布周报"
-    monitor.py report --format html --period week
-        ↓ 从飞书多维表格读取已审条目
-    reporter.py → latest-mobile.html / latest-pc.html
-    generate_pdf.py → 周报.pdf
-    feishu_notify.py → 飞书周报卡片
+早上 8:00 自动运行
+    ↓
+抓取全球合规新闻 → AI 翻译分类 → 过滤噪音
+    ↓
+写入飞书多维表格（每天，含周末）
+    ↓
+推送飞书日报卡片（仅周一至周五）
 ```
+
+**你收到飞书日报后可以做的事：**
+- 查看当日有哪些地区有新动态
+- 点击标题链接查看原文
+- 在飞书多维表格里对每条动态标注处理状态（见下方说明）
 
 ---
 
-## 覆盖地区与来源
+### 每周（手动触发，由负责人操作）
 
-| 显示分组 | 涵盖地区 | 代表监管来源 |
-|----------|----------|-------------|
+团队完成多维表格初筛后，在 GitHub 上手动触发「发布周报」，系统会：
+
+1. 读取多维表格中已审核的条目
+2. 生成手机端和电脑端两份 HTML 报告
+3. 生成 PDF 版本
+4. 推送飞书周报卡片（含报告直链）
+
+---
+
+## 飞书多维表格 — 团队工作台
+
+多维表格是团队日常工作的核心入口。每天新抓取的条目会自动写入，初始状态为「🤖 待初筛」。
+
+### 处理状态说明
+
+| 状态 | 含义 | 动作 |
+|------|------|------|
+| 🤖 待初筛 | 系统自动写入，尚未人工确认 | 需要人工判断 |
+| ✅ 推送 | 确认为有价值的合规动态 | 会出现在周报中 |
+| 🗑️ 噪音/不推送 | 判断为无关或低价值 | 不出现在周报中 |
+| 其他自定义状态 | 团队自行定义 | 会出现在周报中 |
+
+> **重要**：只有状态不是「🤖 待初筛」和「🗑️ 噪音/不推送」的条目，才会被纳入周报。所以每周发布前，请确保团队已完成初筛。
+
+### 主要字段说明
+
+| 字段 | 说明 |
+|------|------|
+| 动态标题 | AI 生成的中文标题，格式为 [国家/地区] 事件描述 |
+| 摘要 | AI 生成的 60-90 字合规摘要，说明具体规则和需要采取的行动 |
+| 💡 核心结论 | 人工补充的法务判断（若填写，周报优先展示此字段而非摘要） |
+| 国家/地区 | 按大区分组：北美 / 欧洲 / 日韩台 / 港澳 / 东南亚 / 其他 |
+| 合规类别 | 见下方分类说明 |
+| 处理状态 | 见上方状态说明 |
+| 跟进 BP | 负责跟进的合规 BP |
+| 发布日期 | 原始文章发布日期 |
+| 原始链接 | 点击可查看原文 |
+| 信源名称 | 来源媒体或机构名称 |
+
+---
+
+## 覆盖地区
+
+| 地区 | 涵盖国家 | 代表监管来源 |
+|------|----------|-------------|
 | 🌎 北美 | 美国、加拿大、墨西哥及中美洲/加勒比海 | FTC、联邦公报、纽约州 AG、加拿大竞争局 |
-| 🌍 欧洲 | 欧盟、英国、德国、法国、荷兰、俄罗斯等全欧 | GDPR 执法动态、Ofcom、ICO、CNIL、PEGI |
+| 🌍 欧洲 | 欧盟成员国、英国、挪威、瑞士、俄罗斯等全欧 | GDPR 执法动态、Ofcom、ICO、CNIL、PEGI |
 | 🌸 日韩台 | 日本、韩国、台湾 | GRAC（韩国）、CERO（日本）、台湾数位部 |
 | 🇭🇰 港澳 | 香港、澳门 | 香港通讯事务管理局、澳门文化局 |
 | 🌏 亚太区 | 越南、印尼、泰国、菲律宾、马来西亚、新加坡等东南亚十一国 | 越南信息通信部、印尼 Kominfo、澳大利亚 eSafety |
@@ -61,9 +96,11 @@
 
 ## 合规分类
 
+系统会将每条动态自动归入以下 9 个类别之一：
+
 | 分类 | 典型议题 |
 |------|----------|
-| 🔒 数据隐私 | GDPR / CCPA 执法、儿童隐私 (COPPA)、跨境数据传输、数据本地化 |
+| 🔒 数据隐私 | GDPR / CCPA 执法、儿童隐私（COPPA）、跨境数据传输、数据本地化 |
 | 🎲 玩法合规 | Loot Box / Gacha 监管、概率公示、虚拟货币、涉赌认定 |
 | 🧒 未成年人保护 | 年龄验证、未成年消费限制、游戏时长管控、家长控制 |
 | 📣 广告营销合规 | 虚假广告、KOL 披露义务、暗黑模式、价格透明度 |
@@ -75,151 +112,85 @@
 
 ---
 
-## 项目架构
+## 周报在哪里看
 
-```
-Monitor/
-├── monitor.py          # 主入口：run / report / query / stats / retranslate
-├── fetcher.py          # RSS + Google News 多语言抓取，去重写入 DB
-├── classifier.py       # 分类打标（地区 / 类别 / 状态 / 影响分值 / 信源层级）
-├── translator.py       # AI 批量翻译 + 术语修正 + LLM 重复对核验 + 摘要融合 + 综述生成
-├── reporter.py         # 双端 HTML 报告生成（移动端 + PC 端，含事件指纹去重、信源排序）
-├── models.py           # 数据模型（LegislationItem）+ SQLite 数据库操作
-├── config.py           # 搜索关键词库、RSS 源、分类标签、输出配置
-├── utils.py            # 共享工具：区域分组映射、send_card、bigram 去重、tier 排序等
-├── daily_check.py      # 日报脚本：查询昨日新增 → 写入 Bitable → 推送飞书（工作日）
-├── feishu_notify.py    # 周报脚本：查询本周数据 → LLM 综述 → 构建飞书卡片 → 推送
-├── feishu_bitable.py   # 飞书多维表格读写（write: daily_check / read: reporter）
-├── generate_pdf.py     # Playwright 截图：PC 端 HTML → PDF（含日期范围命名）
-├── requirements.txt    # Python 依赖
-├── data/
-│   └── monitor.db      # SQLite 数据库（法规条目，随 CI 自动提交）
-├── reports/
-│   ├── latest-mobile.html   # 最新移动端报告（GitHub Pages 分发）
-│   ├── latest-pc.html       # 最新 PC 端报告（适合宽屏阅读和 PDF 打印）
-│   ├── latest.html          # 移动端别名（向后兼容）
-│   └── archive/             # 历史周报（YYYY-WXX/weekly-mobile.html 等）
-└── assets/
-    ├── lilith-logo.jpg      # 品牌 Logo
-    └── fonts/               # 自托管字体（Inter Variable + JetBrains Mono）
-```
+每次发布周报后，可通过以下方式访问：
+
+- **飞书卡片**：周报推送时会附带两个按钮，分别打开手机端和电脑端报告
+- **手机端报告**：适合手机浏览，竖向排版
+- **电脑端报告**：适合宽屏阅读，也是 PDF 打印的来源
+- **历史周报**：所有历史周报均有存档，可通过报告页面底部的链接或直接访问存档目录查看
 
 ---
 
-## 一次性部署（GitHub）
+## 日报卡片怎么看
 
-### 1. Fork / 克隆本仓库
+飞书日报卡片会在每个工作日早上 8 点左右收到（若当日有新动态）。
 
-```bash
-git clone https://github.com/evonotevil/Monitor.git
-cd Monitor
-```
+**卡片结构：**
+- **顶部**：昨日新增条数，以及各地区动态数量概览
+- **AI 综述**（灰色引用块）：150 字以内的整体情况总结
+- **按地区分块**：每个有动态的地区单独一栏，展示最重要的 1-2 条
+- **每条动态包含**：风险等级（🔴高 / 🟠中 / 🔵一般）、地区、合规类别、标题链接、机制变动摘要、发布日期
 
-### 2. 配置 GitHub Secrets
-
-在仓库页面进入 **Settings → Secrets and variables → Actions → New repository secret**，添加以下 Secrets：
-
-| Secret 名称 | 说明 | 是否必填 |
-|-------------|------|---------|
-| `LLM_API_KEY` | 硅基流动 API Key（[免费申请](https://cloud.siliconflow.cn)） | ✅ 必填 |
-| `FEISHU_WEBHOOK_URL` | 飞书自定义机器人 Webhook 地址 | ✅ 必填（否则通知不发送） |
-| `FEISHU_APP_ID` | 飞书自建应用 App ID | 可选（多维表格写入） |
-| `FEISHU_APP_SECRET` | 飞书自建应用 App Secret | 可选（多维表格写入） |
-| `FEISHU_BITABLE_APP_TOKEN` | 多维表格 URL 中的 app_token（`BmXXX` 部分） | 可选（多维表格写入） |
-| `FEISHU_BITABLE_WIKI_TOKEN` | 多维表格 Wiki token（`wiki/xxx` 部分，如使用知识库） | 可选 |
-| `FEISHU_BITABLE_TABLE_ID` | 多维表格 URL 中的 table_id（`tblXXX` 部分） | 可选（多维表格写入） |
-
-### 3. 启用 GitHub Pages
-
-进入 **Settings → Pages**，Source 选择 `Deploy from a branch`，Branch 选 `main`，目录选 `/ (root)`，Save。
-
-报告 URL 格式：
-- 移动端：`https://<owner>.github.io/<repo>/reports/latest-mobile.html`
-- PC 端：`https://<owner>.github.io/<repo>/reports/latest-pc.html`
+**卡片颜色含义：**
+- 🔴 红色 Header：当日有最高风险动态（影响评分 ≥ 9）
+- 🟠 橙色 Header：当日有高风险动态（影响评分 ≥ 7）
+- 🔵 蓝色 Header：一般重要性动态
 
 ---
 
-## 本地调试
+## 常见问题
 
-```bash
-# 安装依赖
-pip install -r requirements.txt
-playwright install chromium      # 仅 PDF 生成需要
+**Q：今天没收到日报，是系统出问题了吗？**
+A：不一定。以下情况属于正常：① 今天是周六或周日（周末不推送）；② 昨天确实没有抓取到符合条件的新动态。可以去 GitHub Actions 页面查看当日运行日志确认。
 
-# 设置环境变量
-export LLM_API_KEY=sk-xxx
-export FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+**Q：多维表格里的条目看起来不相关，是 AI 判断错了吗？**
+A：AI 有一定误判率。遇到这种情况，把处理状态改为「🗑️ 噪音/不推送」即可，这条内容就不会进入周报。如果某类噪音频繁出现，可以告知技术负责人添加过滤规则。
 
-# 抓取昨日数据（日报模式）
-python monitor.py run --period day
+**Q：我在多维表格里填写了「💡 核心结论」，周报里会显示吗？**
+A：会。如果填写了核心结论，周报里这条动态的摘要部分会优先显示核心结论的内容，而不是 AI 自动生成的摘要。
 
-# 仅生成报告（从飞书多维表格读取，不抓取新数据）
-python monitor.py report --format html --period week
+**Q：周报是自动发送的吗？**
+A：不是。周报需要由负责人在完成多维表格初筛后手动触发发布，以确保报告内容经过人工确认。
 
-# 仅生成 PDF（需先生成 HTML，使用 PC 端版本）
-python generate_pdf.py
-
-# 发送日报飞书通知（本地测试）
-python daily_check.py
-
-# 测试写入飞书多维表格（取数据库最新 5 条）
-FEISHU_APP_ID=cli_xxx FEISHU_APP_SECRET=xxx \
-FEISHU_BITABLE_APP_TOKEN=BmXXX FEISHU_BITABLE_TABLE_ID=tblXXX \
-python feishu_bitable.py
-
-# 发送周报飞书通知（本地测试）
-REPORT_MOBILE_URL=https://... REPORT_PC_URL=https://... python feishu_notify.py
-
-# 关键词搜索数据库
-python monitor.py query --keyword "loot box"
-
-# 查看数据库统计
-python monitor.py stats
-
-# 重新翻译历史条目（更新 Prompt 后使用，每次最多 60 条）
-python monitor.py retranslate --limit 60
-```
+**Q：我想查某个关键词的历史动态，怎么做？**
+A：可以直接在飞书多维表格里筛选，也可以联系技术负责人通过数据库查询。
 
 ---
 
-## 环境变量
+## 技术负责人参考
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `LLM_API_KEY` | 硅基流动 API Key | 必填 |
-| `LLM_BASE_URL` | LLM API 地址 | `https://api.siliconflow.cn/v1` |
-| `LLM_MODEL` | 使用的模型 | `Qwen/Qwen3-8B` |
-| `FEISHU_WEBHOOK_URL` | 飞书 Webhook 地址 | 必填（通知功能） |
-| `FEISHU_APP_ID` | 飞书自建应用 App ID | 可选（多维表格读写） |
-| `FEISHU_APP_SECRET` | 飞书自建应用 App Secret | 可选（多维表格读写） |
-| `FEISHU_BITABLE_APP_TOKEN` | 多维表格 app_token | 可选（多维表格读写） |
-| `FEISHU_BITABLE_TABLE_ID` | 多维表格 table_id | 可选（多维表格读写） |
-| `REPORT_MOBILE_URL` | 周报移动端 HTML 链接（飞书卡片按钮） | 可选 |
-| `REPORT_PC_URL` | 周报 PC 端 HTML 链接（飞书卡片按钮） | 可选 |
+### 触发周报发布
 
----
+进入 GitHub 仓库 → Actions → 「发布周报」→ Run workflow。
 
-## 报告访问
+### 查看运行日志
 
-| 文件 | 说明 |
-|------|------|
-| `reports/latest-mobile.html` | 最新移动端报告，GitHub Pages 直接访问 |
-| `reports/latest-pc.html` | 最新 PC 端报告，适合宽屏阅读和 PDF 打印 |
-| `reports/archive/YYYY-WXX/` | 历史周报 HTML 存档（按 ISO 周号归档） |
+进入 GitHub 仓库 → Actions → 选择对应的运行记录，可以看到每一步的详细输出，包括抓取了多少条、过滤了多少条、写入了多少条等。
 
-> PDF 仅在周报发布时按需生成，不长期入库（避免 git 历史膨胀）。
+### 系统关键配置位置
 
----
+| 想修改的内容 | 对应文件 |
+|-------------|---------|
+| 搜索关键词、RSS 订阅源 | `config.py` |
+| 国家/地区分组和映射关系 | `utils.py` |
+| AI 翻译和分类的提示词 | `translator.py` |
+| 噪音过滤规则 | `classifier.py` |
+| 飞书卡片样式和内容 | `daily_check.py`（日报）/ `feishu_notify.py`（周报） |
+| HTML 报告样式 | `reporter.py` |
 
-## 技术说明
+### 环境变量（GitHub Secrets）
 
-- **LLM**：硅基流动免费层 `Qwen/Qwen3-8B`，每批 3 条并行处理，批间 4 秒冷却（遵守免费层限速）；Qwen3 系列默认关闭思维链（`enable_thinking: false`）以提速
-- **去重机制**：四重保障 —— URL 精确匹配（全局）→ 事件指纹预筛（实体 + 议题）→ Bigram 相似度（同区域 > 0.45）→ LLM 批量核验；官方来源（tier=4）与任何同指纹条目 bigram > 0.20 即自动合并
-- **Bitable 作为 SSOT**：所有条目经 `daily_check.py` 质量过滤后写入飞书多维表格，由团队人工初筛；周报从 Bitable 读取已审条目，确保报告内容质量
-- **字体**：Inter Variable + JetBrains Mono 自托管于 `assets/fonts/`，通过 GitHub Pages CDN 分发，无外链依赖
-- **数据库**：SQLite，存储在 `data/monitor.db`，每次 CI 运行后自动提交回仓库
-- **PDF 生成**：Playwright Chromium 渲染 PC 端 HTML（A3 横向），GitHub Actions 已配置浏览器缓存
-- **Git 优化**：所有 workflow 使用 `fetch-depth: 1` 浅克隆；PDF 不长期入库；CI push 前执行 `git pull --rebase` 避免并发冲突
+| 变量名 | 用途 | 是否必填 |
+|--------|------|---------|
+| `LLM_API_KEY` | AI 翻译和分类（硅基流动） | ✅ 必填 |
+| `FEISHU_WEBHOOK_URL` | 飞书机器人推送地址 | ✅ 必填 |
+| `FEISHU_APP_ID` | 飞书自建应用 ID | 多维表格必填 |
+| `FEISHU_APP_SECRET` | 飞书自建应用密钥 | 多维表格必填 |
+| `FEISHU_BITABLE_WIKI_TOKEN` | 多维表格所在知识库页面 token | 二选一 |
+| `FEISHU_BITABLE_APP_TOKEN` | 独立多维表格的 app token | 二选一 |
+| `FEISHU_BITABLE_TABLE_ID` | 多维表格的 table ID | 多维表格必填 |
 
 ---
 
