@@ -28,13 +28,11 @@ from pathlib import Path
 # 北京/新加坡时间 UTC+8
 _TZ_CST = timezone(timedelta(hours=8))
 
-import requests
-
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
 from utils import (
     _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status,
-    CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items,
+    CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items, send_card,
 )
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
@@ -260,24 +258,6 @@ def build_daily_card(items: list, exec_summary: str = "") -> dict:
     }
 
 
-# ── 发送 ─────────────────────────────────────────────────────────────
-
-def send_card(webhook_url: str, card: dict) -> None:
-    payload = {"msg_type": "interactive", "card": card}
-    try:
-        resp = requests.post(webhook_url, json=payload, timeout=15)
-        resp.raise_for_status()
-        result = resp.json()
-        code = result.get("code", result.get("StatusCode", -1))
-        if code == 0:
-            print("✅ 飞书每日通知发送成功")
-        else:
-            print(f"⚠️  飞书返回异常: {result}")
-    except Exception as e:
-        print(f"❌ 发送失败: {e}")
-        sys.exit(1)
-
-
 # ── 入口 ─────────────────────────────────────────────────────────────
 
 def main():
@@ -305,12 +285,18 @@ def main():
     except Exception as e:
         print(f"⚠️  综述生成失败（将跳过）: {e}")
 
-    card = build_daily_card(items, exec_summary=exec_summary)
-    send_card(webhook_url, card)
-
-    # ── 写入飞书多维表格（凭证缺失时自动跳过，不阻断主流程）──────────
+    # ── 写入飞书多维表格（每天写入，包含周末）──────────────────────────
     from feishu_bitable import sync_items_to_bitable
     sync_items_to_bitable(items)
+
+    # ── 飞书机器人推送（仅工作日：周一至周五）─────────────────────────
+    weekday = datetime.now(_TZ_CST).weekday()  # 0=周一, 6=周日
+    if weekday >= 5:
+        print(f"📅 今天是{'周六' if weekday == 5 else '周日'}，跳过飞书机器人推送")
+        return
+
+    card = build_daily_card(items, exec_summary=exec_summary)
+    send_card(webhook_url, card)
 
 
 if __name__ == "__main__":

@@ -165,6 +165,25 @@ def _bigram_sim(a: str, b: str) -> float:
     return len(bg_a & bg_b) / len(union) if union else 0.0
 
 
+def send_card(webhook_url: str, card: dict) -> None:
+    """向飞书自定义机器人 Webhook 发送交互卡片。"""
+    import requests
+    import sys
+    payload = {"msg_type": "interactive", "card": card}
+    try:
+        resp = requests.post(webhook_url, json=payload, timeout=15)
+        resp.raise_for_status()
+        result = resp.json()
+        code = result.get("code", result.get("StatusCode", -1))
+        if code == 0:
+            print("✅ 飞书通知发送成功")
+        else:
+            print(f"⚠️  飞书返回异常: {result}")
+    except Exception as e:
+        print(f"❌ 发送失败: {e}")
+        sys.exit(1)
+
+
 def _pick_group_items(candidates: list, max_items: int) -> list:
     """Bigram 去重 + 同分类限 1 条，取 max_items 条。"""
     selected: list = []

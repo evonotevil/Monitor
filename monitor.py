@@ -26,7 +26,7 @@ from models import Database
 from fetcher import fetch_and_process
 from translator import translate_items_batch
 from reporter import print_table, save_markdown, save_html, generate_markdown
-from utils import _get_region_group
+from utils import _get_region_group, _bigram_sim
 from config import PERIOD_DAYS
 
 # ─── 日志配置 ─────────────────────────────────────────────────────────
@@ -51,16 +51,6 @@ def _period_to_days(period: str) -> int:
 
 
 # ─── 语义去重（同地区/同日期窗口内高度相似的文章只保留一条）────────────
-
-def _title_bigram_sim(a: str, b: str) -> float:
-    """计算两个英文标题的 bigram 字符重叠率（0~1）。"""
-    a, b = a.lower(), b.lower()
-    if len(a) < 2 or len(b) < 2:
-        return 0.0
-    bg_a = {a[i:i + 2] for i in range(len(a) - 1)}
-    bg_b = {b[i:i + 2] for i in range(len(b) - 1)}
-    return len(bg_a & bg_b) / max(len(bg_a), len(bg_b))
-
 
 def _make_timeline_note(items_group: list) -> str:
     """
@@ -114,7 +104,7 @@ def _deduplicate_items(items):
                     continue
             except ValueError:
                 continue
-            sim = _title_bigram_sim(item_i.title, item_j.title)
+            sim = _bigram_sim(item_i.title, item_j.title)
             if sim > 0.8:
                 duplicates.append((j, sim))
         if duplicates:
@@ -154,7 +144,7 @@ def _deduplicate_items(items):
                     continue
             except ValueError:
                 continue
-            sim = _title_bigram_sim(item_i.title, item_j.title)
+            sim = _bigram_sim(item_i.title, item_j.title)
             # 移除上限：sim ≥ 0.5 均为候选（高相似跨阶段对在 LLM 验证后合并）
             if sim >= 0.5:
                 candidates.append((i, j, sim))
@@ -314,12 +304,6 @@ def cmd_run(args):
             logger.info(f"新增 {new_count} 条记录 (共处理 {len(items)} 条)")
             db.log_fetch("full_run", new_count, "ok")
 
-            # ── 写入飞书多维表格（待初筛）──────────────────────────────
-            try:
-                from feishu_bitable import sync_items_to_bitable
-                sync_items_to_bitable([item.to_dict() for item in items])
-            except Exception as bitable_err:
-                logger.warning(f"飞书多维表格写入失败（不影响主流程）: {bitable_err}")
         else:
             logger.info("本次抓取未获取到新数据")
             db.log_fetch("full_run", 0, "ok", "no new items")
