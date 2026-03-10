@@ -792,8 +792,8 @@ _MOBILE_CSS = _FONT_FACE + """
             --accent-red: #E8443A; --accent-green: #27AE60; --accent-purple: #8B5CF6;
             --accent-magenta: #DB2777; --accent-teal: #0D9488; --accent-blue: #2563EB;
             --accent-orange: #D97706;
-            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif;
-            --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, "Cascadia Code", Consolas, monospace;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background-color: var(--bg-canvas); font-family: var(--font-sans); color: var(--text-primary); -webkit-font-smoothing: antialiased; display: flex; justify-content: center; min-height: 100vh; }
@@ -915,8 +915,8 @@ _PC_CSS = _FONT_FACE + """
             --accent-red: #E5484D; --accent-green: #30A46C; --accent-purple: #8E4EC6;
             --accent-magenta: #D6409F; --accent-teal: #00A2C7; --accent-blue: #3B82F6;
             --accent-orange: #F76B15;
-            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif;
-            --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, "Cascadia Code", Consolas, monospace;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
             --radius: 10px;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
