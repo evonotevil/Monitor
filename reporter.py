@@ -1282,8 +1282,9 @@ def _render_pc_html(action_items: List[dict], news_items: List[dict],
     )
     pc_override = (
         "<style>"
-        "@media(min-width:600px){.app-view{max-width:700px;}}"
-        "@media(min-width:1000px){.app-view{max-width:780px;}}"
+        "@media(min-width:600px){.app-view{max-width:860px;}}"
+        "@media(min-width:1000px){.app-view{max-width:1080px;}}"
+        "@media(min-width:1400px){.app-view{max-width:1280px;}}"
         "</style>"
     )
     return mobile_html.replace("</head>", f"{pc_override}\n</head>", 1)
