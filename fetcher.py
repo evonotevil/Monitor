@@ -833,40 +833,48 @@ def fetch_gdelt_all(daily_mode: bool = False) -> List[dict]:
     all_items: List[dict] = []
 
     for query, label in _GDELT_QUERIES:
-        try:
-            resp = requests.get(
-                _GDELT_API,
-                params={
-                    "query":      query,
-                    "mode":       "artlist",
-                    "maxrecords": 25,
-                    "timespan":   timespan,
-                    "format":     "json",
-                    "sort":       "DateDesc",
-                },
-                timeout=20,
-            )
-            resp.raise_for_status()
-            articles = resp.json().get("articles") or []
-            count = 0
-            for a in articles:
-                title = _sanitize_title(a.get("title", ""))
-                if not title:
+        # GDELT 免费 API 限速约 1 次/3 秒，先等再发，避免 429
+        time.sleep(3)
+        for attempt in range(2):   # 429 时最多重试一次
+            try:
+                resp = requests.get(
+                    _GDELT_API,
+                    params={
+                        "query":      query,
+                        "mode":       "artlist",
+                        "maxrecords": 25,
+                        "timespan":   timespan,
+                        "format":     "json",
+                        "sort":       "DateDesc",
+                    },
+                    timeout=20,
+                )
+                if resp.status_code == 429:
+                    logger.warning(f"[GDELT] {label} 触发限速，等待 10 秒后重试…")
+                    time.sleep(10)
                     continue
-                all_items.append({
-                    "title":   title,
-                    "url":     a.get("url", ""),
-                    "date":    _parse_gdelt_date(a.get("seendate", "")),
-                    "summary": "",
-                    "source":  a.get("domain", "GDELT"),
-                    "region":  "",
-                    "lang":    _GDELT_LANG_MAP.get(a.get("language", ""), "en"),
-                })
-                count += 1
-            logger.info(f"[GDELT] {label}: 获取 {count} 条")
-            time.sleep(0.5)
-        except Exception as e:
-            logger.warning(f"[GDELT] {label} 请求失败: {e}")
+                resp.raise_for_status()
+                articles = resp.json().get("articles") or []
+                count = 0
+                for a in articles:
+                    title = _sanitize_title(a.get("title", ""))
+                    if not title:
+                        continue
+                    all_items.append({
+                        "title":   title,
+                        "url":     a.get("url", ""),
+                        "date":    _parse_gdelt_date(a.get("seendate", "")),
+                        "summary": "",
+                        "source":  a.get("domain", "GDELT"),
+                        "region":  "",
+                        "lang":    _GDELT_LANG_MAP.get(a.get("language", ""), "en"),
+                    })
+                    count += 1
+                logger.info(f"[GDELT] {label}: 获取 {count} 条")
+                break
+            except Exception as e:
+                logger.warning(f"[GDELT] {label} 请求失败: {e}")
+                break
 
     return all_items
 
