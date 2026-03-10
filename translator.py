@@ -386,22 +386,8 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
                 # ── 步骤 6：[地区] 前缀兜底修复 ──────────────────────
                 # 若标题未以 [xxx] 开头，从原始英文标题或 item region 推断并补充
                 if not re.match(r'^\[.+?\]', title_zh):
-                    # 尝试从英文标题里找地区关键词（优先顺序：美国/英国/EU等）
-                    _region_hints = [
-                        ("美国",  r'\b(US|USA|United States|America[n]?|FTC|Congress|Senate|White House)\b'),
-                        ("英国",  r'\b(UK|United Kingdom|Britain|British|ASA|Ofcom|ICO)\b'),
-                        ("欧盟",  r'\b(EU|European Union|Europe[an]?|GDPR|DSA|DMA|CNIL)\b'),
-                        ("韩国",  r'\b(Korea[n]?|South Korea|GRAC|KCA)\b'),
-                        ("日本",  r'\b(Japan[ese]?)\b'),
-                        ("澳大利亚", r'\b(Austral[ia]+[n]?|eSafety)\b'),
-                        ("加拿大", r'\b(Canada[ian]?)\b'),
-                        ("越南",  r'\b(Vietnam[ese]?)\b'),
-                        ("印度",  r'\b(India[n]?)\b'),
-                        ("中国",  r'\b(China|Chinese)\b'),
-                        ("全球",  r'\b(global[ly]?|worldwide|international)\b'),
-                    ]
                     inferred = None
-                    for region_cn, pattern in _region_hints:
+                    for region_cn, pattern in _REGION_PREFIX_RULES:
                         if re.search(pattern, title, re.IGNORECASE):
                             inferred = region_cn
                             break

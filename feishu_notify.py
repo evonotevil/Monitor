@@ -24,12 +24,10 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import requests
-
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
 from utils import (
-    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, _TIER_SORT,
+    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, _TIER_SORT, send_card,
 )
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
@@ -214,24 +212,6 @@ def build_card(
     }
 
 
-# ── 发送 ─────────────────────────────────────────────────────────────
-
-def send_card(webhook_url: str, card: dict) -> None:
-    payload = {"msg_type": "interactive", "card": card}
-    try:
-        resp = requests.post(webhook_url, json=payload, timeout=15)
-        resp.raise_for_status()
-        result = resp.json()
-        code = result.get("code", result.get("StatusCode", -1))
-        if code == 0:
-            print("✅ 飞书通知发送成功")
-        else:
-            print(f"⚠️  飞书返回异常: {result}")
-    except Exception as e:
-        print(f"❌ 发送失败: {e}")
-        sys.exit(1)
-
-
 # ── 入口 ─────────────────────────────────────────────────────────────
 
 def main():
@@ -260,10 +240,6 @@ def main():
         mobile_url=mobile_url, pc_url=pc_url,
     )
     send_card(webhook_url, card)
-
-    # ── 写入飞书多维表格（凭证缺失时自动跳过，不阻断主流程）──────────
-    from feishu_bitable import sync_items_to_bitable
-    sync_items_to_bitable(all_items)
 
 
 if __name__ == "__main__":
