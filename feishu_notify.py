@@ -27,9 +27,12 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
 from utils import (
-    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, _TIER_SORT, send_card,
+    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, _TIER_SORT, send_card, CAT_EMOJI,
 )
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
+
+# 与 reporter.py 一致：这三种状态的条目进入「重点跟进」区块
+_ACTION_STATUSES = {"👤 待研判", "🏃 处理/跟进中", "✅ 已合规/归档"}
 
 
 # ── 数据库查询 ────────────────────────────────────────────────────────
@@ -137,7 +140,10 @@ def build_card(
     html_url: str,
     mobile_url: str = "",
     pc_url: str = "",
+    action_items: list = None,
 ) -> dict:
+    if action_items is None:
+        action_items = []
 
     # ── 日期范围文案 ─────────────────────────────────────────────────
     date_range = (
@@ -168,13 +174,52 @@ def build_card(
         "content": f"**🗺️ 按地区**\n{region_line}",
     })
 
-    # 引用块：综述
+    # 引用块：综述（跳过空行，避免飞书渲染出孤立的 >）
     if exec_summary:
+        elements.append({"tag": "hr"})
+        quoted_lines = [
+            f"> {line}" for line in exec_summary.splitlines() if line.strip()
+        ]
+        elements.append({
+            "tag": "markdown",
+            "content": "\n".join(quoted_lines),
+        })
+
+    # ── 本周重点跟进（来自 Bitable 待研判条目）──────────────────────
+    if action_items:
+        from collections import defaultdict
         elements.append({"tag": "hr"})
         elements.append({
             "tag": "markdown",
-            "content": "\n".join(f"> {line}" for line in exec_summary.splitlines()),
+            "content": f"**📋 本周重点跟进** · {len(action_items)} 条",
         })
+
+        grouped: dict = defaultdict(list)
+        for item in action_items:
+            group = _get_region_group(item.get("region", "其他"))
+            grouped[group].append(item)
+
+        for group in _GROUP_ORDER:
+            group_items = grouped.get(group, [])
+            if not group_items:
+                continue
+            emoji = _GROUP_EMOJI.get(group, "•")
+            lines = [f"**{emoji} {group}**"]
+            for item in group_items:
+                title = item.get("title_zh", "").strip()
+                url   = item.get("source_url", "")
+                cat   = item.get("category_l1", "")
+                cat_em = CAT_EMOJI.get(cat, "")
+                assignee = item.get("assignee", "")
+                title_md = f"[{title}]({url})" if url else title
+                line = f"· {title_md}　{cat_em} {cat}"
+                if assignee:
+                    line += f"　👤 {assignee}"
+                lines.append(line)
+            elements.append({
+                "tag": "markdown",
+                "content": "\n".join(lines),
+            })
 
     # ── 底部按钮 ─────────────────────────────────────────────────────
     elements.append({"tag": "hr"})
@@ -234,10 +279,24 @@ def main():
     else:
         print("综述生成跳过（无 API Key 或调用失败）")
 
+    # 从 Bitable 读取待研判条目（不传 days，取全量有效记录再自行筛选本周）
+    action_items: list = []
+    try:
+        from feishu_bitable import fetch_valid_records_from_bitable
+        bitable_items = fetch_valid_records_from_bitable(days=7)
+        action_items = [
+            i for i in bitable_items
+            if i.get("bitable_status") in _ACTION_STATUSES
+        ]
+        print(f"Bitable 待研判条目: {len(action_items)} 条")
+    except Exception as e:
+        print(f"⚠️  获取 Bitable 待研判条目失败（不阻断推送）: {e}")
+
     card = build_card(
         today, week_ago, total, by_region_group,
         exec_summary, html_url,
         mobile_url=mobile_url, pc_url=pc_url,
+        action_items=action_items,
     )
     send_card(webhook_url, card)
 
