@@ -37,43 +37,6 @@ from utils import (
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
 
-# ── 全平台影响简短标签 ────────────────────────────────────────────────
-# 按分类给出移动端 / PC 端最关键的合规关注点（一句话）
-
-_MOBILE_SHORT: dict = {
-    "数据隐私":        "App/SDK 数据同意流程合规",
-    "玩法合规":        "Gacha/Loot Box 概率公示更新",
-    "未成年人保护":    "实名/年龄验证 SDK 接入",
-    "广告营销合规":    "IDFA 授权 + 广告 SDK 合规",
-    "消费者保护":      "IAP 退款条款/订阅自动续费",
-    "经营合规":        "App Store/Play 经营资质核查",
-    "平台政策":        "IAP 分成及支付规则变动",
-    "内容监管":        "移动端内容分级/审核接入",
-    "PC & 跨平台合规": "跨端账号数据同步合规",
-}
-
-_PC_SHORT: dict = {
-    "数据隐私":        "PC SDK/云存储数据合规",
-    "玩法合规":        "Steam 概率公示/D2C 合规",
-    "未成年人保护":    "PC 端年龄验证实名接入",
-    "广告营销合规":    "PC 广告追踪 Cookie 合规",
-    "消费者保护":      "D2C 官网退款/订阅条款",
-    "经营合规":        "PC 官网经营资质/本地备案",
-    "平台政策":        "D2C 充值及 Launcher 策略",
-    "内容监管":        "PC 端内容分级证书更新",
-    "PC & 跨平台合规": "Launcher 权限/Anti-cheat 合规",
-}
-
-_DEFAULT_MOBILE = "App Store/IAP 相关合规排查"
-_DEFAULT_PC     = "PC Launcher/D2C 相关合规排查"
-
-
-def _short_platform_impact(category_l1: str) -> str:
-    """返回简洁的全平台合规影响一行文字。"""
-    mobile = _MOBILE_SHORT.get(category_l1, _DEFAULT_MOBILE)
-    pc     = _PC_SHORT.get(category_l1, _DEFAULT_PC)
-    return f"📱 {mobile} | 💻 {pc}"
-
 
 # ── 数据库查询 ────────────────────────────────────────────────────────
 
@@ -185,11 +148,14 @@ def build_daily_card(items: list, exec_summary: str = "") -> dict:
         ),
     })
 
-    # AI 综述（有则展示为引用块）
+    # AI 综述（有则展示为引用块；跳过空行避免飞书渲染孤立 >）
     if exec_summary:
+        quoted_lines = [
+            f"> {line}" for line in exec_summary.splitlines() if line.strip()
+        ]
         elements.append({
             "tag": "markdown",
-            "content": "\n".join(f"> {line}" for line in exec_summary.splitlines()),
+            "content": "\n".join(quoted_lines),
         })
 
     elements.append({"tag": "hr"})
@@ -222,23 +188,16 @@ def build_daily_card(items: list, exec_summary: str = "") -> dict:
             url      = item.get("source_url", "")
             title_md = f"[{title_zh}]({url})" if url else title_zh
 
-            # 机制变动：从 summary_zh 提取前 55 字（已含监管核心要求）
+            # 机制变动：从 summary_zh 提取前 75 字（已含监管核心要求）
             summary_zh = (item.get("summary_zh") or item.get("summary") or "").strip()
-            mechanism  = summary_zh[:55] + "…" if len(summary_zh) > 55 else summary_zh
-
-            # 全平台影响：分类驱动的简洁一行
-            platform_impact = _short_platform_impact(cat)
-
-            date_tag = item.get("date", "")
+            mechanism  = summary_zh[:75] + "…" if len(summary_zh) > 75 else summary_zh
 
             elements.append({
                 "tag": "markdown",
                 "content": (
                     f"{risk_em} **[{region}]** {status} · {cat_em} {cat}\n"
                     f"{title_md}\n"
-                    f"🔧 **机制变动**：{mechanism}\n"
-                    f"🌐 **全平台影响**：{platform_impact}\n"
-                    f"「{date_tag}」"
+                    f"🔧 **机制变动**：{mechanism}"
                 ),
             })
             total_shown += 1
