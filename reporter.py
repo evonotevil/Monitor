@@ -2,7 +2,7 @@
 报告生成器 - 支持终端表格、Markdown、HTML 输出
 HTML 报告支持:
   - 一级分类颜色区分
-  - 区域分组展示（亚太/中东/欧洲/北美/南美/日韩台/其他）
+  - 区域分组展示（北美/欧洲/日韩/港澳台/东南亚/中东/南美/大洋洲/其他）
   - 时间列展示立法动态发布时间
   - Lilith Legal 品牌标识
 """
@@ -149,10 +149,10 @@ _TEXT_GROUP_PATTERNS = [
                r'|gdpr\b|dsa\b|dma\b|ai act|asa\b)\b'
                r'|英国|德国|法国|荷兰|比利时|奥地利|意大利|西班牙|波兰|瑞典|挪威|欧盟|欧洲'
                r'|俄罗斯|乌克兰|白俄罗斯'),
-    # 港澳：香港/澳门（须在日韩台之前）
-    ("港澳",   r'(?i)\b(hong kong|hongkong|hksar\b|hk\b|pcpd\b|hkcma\b|hkma\b|sfc\b'
-               r'|macau|macao|dicj\b)\b'
-               r'|香港|澳门|港澳'),
+    # 港澳台：香港/澳门/台湾（须在日韩之前）
+    ("港澳台", r'(?i)\b(hong kong|hongkong|hksar\b|hk\b|pcpd\b|hkcma\b|hkma\b|sfc\b'
+               r'|macau|macao|dicj\b|taiwan[ese]?)\b'
+               r'|香港|澳门|台湾|港澳'),
     ("北美",   r'(?i)\b(usa\b|united states|america[n]?|ftc\b|federal trade commission'
                r'|fcc\b|federal communications commission'
                r'|doj\b|department of justice|cisa\b|sec\b'
@@ -165,25 +165,36 @@ _TEXT_GROUP_PATTERNS = [
                r'|mexico|mexican'
                r'|ccpa\b|cpra\b|coppa\b|kids act|kosa\b|shield act)\b'
                r'|美国|加拿大|纽约|加利福尼亚|德克萨斯|墨西哥|联邦贸易委员会|美国国会|白宫'),
-    # 亚太区：仅含东南亚十一国（与 utils.py _REGION_GROUP_MAP 定义一致）
-    ("亚太区", r'(?i)\b(vietnam[ese]?|việt|indonesi[a]?[n]?|kominfo\b|igac\b'
+    # 东南亚：十一国（与 utils.py _REGION_GROUP_MAP 定义一致）
+    ("东南亚", r'(?i)\b(vietnam[ese]?|việt|indonesi[a]?[n]?|kominfo\b|igac\b'
                r'|thailand|thai\b|pdpa\b'
                r'|philippine[s]?|malaysia[n]?|mcmc\b'
                r'|singapore|imda\b|brunei|myanmar|cambodia|laos|timor)\b'
                r'|越南|印度尼西亚|印尼|泰国|菲律宾|马来西亚|新加坡|缅甸|柬埔寨|文莱'),
-    ("日韩台", r'(?i)\b(japan[ese]?|korea[n]?|south korea|grac\b|kca\b|cero\b'
-               r'|nintendo\b|taiwan[ese]?)\b'
-               r'|台湾|韓[国國]?|日本|韩国|ゲーム|게임|확률형'),
-    # 其他：南美 / 非洲 / 南亚 / 大洋洲 / 中东（与 utils.py 一致）
-    ("其他",   r'(?i)\b(saudi|uae\b|united arab emirates|turkey|turkish|türkiye'
-               r'|nigeria[n]?|south africa'
-               r'|india[n]?|dpdpa\b|meity\b|pakistan|bangladesh'
-               r'|australia[n]?|new zealand|esafety\b|accc\b|oaic\b'
-               r'|brazil[ian]?|lgpd\b|argentina[n]?'
-               r'|chile[an]?|colombia[n]?)\b'
-               r'|沙特|阿联酋|土耳其|尼日利亚|南非'
-               r'|印度|巴基斯坦|孟加拉|澳大利亚|新西兰'
-               r'|巴西|阿根廷|智利|哥伦比亚'),
+    ("日韩",   r'(?i)\b(japan[ese]?|korea[n]?|south korea|grac\b|kca\b|cero\b'
+               r'|nintendo\b)\b'
+               r'|韓[国國]?|日本|韩国|ゲーム|게임|확률형'),
+    # 中东
+    ("中东",   r'(?i)\b(saudi|uae\b|united arab emirates|turkey|turkish|türkiye'
+               r'|iran[ian]?|iraq[i]?|kuwait[i]?|bahrain[i]?|qatar[i]?'
+               r'|oman[i]?|yem[ae]n[i]?|jordan[ian]?|lebanon|lebanese'
+               r'|israel[i]?|palestin[ian]?|syria[n]?)\b'
+               r'|沙特|阿联酋|土耳其|伊朗|伊拉克|科威特|巴林|卡塔尔|阿曼|也门'
+               r'|约旦|黎巴嫩|以色列|巴勒斯坦|叙利亚'),
+    # 南美
+    ("南美",   r'(?i)\b(brazil[ian]?|lgpd\b|argentina[n]?|chile[an]?|colombia[n]?'
+               r'|venezuela[n]?|peru[vian]?|ecuador[ian]?|bolivia[n]?'
+               r'|paraguay[an]?|uruguay[an]?|guyana|suriname)\b'
+               r'|巴西|阿根廷|智利|哥伦比亚|委内瑞拉|秘鲁|厄瓜多尔|玻利维亚'
+               r'|巴拉圭|乌拉圭|圭亚那|苏里南'),
+    # 大洋洲
+    ("大洋洲", r'(?i)\b(australia[n]?|new zealand|esafety\b|accc\b|oaic\b'
+               r'|papua|fiji[an]?|samoa[n]?|tonga[n]?|vanuatu)\b'
+               r'|澳大利亚|新西兰|巴布亚|斐济|萨摩亚|汤加'),
+    # 其他：非洲 / 中亚 / 南亚
+    ("其他",   r'(?i)\b(nigeria[n]?|south africa|kenya[n]?|ethiopia[n]?'
+               r'|india[n]?|dpdpa\b|meity\b|pakistan[i]?|bangladesh[i]?)\b'
+               r'|尼日利亚|南非|肯尼亚|埃塞俄比亚|印度|巴基斯坦|孟加拉'),
 ]
 
 
@@ -1810,7 +1821,7 @@ td {{ padding: 9px 12px; font-size: 12px; vertical-align: top; }}
   }});
 
   // 按预设顺序填充地区下拉
-  const groupOrder = ["北美","欧洲","日韩台","港澳","亚太区","其他"];
+  const groupOrder = ["北美","欧洲","日韩","港澳台","东南亚","中东","南美","大洋洲","其他"];
   const fGroup = document.getElementById('fGroup');
   groupOrder.forEach(g => {{
     if (groups.has(g)) {{
@@ -1890,7 +1901,7 @@ function sortTable(col) {{
 
   // 把分组 header 和对应数据行重新排列
   const groupRows = [...tbody.querySelectorAll('.group-row')];
-  const groupOrder = ["北美","欧洲","日韩台","港澳","亚太区","其他"];
+  const groupOrder = ["北美","欧洲","日韩","港澳台","东南亚","中东","南美","大洋洲","其他"];
   tbody.innerHTML = '';
 
   groupOrder.forEach(grp => {{
