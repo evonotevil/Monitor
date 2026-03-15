@@ -536,15 +536,7 @@ RSS_FEEDS = [
         "region": "北美",
         "tier": "official",
     },
-    {
-        # 美国联邦公报 — FTC 分类，覆盖 FTC 提交的正式法规文件
-        "name": "Federal Register (FTC)",
-        "url": "https://www.federalregister.gov/articles/search.rss?conditions[agencies][]=federal-trade-commission",
-        "lang": "en",
-        "type": "rss",
-        "region": "北美",
-        "tier": "official",
-    },
+    # Federal Register (FTC) — 403 Forbidden，已移除；FTC 动态改由 site:ftc.gov OFFICIAL_SITE_QUERIES 覆盖
     {
         # 英国政府官方 Atom — Ofcom 发布的游戏/在线安全动态 (ICO RSS 已失效改用此源)
         "name": "UK Gov (Ofcom/Gaming)",
@@ -565,20 +557,13 @@ RSS_FEEDS = [
     },
 
     # ── 法律情报 (Legal tier) ─────────────────────────────────────────
-    {
-        "name": "GDPR.eu News",
-        "url": "https://gdpr.eu/feed/",
-        "lang": "en",
-        "type": "rss",
-        "region": "欧洲",
-        "tier": "legal",
-    },
+    # GDPR.eu News — 持续超时，已移除
 
     # ── 更多官方来源 (Official tier) ──────────────────────────────────
     {
         # EDPB — 欧盟数据保护委员会官方新闻（GDPR 执法、跨境数据传输、标准合同条款）
         "name": "EDPB News",
-        "url": "https://www.edpb.europa.eu/news/news_en.rss",
+        "url": "https://www.edpb.europa.eu/rss.xml",
         "lang": "en",
         "type": "rss",
         "region": "欧洲",
