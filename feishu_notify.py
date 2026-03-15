@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-飞书机器人通知 — 每周合规简报卡片（决策参考版）
+飞书机器人通知 — 每周合规简报卡片
 
 必需环境变量:
     FEISHU_WEBHOOK_URL   飞书自定义机器人的 Webhook 地址
@@ -9,7 +9,6 @@
     REPORT_MOBILE_URL    移动端 HTML 周报 URL
     REPORT_PC_URL        PC 端 HTML 周报 URL
     REPORT_HTML_URL      HTML 简报 URL（兼容旧配置，指向移动端）
-    REPORT_PDF_URL       PDF 报告的公开访问/下载 URL
 
 本地调试:
     FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx \
@@ -19,170 +18,86 @@
 """
 
 import os
-import sqlite3
 import sys
-from datetime import datetime, timedelta
-from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "data" / "monitor.db"
-
-from utils import (
-    _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, _TIER_SORT, send_card,
-)
-from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
-
-
-# ── 数据库查询 ────────────────────────────────────────────────────────
-
-
-def get_weekly_data():
-    """
-    返回 (today, week_ago, total, by_cat, by_region_group, all_items)
-
-    all_items 为本周内 impact_score > 0、已有中文标题的条目列表，
-    已按 source_tier DESC → impact_score DESC 排序，供区域分组直接使用。
-    """
-    if not DB_PATH.exists():
-        print(f"⚠️  数据库不存在: {DB_PATH}")
-        return datetime.now(), datetime.now() - timedelta(days=7), 0, [], {}, []
-
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-
-    today    = datetime.now()
-    week_ago = today - timedelta(days=7)
-    since    = week_ago.strftime("%Y-%m-%d")
-
-    # ── 噪音门控：仅计 impact_score > 0 的条目 ──────────────────────
-    NOISE_GUARD = "COALESCE(impact_score, 1.0) > 0"
-
-    total = conn.execute(
-        f"SELECT COUNT(*) FROM legislation WHERE date >= ? AND {NOISE_GUARD}",
-        (since,),
-    ).fetchone()[0]
-
-    by_region_raw = conn.execute(
-        f"""SELECT region, COUNT(*) AS cnt
-            FROM legislation WHERE date >= ? AND {NOISE_GUARD}
-            GROUP BY region""",
-        (since,),
-    ).fetchall()
-
-    # 所有条目（用于综述生成 + 区域分组展示）
-    # title_zh 过滤：没有中文标题的条目不展示在卡片中
-    all_rows = conn.execute(
-        f"""SELECT title, title_zh, summary_zh, summary, region, status, category_l1,
-                   source_url, date,
-                   COALESCE(impact_score, 1.0) AS impact_score,
-                   COALESCE(source_name, '') AS source_name
-            FROM legislation
-            WHERE date >= ?
-              AND {NOISE_GUARD}
-              AND title_zh IS NOT NULL AND TRIM(title_zh) != ''
-            ORDER BY COALESCE(impact_score, 1.0) DESC""",
-        (since,),
-    ).fetchall()
-
-    conn.close()
-
-    by_region_group: dict = {}
-    for row in by_region_raw:
-        group = _get_region_group(row["region"])
-        by_region_group[group] = by_region_group.get(group, 0) + row["cnt"]
-
-    # ── 实时噪音门控（兜底 DB 中旧评分残留）──────────────────────────
-    # DB 中 impact_score 可能是旧版分类结果，用最新规则再过滤一次
-    def _is_noise(item: dict) -> bool:
-        text = " ".join(filter(None, [
-            item.get("title", ""),
-            item.get("title_zh", ""),
-            item.get("summary", ""),
-        ]))
-        return _is_hardware_noise(text) or _is_google_apple_non_core(text)
-
-    # ── 每条目补充 source_tier，排序：tier DESC → score DESC ──────────
-    items = []
-    for r in all_rows:
-        d = dict(r)
-        if _is_noise(d):
-            continue
-        d["_tier"] = _TIER_SORT.get(get_source_tier(d.get("source_name", "")), 1)
-        items.append(d)
-    items.sort(key=lambda x: (x["_tier"], float(x.get("impact_score", 1.0))), reverse=True)
-
-    return today, week_ago, total, by_region_group, items
-
-
-# ── 执行摘要（复用 HTML 报告同一 LLM 函数）───────────────────────────
-
-def _get_exec_summary(items: list) -> str:
-    """调用 translator.generate_executive_summary 获取 300 字综述；失败静默返回空。"""
-    try:
-        from translator import generate_executive_summary
-        return generate_executive_summary(items)
-    except Exception as e:
-        print(f"⚠️  综述生成失败（将跳过）: {e}")
-        return ""
+from utils import _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, send_card
 
 
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
 
-
 def build_card(
-    today: datetime,
-    week_ago: datetime,
-    total: int,
-    by_region_group: dict,
-    exec_summary: str,
-    html_url: str,
+    archived: list,
+    news: list,
+    active: list,
+    ai_summary: str,
     mobile_url: str = "",
-    pc_url: str = "",
+    pc_url: str    = "",
+    html_url: str  = "",
 ) -> dict:
-    # ── 日期范围文案 ─────────────────────────────────────────────────
-    date_range = (
-        f"{week_ago.strftime('%Y/%m/%d')} – {today.strftime('%Y/%m/%d')}"
-    )
-
-    # ── 区域分组统计行（按 _GROUP_ORDER 排序）──────────────────────
-    region_parts = []
-    for group in _GROUP_ORDER:
-        cnt = by_region_group.get(group, 0)
-        if cnt > 0:
-            emoji = _GROUP_EMOJI.get(group, "•")
-            region_parts.append(f"{emoji} {group} **{cnt}**")
-    region_line = "　".join(region_parts) if region_parts else "暂无数据"
-
-    # ── 组装卡片 elements ────────────────────────────────────────────
+    """
+    卡片结构：
+    ① 上周已归档完成（条数 + 地区标签）
+    ② AI 摘要引用块（关键词 + 风险提示）
+    ③ 本周仍在跟进（条数 + 待研判/处理中拆分）
+    ④ 按钮行（移动端 / PC 端周报）
+    """
     elements: list = []
 
-    # 日期 + 总量
+    # ── ① 上周已归档完成 ─────────────────────────────────────────────
+    n_archived = len(archived)
+    # 收集去重后的地区标签（保持 _GROUP_ORDER 顺序）
+    seen_groups: dict = {}
+    for item in archived:
+        group = _get_region_group(item.get("region", ""))
+        if group not in seen_groups:
+            seen_groups[group] = f"{_GROUP_EMOJI.get(group, '🌐')} {group}"
+    # 按标准顺序排列
+    region_tags = "　".join(
+        seen_groups[g] for g in _GROUP_ORDER if g in seen_groups
+    ) or "—"
+
     elements.append({
         "tag": "markdown",
-        "content": f"📅 **上周合规动态回顾** | {date_range}\n共监测到 **{total}** 条合规动态",
+        "content": (
+            f"✅ **上周已归档完成 · {n_archived} 条**\n"
+            f"{region_tags}"
+        ),
     })
 
-    # 区域分布
-    elements.append({
-        "tag": "markdown",
-        "content": f"**🗺️ 按地区**\n{region_line}",
-    })
-
-    # 引用块：综述（跳过空行，避免飞书渲染出孤立的 >）
-    if exec_summary:
+    # ── ② AI 摘要（A+B：关键词 + 风险提示）──────────────────────────
+    if ai_summary:
         elements.append({"tag": "hr"})
-        quoted_lines = [
-            f"> {line}" for line in exec_summary.splitlines() if line.strip()
-        ]
-        elements.append({
-            "tag": "markdown",
-            "content": "\n".join(quoted_lines),
-        })
+        quoted = "\n".join(
+            f"> {line}" for line in ai_summary.splitlines() if line.strip()
+        )
+        elements.append({"tag": "markdown", "content": quoted})
 
-    # ── 底部按钮 ─────────────────────────────────────────────────────
+    # ── ③ 本周仍在跟进 ───────────────────────────────────────────────
+    n_active     = len(active)
+    n_pending    = sum(1 for i in active if "待研判" in (i.get("bitable_status") or ""))
+    n_processing = n_active - n_pending
+
+    followup_line = ""
+    parts = []
+    if n_pending:
+        parts.append(f"👤 待研判 {n_pending} 条")
+    if n_processing:
+        parts.append(f"🏃 处理中 {n_processing} 条")
+    if parts:
+        followup_line = "　".join(parts)
+
     elements.append({"tag": "hr"})
+    elements.append({
+        "tag": "markdown",
+        "content": (
+            f"🎯 **本周仍在跟进 · {n_active} 条**"
+            + (f"\n{followup_line}" if followup_line else "")
+        ),
+    })
 
+    # ── ④ 按钮行 ─────────────────────────────────────────────────────
+    elements.append({"tag": "hr"})
     actions = []
-    # Prefer explicit mobile/PC URLs; fall back to legacy html_url
     effective_mobile = mobile_url or html_url
     if effective_mobile:
         actions.append({
@@ -204,7 +119,7 @@ def build_card(
     return {
         "config": {"wide_screen_mode": True},
         "header": {
-            "template": "red",
+            "template": "blue",
             "title": {
                 "tag": "plain_text",
                 "content": "🌍 Lilith Legal · 全球游戏合规周报",
@@ -219,37 +134,42 @@ def build_card(
 def main():
     webhook_url = os.environ.get("FEISHU_WEBHOOK_URL", "")
     mobile_url  = os.environ.get("REPORT_MOBILE_URL", "") or os.environ.get("MOBILE_URL", "")
-    pc_url      = os.environ.get("REPORT_PC_URL", "") or os.environ.get("PC_URL", "")
+    pc_url      = os.environ.get("REPORT_PC_URL", "")    or os.environ.get("PC_URL", "")
     html_url    = os.environ.get("REPORT_HTML_URL", "")
 
     if not webhook_url:
         print("❌ 未设置 FEISHU_WEBHOOK_URL 环境变量")
         sys.exit(1)
 
-    today, week_ago, total, by_region_group, all_items = get_weekly_data()
-    print(f"本周数据: {total} 条（噪音过滤后），区域分布: {by_region_group}，展示条目: {len(all_items)}")
+    # ── 从 Bitable 读取已审核条目，作为唯一数据源 ────────────────────
+    from feishu_bitable import fetch_valid_records_from_bitable
+    from reporter import _split_three_ways
 
-    # 从 Bitable 读取团队已审核条目，作为综述数据源
-    bitable_items: list = []
     try:
-        from feishu_bitable import fetch_valid_records_from_bitable
         bitable_items = fetch_valid_records_from_bitable(days=7)
         print(f"Bitable 已审核条目: {len(bitable_items)} 条")
     except Exception as e:
-        print(f"⚠️  获取 Bitable 条目失败，综述将回退至 DB 数据: {e}")
+        print(f"❌ 获取 Bitable 条目失败: {e}")
+        bitable_items = []
 
-    # 综述生成：优先用 Bitable 已审核数据，无则回退 DB 全量
-    summary_source = bitable_items if bitable_items else all_items
-    exec_summary = _get_exec_summary(summary_source)
-    if exec_summary:
-        print(f"综述生成成功，{len(exec_summary)} 字")
-    else:
-        print("综述生成跳过（无 API Key 或调用失败）")
+    archived, news, active = _split_three_ways(bitable_items)
+    print(f"三分区：归档 {len(archived)} 条 / 动态 {len(news)} 条 / 跟进 {len(active)} 条")
+
+    # ── AI 卡片摘要（基于行业动态类条目）────────────────────────────
+    ai_summary = ""
+    try:
+        from translator import generate_weekly_card_summary
+        ai_summary = generate_weekly_card_summary(news)
+        if ai_summary:
+            print(f"AI 摘要生成成功，{len(ai_summary)} 字")
+        else:
+            print("AI 摘要生成跳过（无 API Key 或无新闻条目）")
+    except Exception as e:
+        print(f"⚠️  AI 摘要生成失败（跳过）: {e}")
 
     card = build_card(
-        today, week_ago, total, by_region_group,
-        exec_summary, html_url,
-        mobile_url=mobile_url, pc_url=pc_url,
+        archived, news, active, ai_summary,
+        mobile_url=mobile_url, pc_url=pc_url, html_url=html_url,
     )
     send_card(webhook_url, card)
 

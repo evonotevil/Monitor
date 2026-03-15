@@ -997,6 +997,69 @@ def generate_executive_summary(items: list) -> str:
         return ""
 
 
+# ── 周报飞书卡片摘要（A+B 关键词 + 风险提示，100 字以内）─────────────
+
+def generate_weekly_card_summary(news_items: list) -> str:
+    """
+    针对飞书周报推送卡片生成 A+B 式简短摘要，基于「行业动态」类条目。
+
+    输出格式（严格两行）：
+      📡 本周关键词：XXX · XXX · XXX
+      ⚠️ 建议关注：XXXXXX（不超过 80 字）
+
+    失败时返回空字符串，由调用方决定是否降级。
+    """
+    if not news_items:
+        return ""
+    if not (_HAS_AI and _AI_CLIENT):
+        return ""
+
+    sorted_items = sorted(news_items, key=lambda x: float(x.get("impact_score", 0)), reverse=True)
+
+    material_lines = []
+    for it in sorted_items[:20]:   # 最多取 20 条，避免 token 过长
+        title   = (it.get("title_zh") or it.get("title") or "").strip()
+        summary = (it.get("summary_zh") or "").strip()
+        region  = (it.get("region") or "").strip()
+        cat     = (it.get("category_l1") or "").strip()
+        if title:
+            line = f"[{region}/{cat}] {title}"
+            if summary:
+                line += f"：{summary[:80]}"
+            material_lines.append(line)
+
+    if not material_lines:
+        return ""
+
+    material = "\n".join(material_lines)
+    user_msg = (
+        f"以下是本周经团队初筛的全球游戏行业合规资讯（共 {len(news_items)} 条）。\n\n"
+        f"请输出严格两行内容，总字数不超过 100 字：\n"
+        f"第一行：「📡 本周关键词：」后跟 3-4 个主题词，用「·」分隔\n"
+        f"第二行：「⚠️ 建议关注：」后针对中资出海手游公司，指出 1-2 条最值得跟进的\n"
+        f"风险或动作点，直接说影响和建议，不要泛泛而谈。\n\n"
+        f"只输出这两行，不要加任何其他内容。\n\n"
+        f"资讯素材：\n{material}"
+    )
+
+    try:
+        resp = _AI_CLIENT.chat.completions.create(
+            model=_LLM_MODEL,
+            max_tokens=200,
+            extra_body=_LLM_EXTRA_BODY,
+            messages=[
+                {"role": "system", "content": "你是资深游戏行业合规分析师，专注中资出海游戏公司监管风险研究。"},
+                {"role": "user",   "content": user_msg},
+            ],
+        )
+        text = resp.choices[0].message.content.strip()
+        logger.info(f"[周报卡片摘要] 生成成功，{len(text)} 字")
+        return text
+    except Exception as e:
+        logger.warning(f"[周报卡片摘要] LLM 生成失败: {e}")
+        return ""
+
+
 # ── 日报综述生成（150 字以内）────────────────────────────────────────
 
 def generate_daily_summary(items: list) -> str:
