@@ -720,8 +720,13 @@ def _sort_group(group_items: list) -> list:
 
 # ── 工作流状态分区常量 ─────────────────────────────────────────────────
 # bitable_status 属于 Bitable 工作流状态，不是法规生命周期状态
-_ACTION_STATUSES = {"👤 待研判", "🏃 处理/跟进中", "✅ 已合规/归档"}
-_NEWS_STATUSES   = {"📰 行业动态"}
+# 同时收录带 emoji 前缀和不带 emoji 的变体，兼容 Bitable 选项名不一致的情况
+_ACTION_STATUSES = {
+    "👤 待研判", "待研判",
+    "🏃 处理/跟进中", "处理/跟进中",
+    "✅ 已合规/归档", "已合规/归档",
+}
+_NEWS_STATUSES   = {"📰 行业动态", "行业动态"}
 
 
 def _split_by_workflow_status(items: List[dict]) -> tuple:
