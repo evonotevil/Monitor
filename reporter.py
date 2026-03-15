@@ -718,66 +718,64 @@ def _sort_group(group_items: list) -> list:
     )
 
 
-# ── 工作流状态分区常量 ─────────────────────────────────────────────────
-# bitable_status 属于 Bitable 工作流状态，不是法规生命周期状态
+# ── 工作流状态三分区逻辑 ──────────────────────────────────────────────
 # 用关键词子串匹配，兼容带/不带 emoji、不同斜杠字符等 Bitable 存储差异
-_ACTION_KEYWORDS = ("待研判", "处理", "跟进中", "归档")
-_NEWS_KEYWORDS   = ("行业动态",)
 
-
-def _is_action_status(ws: str) -> bool:
-    """判断一条 bitable_status 是否属于需跟进的合规任务区块。"""
-    if not ws:
-        return False
-    return any(kw in ws for kw in _ACTION_KEYWORDS)
-
-
-def _split_by_workflow_status(items: List[dict]) -> tuple:
+def _split_three_ways(items: List[dict]) -> tuple:
     """
-    按 bitable_status 将条目分为两类：
-    - action_items：需要跟进的合规任务（含「待研判」/「处理/跟进中」/「已合规/归档」）
-    - news_items：仅供阅读的合规资讯（含「行业动态」）
-    无 bitable_status 的条目（SQLite 回退路径）归入 news_items。
+    按 bitable_status 将条目分为三类：
+    - archived : 已合规/归档（上周已完成任务）
+    - news     : 行业动态（全球合规动态汇总，仅供阅读）
+    - active   : 待研判/处理/跟进中（本周跟进任务）
+    未知状态归入 active。
     """
-    action_items: List[dict] = []
-    news_items:   List[dict] = []
+    archived: List[dict] = []
+    news:     List[dict] = []
+    active:   List[dict] = []
     for item in items:
         ws = item.get("bitable_status", "")
-        if _is_action_status(ws):
-            action_items.append(item)
+        if "归档" in ws:
+            archived.append(item)
+        elif "行业动态" in ws:
+            news.append(item)
         else:
-            news_items.append(item)
-    return action_items, news_items
+            active.append(item)
+    return archived, news, active
 
 
 def _prepare_report_data(items: List[dict]) -> tuple:
     """
-    Dedup → filter → split by workflow status → exec summary → group by region.
-    Returns (action_items, news_items, exec_summary, action_grouped, news_grouped).
+    Dedup → filter → split into three zones → exec summary → group by region.
+    Returns (archived, news, active, exec_summary,
+             archived_grouped, news_grouped, active_grouped).
     """
     items = _dedup_for_display(items)
     items = [i for i in items if float(i.get("impact_score", 1.0)) > 0]
 
-    action_items, news_items = _split_by_workflow_status(items)
+    archived, news, active = _split_three_ways(items)
 
-    # 综述以 action_items 为主（有跟进价值的内容），为空则退化到全量
+    # 综述以 active + archived 为主（有跟进价值的内容），为空则退化到全量
     exec_summary = ""
-    summary_src  = action_items if action_items else items
+    summary_src  = (active + archived) if (active or archived) else items
     try:
         from translator import generate_executive_summary
         exec_summary = generate_executive_summary(summary_src)
     except Exception:
         pass
 
-    action_grouped: dict = defaultdict(list)
-    for item in action_items:
-        action_grouped[_resolve_group(item)].append(item)
+    archived_grouped: dict = defaultdict(list)
+    for item in archived:
+        archived_grouped[_resolve_group(item)].append(item)
 
     news_grouped: dict = defaultdict(list)
-    for item in news_items:
+    for item in news:
         news_grouped[_resolve_group(item)].append(item)
 
-    return action_items, news_items, exec_summary, action_grouped, news_grouped
+    active_grouped: dict = defaultdict(list)
+    for item in active:
+        active_grouped[_resolve_group(item)].append(item)
+
+    return archived, news, active, exec_summary, archived_grouped, news_grouped, active_grouped
 
 
 # ── CSS / JS constants (plain strings, no f-string brace escaping needed) ─────
@@ -909,6 +907,11 @@ _MOBILE_CSS = _FONT_FACE + """
         .log-bp-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-meta); }
         .log-bp-value { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
         .log-conclusion { margin-top: 8px; font-size: 11px; line-height: 1.7; color: var(--text-secondary); padding: 8px 12px; background: rgba(99,102,241,0.06); border-radius: 6px; border: 1px solid rgba(99,102,241,0.14); border-left: 3px solid #6366F1; }
+        .log-btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .log-btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 11px; border-radius: 6px; font-size: 11px; font-weight: 500; text-decoration: none; transition: opacity 0.15s; }
+        .log-btn:hover { opacity: 0.8; }
+        .log-btn-doc     { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+        .log-btn-bitable { background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; }
 """
 
 _MOBILE_JS = """
@@ -1044,8 +1047,10 @@ _ICON_DOC = '<svg class="icon-doc" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 
 _ICON_DL   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
 
 
-def _render_region_sections_mobile(grouped: dict, is_action: bool) -> str:
-    """渲染一个区块内按地区分组的卡片列表（供 mobile action / news 两区块复用）。"""
+def _render_region_sections_mobile(grouped: dict, zone_type: str) -> str:
+    """渲染一个区块内按地区分组的卡片列表（供 mobile 三分区复用）。
+    zone_type: "archived" | "news" | "active"
+    """
     sections_html = ""
     for group in _GROUP_ORDER:
         group_items = grouped.get(group, [])
@@ -1071,11 +1076,14 @@ def _render_region_sections_mobile(grouped: dict, is_action: bool) -> str:
             cat_status = f"{cat}{' · ' + status if status else ''}"
             title_tag  = (f'<a href="{url}" target="_blank" rel="noopener">{zh}</a>' if url else zh)
 
-            # 跟进 BP 和法务结论（仅 action 区块）
             extra_html = ""
-            if is_action:
-                assignee   = html_mod.escape((item.get("assignee") or "").strip())
-                conclusion = html_mod.escape((item.get("legal_conclusion") or "").strip())
+            if zone_type == "archived":
+                # 归档区：跟进 BP + 核心结论 + 专项合规文档按钮 + 跳转到 Bitable 卡片按钮
+                assignee    = html_mod.escape((item.get("assignee") or "").strip())
+                conclusion  = html_mod.escape((item.get("legal_conclusion") or "").strip())
+                doc_url     = html_mod.escape((item.get("doc_url") or "").strip())
+                doc_text    = html_mod.escape((item.get("doc_text") or "专项合规文档").strip())
+                bitable_url = html_mod.escape((item.get("bitable_url") or "").strip())
                 if assignee:
                     extra_html += (
                         f'<div class="log-bp-row">'
@@ -1085,6 +1093,30 @@ def _render_region_sections_mobile(grouped: dict, is_action: bool) -> str:
                     )
                 if conclusion:
                     extra_html += f'<div class="log-conclusion">{conclusion}</div>'
+                buttons = ""
+                if doc_url:
+                    buttons += (
+                        f'<a class="log-btn log-btn-doc" href="{doc_url}" '
+                        f'target="_blank" rel="noopener">📄 {doc_text}</a>'
+                    )
+                if bitable_url:
+                    buttons += (
+                        f'<a class="log-btn log-btn-bitable" href="{bitable_url}" '
+                        f'target="_blank" rel="noopener">↗ 查看卡片</a>'
+                    )
+                if buttons:
+                    extra_html += f'<div class="log-btn-row">{buttons}</div>'
+            elif zone_type == "active":
+                # 跟进任务区：只展示跟进 BP
+                assignee = html_mod.escape((item.get("assignee") or "").strip())
+                if assignee:
+                    extra_html += (
+                        f'<div class="log-bp-row">'
+                        f'<span class="log-bp-label">跟进</span>'
+                        f'<span class="log-bp-value">{assignee}</span>'
+                        f'</div>'
+                    )
+            # news 区：不展示额外信息
 
             items_html += (
                 f'<article class="log-item" data-accent="{accent}">'
@@ -1112,18 +1144,22 @@ def _render_region_sections_mobile(grouped: dict, is_action: bool) -> str:
     return sections_html
 
 
-def _render_mobile_html(action_items: List[dict], news_items: List[dict],
+def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dict],
                         exec_summary: str,
-                        action_grouped: dict, news_grouped: dict,
+                        archived_grouped: dict, news_grouped: dict, active_grouped: dict,
                         period_label: str = "") -> str:
     logo_html  = _get_logo_html()
     week_label = _week_cn(period_label) if "-W" in period_label else period_label
-    all_items  = action_items + news_items
+    all_items  = archived + news + active
     date_range = _date_range_str(all_items)
     total      = len(all_items)
-    n_action   = len(action_items)
-    n_news     = len(news_items)
-    n_regions  = len({g for g in _GROUP_ORDER if action_grouped.get(g) or news_grouped.get(g)})
+    n_archived = len(archived)
+    n_news     = len(news)
+    n_active   = len(active)
+    n_regions  = len({
+        g for g in _GROUP_ORDER
+        if archived_grouped.get(g) or news_grouped.get(g) or active_grouped.get(g)
+    })
     period_esc = html_mod.escape(period_label)
     week_esc   = html_mod.escape(week_label)
     range_esc  = html_mod.escape(date_range)
@@ -1131,39 +1167,42 @@ def _render_mobile_html(action_items: List[dict], news_items: List[dict],
     exec_html = ""
 
     # 过滤按钮（只显示有数据的地区）
-    active_regions = [g for g in _GROUP_ORDER if action_grouped.get(g) or news_grouped.get(g)]
+    present_regions = [
+        g for g in _GROUP_ORDER
+        if archived_grouped.get(g) or news_grouped.get(g) or active_grouped.get(g)
+    ]
     filter_btns = ''.join(
         f'<button class="filter-btn" data-filter="{html_mod.escape(g)}" '
         f'onclick="filterRegion(\'{html_mod.escape(g)}\', this)">{html_mod.escape(g)}</button>'
-        for g in active_regions
+        for g in present_regions
     )
 
-    # ── 区块一：本周重点合规工作 ──
-    if action_items:
-        action_sections = _render_region_sections_mobile(action_grouped, is_action=True)
-        action_zone = (
+    # ── 区块一：上周已完成任务 ──
+    if archived:
+        archived_sections = _render_region_sections_mobile(archived_grouped, zone_type="archived")
+        archived_zone = (
             f'<div class="zone-divider zone-divider-action">'
             f'<div class="zone-inner">'
-            f'<div class="zone-icon">🎯</div>'
+            f'<div class="zone-icon">🎉</div>'
             f'<div class="zone-info">'
-            f'<div class="zone-title-action">本周重点合规工作</div>'
+            f'<div class="zone-title-action">上周已完成任务</div>'
             f'</div>'
-            f'<div class="zone-count-action">{n_action} 条</div>'
+            f'<div class="zone-count-action">{n_archived} 条</div>'
             f'</div></div>\n'
-            f'{action_sections}'
+            f'{archived_sections}'
         )
     else:
-        action_zone = ""
+        archived_zone = ""
 
-    # ── 区块二：全球合规动态 ──
-    if news_items:
-        news_sections = _render_region_sections_mobile(news_grouped, is_action=False)
+    # ── 区块二：上周全球合规动态汇总 ──
+    if news:
+        news_sections = _render_region_sections_mobile(news_grouped, zone_type="news")
         news_zone = (
             f'<div class="zone-divider zone-divider-news">'
             f'<div class="zone-inner">'
             f'<div class="zone-icon">🌏</div>'
             f'<div class="zone-info">'
-            f'<div class="zone-title-news">全球合规动态</div>'
+            f'<div class="zone-title-news">上周全球合规动态汇总</div>'
             f'</div>'
             f'<div class="zone-count-news">{n_news} 条</div>'
             f'</div></div>\n'
@@ -1171,6 +1210,23 @@ def _render_mobile_html(action_items: List[dict], news_items: List[dict],
         )
     else:
         news_zone = ""
+
+    # ── 区块三：本周跟进任务 ──
+    if active:
+        active_sections = _render_region_sections_mobile(active_grouped, zone_type="active")
+        active_zone = (
+            f'<div class="zone-divider zone-divider-action">'
+            f'<div class="zone-inner">'
+            f'<div class="zone-icon">🎯</div>'
+            f'<div class="zone-info">'
+            f'<div class="zone-title-action">本周跟进任务</div>'
+            f'</div>'
+            f'<div class="zone-count-action">{n_active} 条</div>'
+            f'</div></div>\n'
+            f'{active_sections}'
+        )
+    else:
+        active_zone = ""
 
     return (
         f'<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n'
@@ -1194,8 +1250,9 @@ def _render_mobile_html(action_items: List[dict], news_items: List[dict],
         f'<button class="filter-btn active" data-filter="all" onclick="filterRegion(\'all\', this)">全部</button>'
         f'{filter_btns}'
         f'</div>\n'
-        f'{action_zone}'
+        f'{archived_zone}'
         f'{news_zone}'
+        f'{active_zone}'
         f'<div class="page-footer"><div class="page-footer-text">{period_esc} · LILITH LEGAL</div></div>\n'
         f'</main></div>\n'
         f'<script>{_MOBILE_JS}</script>\n'
@@ -1278,26 +1335,14 @@ def _render_region_sections_pc(grouped: dict, is_action: bool) -> str:
     return sections_html
 
 
-def _render_pc_html(action_items: List[dict], news_items: List[dict],
+def _render_pc_html(archived: List[dict], news: List[dict], active: List[dict],
                     exec_summary: str,
-                    action_grouped: dict, news_grouped: dict,
+                    archived_grouped: dict, news_grouped: dict, active_grouped: dict,
                     period_label: str = "") -> str:
-    logo_html  = _get_logo_html()
-    week_label = _week_cn(period_label) if "-W" in period_label else period_label
-    all_items  = action_items + news_items
-    date_range = _date_range_str(all_items)
-    total      = len(all_items)
-    n_action   = len(action_items)
-    n_news     = len(news_items)
-    n_regions  = len({g for g in _GROUP_ORDER if action_grouped.get(g) or news_grouped.get(g)})
-    period_esc = html_mod.escape(period_label)
-    week_esc   = html_mod.escape(week_label)
-    range_esc  = html_mod.escape(date_range)
-
     # PC 端复用 mobile 渲染，仅注入更宽的容器尺寸
     mobile_html = _render_mobile_html(
-        action_items, news_items, exec_summary,
-        action_grouped, news_grouped, period_label
+        archived, news, active, exec_summary,
+        archived_grouped, news_grouped, active_grouped, period_label
     )
     pc_override = (
         "<style>"
@@ -1931,12 +1976,18 @@ def save_html(items: List[dict], period_label: str = "") -> tuple:
     ensure_output_dir()
 
     # Process data once (dedup, filter, split, exec summary, grouping)
-    action_items, news_items, exec_summary, action_grouped, news_grouped = _prepare_report_data(items)
+    archived, news, active, exec_summary, archived_grouped, news_grouped, active_grouped = (
+        _prepare_report_data(items)
+    )
 
-    mobile_html = _render_mobile_html(action_items, news_items, exec_summary,
-                                      action_grouped, news_grouped, period_label)
-    pc_html     = _render_pc_html(action_items, news_items, exec_summary,
-                                  action_grouped, news_grouped, period_label)
+    mobile_html = _render_mobile_html(
+        archived, news, active, exec_summary,
+        archived_grouped, news_grouped, active_grouped, period_label
+    )
+    pc_html = _render_pc_html(
+        archived, news, active, exec_summary,
+        archived_grouped, news_grouped, active_grouped, period_label
+    )
 
     mobile_path = os.path.join(OUTPUT_DIR, "latest-mobile.html")
     pc_path     = os.path.join(OUTPUT_DIR, "latest-pc.html")

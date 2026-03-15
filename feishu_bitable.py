@@ -323,7 +323,11 @@ def _ms_to_date(ms) -> str:
         return ""
 
 
-def _map_bitable_record(fields: dict) -> dict:
+def _map_bitable_record(
+    fields: dict,
+    record_id: str = "",
+    bitable_url: str = "",
+) -> dict:
     """
     将飞书多维表格字段值映射为 reporter.py 所需的条目字典格式。
 
@@ -331,8 +335,10 @@ def _map_bitable_record(fields: dict) -> dict:
     - 合规类别  ：多选数组 ["数据隐私", ...]  → 取第一项
     - 原始链接  ：超链接对象 {"text": ..., "link": "https://..."} → 取 link
     - 发布日期  ：毫秒时间戳 → YYYY-MM-DD
+    - 归档日期  ：毫秒时间戳 → YYYY-MM-DD（由飞书自动化在拖入归档时写入）
     - 国家/地区 ：单选字符串，已是分组标签（北美/欧洲/日韩/港澳台/东南亚/中东/南美/大洋洲/其他）
     - 💡 核心结论：若存在则优先作为 summary_zh；否则使用「摘要」字段
+    - 专项合规文档：超链接字段，仅归档条目展示
     """
     # ── 合规类别（多选字段）────────────────────────────────────────────
     cat_raw  = fields.get("合规类别", "")
@@ -349,6 +355,14 @@ def _map_bitable_record(fields: dict) -> dict:
     date_raw = fields.get("发布日期")
     date_str = _ms_to_date(date_raw) if isinstance(date_raw, (int, float)) else str(date_raw or "")
 
+    # ── 归档日期（毫秒时间戳，由飞书自动化写入）────────────────────────
+    archive_date_raw = fields.get("归档日期")
+    archive_date = (
+        _ms_to_date(archive_date_raw)
+        if isinstance(archive_date_raw, (int, float))
+        else str(archive_date_raw or "")
+    )
+
     # ── 摘要：优先「💡 核心结论」，否则「摘要」──────────────────────────
     core     = str(fields.get("💡 核心结论") or "").strip()
     abstract = str(fields.get("摘要") or "").strip()
@@ -357,7 +371,7 @@ def _map_bitable_record(fields: dict) -> dict:
     # ── 国家/地区：直接传 Bitable 显示标签，_get_region_group() 已可识别所有分组名 ──
     region = str(fields.get("国家/地区") or "其他")
 
-    # ── 工作流状态（供 reporter 按 Action / News 分区）──────────────────
+    # ── 工作流状态（供 reporter 三分区）────────────────────────────────
     bitable_status = str(fields.get("处理状态") or "").strip()
 
     # ── 跟进 BP（可能为人员字段 list，也可能为文本）─────────────────────
@@ -373,6 +387,15 @@ def _map_bitable_record(fields: dict) -> dict:
     # ── 法务结论（独立于「摘要」和「💡 核心结论」）──────────────────────
     legal_conclusion = str(fields.get("法务结论") or fields.get("💡 法务结论") or "").strip()
 
+    # ── 专项合规文档（超链接字段，仅归档条目展示）──────────────────────
+    doc_raw = fields.get("专项合规文档", "")
+    if isinstance(doc_raw, dict):
+        doc_url  = doc_raw.get("link") or doc_raw.get("url") or ""
+        doc_text = doc_raw.get("text") or "专项合规文档"
+    else:
+        doc_url  = str(doc_raw).strip() if doc_raw else ""
+        doc_text = "专项合规文档" if doc_url else ""
+
     return {
         "title":            "",             # Bitable 无原文标题字段（英文）
         "title_zh":         str(fields.get("动态标题") or "").strip(),
@@ -380,12 +403,17 @@ def _map_bitable_record(fields: dict) -> dict:
         "summary":          "",
         "region":           region,
         "status":           "",             # 法规生命周期状态（Bitable 未单独维护，留空）
-        "bitable_status":   bitable_status, # 工作流状态：用于 Action / News 分区
+        "bitable_status":   bitable_status, # 工作流状态：用于三分区
         "assignee":         assignee,       # 跟进 BP
         "legal_conclusion": legal_conclusion,
         "category_l1":      category,
         "source_url":       source_url,
         "date":             date_str,
+        "archive_date":     archive_date,   # 归档日期（用于归档条目的时间窗口过滤）
+        "record_id":        record_id,      # Bitable 记录 ID
+        "bitable_url":      bitable_url,    # Bitable 记录深链（跳转到卡片按钮）
+        "doc_url":          doc_url,        # 专项合规文档链接
+        "doc_text":         doc_text,       # 专项合规文档显示名
         "impact_score":     5.0,            # 人工筛选后统一中等优先级，reporter 仍可正常排序
         "source_name":      str(fields.get("信源名称") or "").strip(),
     }
@@ -431,6 +459,8 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
 
         list_url = _LIST_URL.format(app_token=app_token, table_id=table_id)
         headers  = {"Authorization": f"Bearer {token}"}
+        # 拼接 Bitable 记录深链前缀（跳转到卡片按钮用）
+        bitable_record_base = f"https://feishu.cn/base/{app_token}?table={table_id}&record="
 
         # ── 分页拉取全量记录 ────────────────────────────────────────────
         all_records: list = []
@@ -476,7 +506,8 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
         skipped_date    = 0
 
         for rec in all_records:
-            fields = rec.get("fields", {})
+            fields    = rec.get("fields", {})
+            record_id = rec.get("record_id", "")
 
             # 过滤工作流状态
             status_val = str(fields.get("处理状态", "")).strip()
@@ -484,7 +515,8 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
                 skipped_status += 1
                 continue
 
-            mapped = _map_bitable_record(fields)
+            bitable_url = (bitable_record_base + record_id) if record_id else ""
+            mapped = _map_bitable_record(fields, record_id=record_id, bitable_url=bitable_url)
 
             # 过滤空记录（既无标题也无链接）
             if not mapped["title_zh"] and not mapped["source_url"]:
@@ -492,9 +524,15 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
                 continue
 
             # 按日期过滤（仅当指定了 days 时）
-            if date_cutoff and mapped["date"] and mapped["date"] < date_cutoff:
-                skipped_date += 1
-                continue
+            # 归档条目用「归档日期」，其余条目用「发布日期」
+            if date_cutoff:
+                if "归档" in status_val:
+                    ref_date = mapped["archive_date"] or mapped["date"]
+                else:
+                    ref_date = mapped["date"]
+                if ref_date and ref_date < date_cutoff:
+                    skipped_date += 1
+                    continue
 
             valid.append(mapped)
 
