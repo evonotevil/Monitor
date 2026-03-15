@@ -214,10 +214,13 @@ def _filter_valid_dates(items):
     """
     current_year = datetime.now().year
     valid_years = {str(current_year), str(current_year - 1)}
-    valid = [item for item in items if item.date[:4] in valid_years]
+    valid = [item for item in items if (item.date or "")[:4] in valid_years]
     removed = len(items) - len(valid)
     if removed:
-        logger.info(f"[日期过滤] 移除 {removed} 条日期不在 2025-2026 的条目")
+        logger.info(
+            f"[日期过滤] 移除 {removed} 条日期不在 "
+            f"{current_year - 1}-{current_year} 的条目"
+        )
     return valid
 
 
