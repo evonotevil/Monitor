@@ -720,27 +720,30 @@ def _sort_group(group_items: list) -> list:
 
 # ── 工作流状态分区常量 ─────────────────────────────────────────────────
 # bitable_status 属于 Bitable 工作流状态，不是法规生命周期状态
-# 同时收录带 emoji 前缀和不带 emoji 的变体，兼容 Bitable 选项名不一致的情况
-_ACTION_STATUSES = {
-    "👤 待研判", "待研判",
-    "🏃 处理/跟进中", "处理/跟进中",
-    "✅ 已合规/归档", "已合规/归档",
-}
-_NEWS_STATUSES   = {"📰 行业动态", "行业动态"}
+# 用关键词子串匹配，兼容带/不带 emoji、不同斜杠字符等 Bitable 存储差异
+_ACTION_KEYWORDS = ("待研判", "处理", "跟进中", "归档")
+_NEWS_KEYWORDS   = ("行业动态",)
+
+
+def _is_action_status(ws: str) -> bool:
+    """判断一条 bitable_status 是否属于需跟进的合规任务区块。"""
+    if not ws:
+        return False
+    return any(kw in ws for kw in _ACTION_KEYWORDS)
 
 
 def _split_by_workflow_status(items: List[dict]) -> tuple:
     """
     按 bitable_status 将条目分为两类：
-    - action_items：需要跟进的合规任务（待研判 / 处理中 / 已归档）
-    - news_items：仅供阅读的合规资讯（行业动态）
+    - action_items：需要跟进的合规任务（含「待研判」/「处理/跟进中」/「已合规/归档」）
+    - news_items：仅供阅读的合规资讯（含「行业动态」）
     无 bitable_status 的条目（SQLite 回退路径）归入 news_items。
     """
     action_items: List[dict] = []
     news_items:   List[dict] = []
     for item in items:
         ws = item.get("bitable_status", "")
-        if ws in _ACTION_STATUSES:
+        if _is_action_status(ws):
             action_items.append(item)
         else:
             news_items.append(item)
