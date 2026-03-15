@@ -119,7 +119,7 @@ def build_card(
     return {
         "config": {"wide_screen_mode": True},
         "header": {
-            "template": "blue",
+            "template": "orange",
             "title": {
                 "tag": "plain_text",
                 "content": "🌍 Lilith Legal · 全球游戏合规周报",
