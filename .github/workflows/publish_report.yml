@@ -1,7 +1,10 @@
 name: 发布周报（从飞书多维表格读取已审条目）
 
 on:
-  # 手动触发：团队完成飞书多维表格初筛后，手动点击 Run workflow 发布报告
+  # 定时触发：每周一北京时间 10:10 自动发布周报（UTC 02:10）
+  schedule:
+    - cron: '10 2 * * 1'
+  # 手动触发：团队完成飞书多维表格初筛后，也可手动点击 Run workflow 发布报告
   workflow_dispatch:
 
 permissions:
