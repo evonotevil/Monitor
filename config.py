@@ -178,6 +178,7 @@ PC_PLATFORM_KEYWORDS_EN = [
     # 游戏分级机构 — PC 端延伸（ESRB/PEGI 对 Steam 上架内容的影响）
     "ESRB rating requirement PC game Steam regulation",
     "PEGI age rating PC game regulation Europe",
+    "PEGI age rating criteria update Europe regulation",
 ]
 
 KEYWORDS = {
@@ -651,6 +652,7 @@ OFFICIAL_SITE_QUERIES = [
     "game privacy fine site:ico.org.uk",         # UK Information Commissioner
     "loot box game regulation site:cnil.fr",     # 法国 CNIL
     "game Datenschutz site:bfdi.bund.de",        # 德国联邦数据保护局
+    "age rating criteria update site:pegi.info", # 欧洲 PEGI 官方公告
     # ── 亚太 ────────────────────────────────────────────────────────────
     "game regulation site:grac.or.kr",           # 韩国 GRAC
     "game regulation site:moleg.go.kr",          # 韩국法制处
