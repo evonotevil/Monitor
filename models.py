@@ -5,7 +5,7 @@
 import sqlite3
 import os
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 
 from config import DATABASE_PATH
@@ -234,6 +234,61 @@ class Database:
         """按 id 删除条目（用于 retranslate 清理 LLM 判定不相关的历史垃圾条目）。"""
         self.conn.execute("DELETE FROM legislation WHERE id = ?", (item_id,))
         self.conn.commit()
+
+    def archive_old_records(self, keep_days: int = 180) -> int:
+        """
+        将超过 keep_days 天以前的记录移入 legislation_archive 表并从主表删除。
+        返回实际归档条数。
+        """
+        # 建归档表（首次调用时自动创建）
+        self.conn.executescript("""
+            CREATE TABLE IF NOT EXISTS legislation_archive (
+                id INTEGER,
+                region TEXT,
+                category_l1 TEXT,
+                category_l2 TEXT,
+                title TEXT,
+                date TEXT,
+                status TEXT,
+                summary TEXT,
+                source_name TEXT,
+                source_url TEXT,
+                lang TEXT,
+                title_zh TEXT,
+                summary_zh TEXT,
+                impact_score REAL,
+                created_at TEXT,
+                archived_at TEXT DEFAULT (datetime('now')),
+                PRIMARY KEY (id)
+            );
+        """)
+        self.conn.commit()
+
+        cutoff = (datetime.now() - timedelta(days=keep_days)).strftime("%Y-%m-%d")
+
+        # 复制到归档表（已存在则跳过）
+        self.conn.execute("""
+            INSERT OR IGNORE INTO legislation_archive
+                (id, region, category_l1, category_l2, title, date, status,
+                 summary, source_name, source_url, lang, title_zh, summary_zh,
+                 impact_score, created_at)
+            SELECT id, region, category_l1, category_l2, title, date, status,
+                   summary, source_name, source_url, lang, title_zh, summary_zh,
+                   impact_score, created_at
+            FROM legislation
+            WHERE date < ?
+        """, (cutoff,))
+
+        archived = self.conn.execute("SELECT changes()").fetchone()[0]
+
+        # 从主表删除
+        self.conn.execute("DELETE FROM legislation WHERE date < ?", (cutoff,))
+        self.conn.commit()
+
+        # 释放磁盘空间
+        self.conn.execute("VACUUM")
+
+        return archived
 
     def close(self):
         self.conn.close()

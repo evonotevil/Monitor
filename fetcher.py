@@ -686,8 +686,6 @@ def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool
     daily_mode=True 时：强制使用 when:1d（过去 24 小时），每查询仅取前 10 条，减少噪音并提速。
     """
     all_items = []
-    tasks = []  # (query, region_key)
-
     # 日期过滤参数：日报强制 when:1d，周报/全量用 when:{max_days}d
     when_days = 1 if daily_mode else max_days
     when = f" when:{when_days}d"
@@ -696,60 +694,56 @@ def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool
     # 英文通用查询降噪后缀（附加 -conference -summit -funding -investment）
     noise = INDUSTRY_QUERY_NOISE_SUFFIX
 
-    # ── 英语圈：美国 + 英国/澳洲/加拿大/新加坡 补充视角 ──────────────
-    for kw in KEYWORDS["en"]:
-        tasks.append((kw + noise + when, "en_US"))
-    for kw in KEYWORDS["en"][30:50]:  # 经营合规相关关键词补充英国视角
-        tasks.append((kw + noise + when, "en_UK"))
-    # PC 平台合规专项：监管重心在欧洲（DMA/GDPR/PEGI），不加通用降噪（查询已足够精准）
-    for kw in PC_PLATFORM_KEYWORDS_EN:
-        tasks.append((kw + when, "en_UK"))
-    for kw in KEYWORDS["en"][10:30]:  # 未成年/数据隐私补充澳洲视角
-        tasks.append((kw + noise + when, "en_AU"))
-    for kw in KEYWORDS["en"][30:50]:  # 东南亚经营合规补充新加坡视角
-        tasks.append((kw + noise + when, "en_SG"))
+    # ── 按 locale 分组，组间冷却 3 秒，避免同一 Google 区域节点触发限速 ──
+    # 组内任务间隔 1.0 秒（原 0.5 秒），请求发出速率减半。
+    locale_groups = [
+        # 1. 英语圈：美国（最大量，优先发出）
+        [(kw + noise + when, "en_US") for kw in KEYWORDS["en"]],
+        # 2. 英语圈：英国 / 澳洲 / 新加坡 补充视角 + PC 平台专项
+        (
+            [(kw + noise + when, "en_UK") for kw in KEYWORDS["en"][30:50]]
+            + [(kw + when, "en_UK") for kw in PC_PLATFORM_KEYWORDS_EN]
+            + [(kw + noise + when, "en_AU") for kw in KEYWORDS["en"][10:30]]
+            + [(kw + noise + when, "en_SG") for kw in KEYWORDS["en"][30:50]]
+        ),
+        # 3. 官方政府域名精准查询（site:，不加降噪后缀）
+        [(kw + when, "en_US") for kw in OFFICIAL_SITE_QUERIES],
+        # 4. 日语
+        [(kw + when, "ja_JP") for kw in KEYWORDS["ja"]],
+        # 5. 韩语
+        [(kw + when, "ko_KR") for kw in KEYWORDS["ko"]],
+        # 6. 越南语 + 印尼语
+        (
+            [(kw + when, "vi_VN") for kw in KEYWORDS.get("vi", [])]
+            + [(kw + when, "en_ID") for kw in KEYWORDS.get("id", [])]
+        ),
+        # 7. 繁中 + 泰语
+        (
+            [(kw + when, "zh_TW") for kw in KEYWORDS.get("zh_tw", [])]
+            + [(kw + when, "th_TH") for kw in KEYWORDS.get("th", [])]
+        ),
+        # 8. 欧洲本地语言 + 南美 + 中东（量少，合并一组）
+        (
+            [(kw + when, "de_DE") for kw in KEYWORDS.get("de", [])]
+            + [(kw + when, "fr_FR") for kw in KEYWORDS.get("fr", [])]
+            + [(kw + when, "pt_BR") for kw in KEYWORDS.get("pt", [])]
+            + [(kw + when, "es_MX") for kw in KEYWORDS.get("es", [])]
+            + [(kw + when, "ar_SA") for kw in KEYWORDS.get("ar", [])]
+        ),
+    ]
 
-    # ── 官方政府域名精准查询（site: 定向，直接获取法律原文和处罚决定书）──
-    # 不添加降噪后缀（政府网站不发布融资/峰会内容）
-    for kw in OFFICIAL_SITE_QUERIES:
-        tasks.append((kw + when, "en_US"))
-
-    # ── 亚洲本地语言 ───────────────────────────────────────────────
-    for kw in KEYWORDS["ja"]:
-        tasks.append((kw + when, "ja_JP"))
-    for kw in KEYWORDS["ko"]:
-        tasks.append((kw + when, "ko_KR"))
-    for kw in KEYWORDS.get("vi", []):
-        tasks.append((kw + when, "vi_VN"))
-    for kw in KEYWORDS.get("id", []):
-        tasks.append((kw + when, "en_ID"))
-    for kw in KEYWORDS.get("zh_tw", []):
-        tasks.append((kw + when, "zh_TW"))
-    for kw in KEYWORDS.get("th", []):
-        tasks.append((kw + when, "th_TH"))
-
-    # ── 欧洲本地语言 ───────────────────────────────────────────────
-    for kw in KEYWORDS.get("de", []):
-        tasks.append((kw + when, "de_DE"))
-    for kw in KEYWORDS.get("fr", []):
-        tasks.append((kw + when, "fr_FR"))
-
-    # ── 南美 ───────────────────────────────────────────────────────
-    for kw in KEYWORDS.get("pt", []):
-        tasks.append((kw + when, "pt_BR"))
-    for kw in KEYWORDS.get("es", []):
-        tasks.append((kw + when, "es_MX"))
-
-    # ── 中东 ───────────────────────────────────────────────────────
-    for kw in KEYWORDS.get("ar", []):
-        tasks.append((kw + when, "ar_SA"))
+    _GROUP_COOLDOWN = 3.0   # 秒，locale 组间冷却，让 Google 限速窗口重置
+    _TASK_INTERVAL  = 1.0   # 秒，组内请求提交间隔（原 0.5s，加倍降低 503 概率）
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
         futures = {}
-        for query, region in tasks:
-            future = executor.submit(fetch_google_news, query, region, max_results_per_query)
-            futures[future] = (query, region)
-            time.sleep(0.5)
+        for g_idx, group in enumerate(locale_groups):
+            if g_idx > 0:
+                time.sleep(_GROUP_COOLDOWN)
+            for query, region in group:
+                future = executor.submit(fetch_google_news, query, region, max_results_per_query)
+                futures[future] = (query, region)
+                time.sleep(_TASK_INTERVAL)
 
         for future in concurrent.futures.as_completed(futures):
             query, region = futures[future]

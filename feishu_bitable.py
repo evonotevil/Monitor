@@ -549,6 +549,69 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
         return []
 
 
+def fetch_noise_source_stats() -> dict:
+    """
+    从 Bitable 读取所有「🗑️ 噪音/不推送」记录，统计各信源的噪音出现次数。
+
+    返回：{"source_name": count, ...} 按 count 降序排列。
+    若凭证未配置或 API 失败，返回空字典。
+    """
+    app_id     = os.environ.get("FEISHU_APP_ID", "")
+    app_secret = os.environ.get("FEISHU_APP_SECRET", "")
+    wiki_token = os.environ.get("FEISHU_BITABLE_WIKI_TOKEN", "")
+    app_token  = os.environ.get("FEISHU_BITABLE_APP_TOKEN", "")
+    table_id   = os.environ.get("FEISHU_BITABLE_TABLE_ID", "")
+
+    if not all([app_id, app_secret, table_id]) or not (wiki_token or app_token):
+        print("⏭️  未配置飞书多维表格凭证，跳过噪音统计")
+        return {}
+
+    try:
+        token = get_tenant_access_token(app_id, app_secret)
+        if wiki_token:
+            app_token = resolve_wiki_app_token(wiki_token, token)
+
+        list_url = _LIST_URL.format(app_token=app_token, table_id=table_id)
+        headers  = {"Authorization": f"Bearer {token}"}
+
+        all_records: list = []
+        page_token: Optional[str] = None
+        while True:
+            params: dict = {"page_size": 500}
+            if page_token:
+                params["page_token"] = page_token
+            resp = requests.get(list_url, headers=headers, params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("code") != 0:
+                raise RuntimeError(f"拉取记录失败: {data.get('msg')}")
+            batch = data.get("data", {}).get("items", [])
+            all_records.extend(batch)
+            has_more   = data.get("data", {}).get("has_more", False)
+            page_token = data.get("data", {}).get("page_token")
+            if not has_more or not page_token:
+                break
+
+        # 只统计被标记为噪音的条目
+        counts: dict = {}
+        for rec in all_records:
+            fields     = rec.get("fields", {})
+            status_val = str(fields.get("处理状态", "")).strip()
+            if "噪音" not in status_val and "不推送" not in status_val:
+                continue
+            # 信源名称字段
+            source = str(fields.get("信源名称", "")).strip()
+            if source:
+                counts[source] = counts.get(source, 0) + 1
+
+        # 按次数降序返回
+        return dict(sorted(counts.items(), key=lambda x: -x[1]))
+
+    except Exception as exc:
+        print(f"❌ 获取噪音统计失败: {exc}")
+        return {}
+
+
 # ── 本地测试入口 ──────────────────────────────────────────────────────
 
 if __name__ == "__main__":

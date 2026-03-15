@@ -10,7 +10,9 @@
   移动端优先：App Store/Google Play 政策变更 ≥ PC 合规风险（移动端是 Lilith/鹰角/米哈游营收主渠道）
 """
 
+import json
 import re
+from pathlib import Path
 from typing import Tuple
 
 from config import (
@@ -18,6 +20,22 @@ from config import (
     SOURCE_TIER_MAP, SOURCE_TIER_PATTERNS,
 )
 from models import LegislationItem
+
+# ── 噪音来源加载（由 monitor.py noise-sync 命令生成）───────────────────
+# 若文件不存在则静默忽略，不影响正常分类流程。
+_NOISE_SOURCES_PATH = Path(__file__).parent / "data" / "noise_sources.json"
+_HIGH_NOISE_SOURCES: set = set()
+
+def _reload_noise_sources() -> None:
+    global _HIGH_NOISE_SOURCES
+    if _NOISE_SOURCES_PATH.exists():
+        try:
+            data = json.loads(_NOISE_SOURCES_PATH.read_text(encoding="utf-8"))
+            _HIGH_NOISE_SOURCES = set(data.get("blocklist", []))
+        except Exception:
+            pass
+
+_reload_noise_sources()
 
 
 # ─── 国家 → 区域 映射 ──────────────────────────────────────────────
@@ -504,6 +522,12 @@ def score_impact(
     risk_bonus = _high_risk_bonus(text) if text else 0.0
 
     total = base + tier_bonus + market_bonus + risk_bonus
+
+    # 高噪音来源降分（Bitable 噪音反馈，阈值由 noise-sync 命令配置）
+    # 不直接归零：即使高噪音来源偶尔发出真实监管动态，仍可进入日报，只是优先级更低。
+    if source_name and source_name in _HIGH_NOISE_SOURCES:
+        total = max(1.0, total * 0.5)
+
     return round(min(10.0, max(1.0, total)), 1)
 
 

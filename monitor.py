@@ -495,6 +495,71 @@ def cmd_retranslate(args):
         db.close()
 
 
+# ─── 命令: noise-sync ────────────────────────────────────────────────
+
+def cmd_noise_sync(args):
+    """
+    从 Bitable 读取「🗑️ 噪音/不推送」记录，统计各信源出现次数，
+    将超过阈值的信源写入 data/noise_sources.json。
+    classifier.py 启动时自动加载该文件，对高噪音信源降低 impact_score。
+    """
+    import json
+    from pathlib import Path
+    from feishu_bitable import fetch_noise_source_stats
+    from classifier import _reload_noise_sources
+
+    logger.info("[噪音同步] 从 Bitable 读取噪音记录…")
+    stats = fetch_noise_source_stats()
+    if not stats:
+        logger.warning("[噪音同步] 未获取到噪音统计（Bitable 未配置或无噪音记录）")
+        return
+
+    threshold = args.threshold
+    blocklist = [k for k, v in stats.items() if v >= threshold]
+
+    output = {
+        "updated_at": datetime.now().strftime("%Y-%m-%d"),
+        "threshold":  threshold,
+        "stats":      stats,
+        "blocklist":  blocklist,
+    }
+
+    path = Path("data/noise_sources.json")
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    logger.info(
+        f"[噪音同步] 已更新：{len(stats)} 个信源统计，"
+        f"{len(blocklist)} 个高噪音信源（阈值 ≥{threshold} 条）"
+    )
+    print("\n信源噪音排行（前 15）：")
+    for src, cnt in list(stats.items())[:15]:
+        flag = "🚫" if src in set(blocklist) else "  "
+        print(f"  {flag} {cnt:3d}x  {src}")
+
+    # 让当前进程内的 classifier 立即生效
+    _reload_noise_sources()
+
+
+# ─── 命令: archive ────────────────────────────────────────────────────
+
+def cmd_archive(args):
+    """
+    将超过 keep_days 天以前的 DB 记录归档到 legislation_archive 表并从主表删除，
+    回收 SQLite 磁盘空间。建议每月执行一次（GitHub Actions 月度定时任务）。
+    """
+    db = Database()
+    try:
+        keep_days = args.keep_days
+        logger.info(f"[归档] 将 {keep_days} 天以前的记录移入 legislation_archive …")
+        count = db.archive_old_records(keep_days=keep_days)
+        logger.info(
+            f"[归档] 完成：归档 {count} 条，主表保留近 {keep_days} 天数据"
+        )
+    finally:
+        db.close()
+
+
 # ─── 命令: schedule ──────────────────────────────────────────────────
 
 def cmd_schedule(args):
@@ -581,6 +646,28 @@ def main():
         help="单次最多重译条数（默认 100，避免超 Groq 配额）",
     )
     p_retrans.set_defaults(func=cmd_retranslate)
+
+    # noise-sync
+    p_noise = subparsers.add_parser(
+        "noise-sync",
+        help="从 Bitable 同步噪音来源统计，更新 data/noise_sources.json",
+    )
+    p_noise.add_argument(
+        "--threshold", type=int, default=5,
+        help="噪音次数阈值，达到此值的信源进入降分名单（默认 5）",
+    )
+    p_noise.set_defaults(func=cmd_noise_sync)
+
+    # archive
+    p_archive = subparsers.add_parser(
+        "archive",
+        help="将旧记录归档到 legislation_archive 表并压缩数据库",
+    )
+    p_archive.add_argument(
+        "--keep-days", type=int, default=180,
+        help="保留最近 N 天的主表数据（默认 180 天）",
+    )
+    p_archive.set_defaults(func=cmd_archive)
 
     # schedule
     p_schedule = subparsers.add_parser("schedule", help="定时自动执行")
