@@ -172,7 +172,7 @@ def build_daily_card(items: list, exec_summary: str = "") -> dict:
         count_text = f"{group_cnt} 条（展示 {shown_cnt} 条）" if shown_cnt < group_cnt else f"{group_cnt} 条"
         elements.append({
             "tag": "markdown",
-            "content": f"**{_GROUP_EMOJI.get(group, '🌐')} {group}** · 今日 {count_text}",
+            "content": f"**{_GROUP_EMOJI.get(group, '🌐')} {group}** · 昨日 {count_text}",
         })
 
         for item in group_items:
