@@ -72,6 +72,12 @@ CATEGORIES = {
         "跨境数据传输",
         "数据本地化",
         "数据泄露通知",
+        "韩国PIPA合规",
+        "日本APPI合规",
+        "印度DPDP法案",
+        "沙特PDPL合规",
+        "泰国PDPA合规",
+        "巴西LGPD合规",
     ],
     "玩法合规": [
         "抽奖/开箱(Loot Box)",
@@ -80,6 +86,9 @@ CATEGORIES = {
         "付费随机机制",
         "涉赌认定",
         "游戏内购规范",
+        "日本完全ガチャ禁令",
+        "荷兰/比利时赌博局认定",
+        "韩国概率型道具强制公示",
     ],
     "未成年人保护": [
         "年龄验证/分级",
@@ -88,6 +97,9 @@ CATEGORIES = {
         "内容分级制度",
         "家长控制",
         "防沉迷系统",
+        "英国儿童隐私设计规范(Children's Code)",
+        "美国KOSA立法动态",
+        "欧盟GDPR未成年同意年龄",
     ],
     "广告营销合规": [
         "虚假广告",
@@ -96,6 +108,8 @@ CATEGORIES = {
         "价格透明度",
         "暗黑模式",
         "促销活动合规",
+        "日本景品表示法/ステマ禁令",
+        "澳大利亚广告标准",
     ],
     "消费者保护": [
         "退款政策",
@@ -103,6 +117,8 @@ CATEGORIES = {
         "价格歧视",
         "消费者权益诉讼",
         "虚假宣传",
+        "澳大利亚ACL合规",
+        "韩国消费者保护法",
     ],
     "经营合规": [
         "本地代理/代表处",
@@ -111,6 +127,9 @@ CATEGORIES = {
         "税务合规",
         "外资限制",
         "本地发行商要求",
+        "中东游戏内容许可(GCAM/TRA)",
+        "印度外资规定",
+        "俄罗斯RKN本地化要求",
     ],
     "平台政策": [
         "App Store政策",
@@ -118,12 +137,17 @@ CATEGORIES = {
         "第三方支付",
         "佣金/分成",
         "侧载政策",
+        "欧盟DMA对应用商店影响",
+        "Epic/Steam PC平台政策",
     ],
     "内容监管": [
         "内容审查",
         "AI生成内容",
         "知识产权保护",
         "版权合规",
+        "欧盟DSA(数字服务法)",
+        "德国NetzDG",
+        "澳大利亚在线安全法",
     ],
     # PC 与跨平台合规 — 针对 Steam/Epic/驱动级反作弊/D2C/三方充值等 PC 端风险
     "PC & 跨平台合规": [
@@ -131,6 +155,23 @@ CATEGORIES = {
         "反作弊程序合规",
         "PC充值/D2C合规",
         "跨平台数据合规",
+    ],
+    # AI 内容合规 — EU AI Act / 深度合成 / 算法推荐透明度
+    "AI内容合规": [
+        "EU AI Act合规(高风险/通用AI分类)",
+        "AI生成内容标识义务",
+        "深度合成/虚拟数字人合规",
+        "AI算法推荐透明度",
+        "各国AI监管立法动态",
+    ],
+    # 金融合规与支付 — OFAC制裁 / AML / 虚拟资产 / 跨境支付
+    "金融合规与支付": [
+        "跨境支付合规",
+        "OFAC制裁合规",
+        "反洗钱/反恐融资(AML/CTF)",
+        "虚拟资产/游戏币监管",
+        "第三方支付牌照要求",
+        "自动续费透明度",
     ],
 }
 
@@ -204,6 +245,10 @@ KEYWORDS = {
         "minor game purchase restriction",
         "parental control mobile game law",
         "teen online gaming curfew",
+        '"Kids Online Safety Act" game',
+        "KOSA game minor protection legislation",
+        "GDPR minor consent age game",
+        "UK Children Code game app",
 
         # === 数据隐私 ===
         "GDPR game enforcement",
@@ -267,13 +312,18 @@ KEYWORDS = {
         "DSA game compliance",
         "DMA app store game regulation",
         "EU AI act game",
+        "EU AI Act high risk general purpose game",
         "EU loot box regulation",
         "Netherlands Belgium loot box ban game",
+        "NetzDG game platform Germany",
 
         # === 澳大利亚 / 大洋洲 ===
         "Australia game loot box age verification",
         "Australia online safety act game",
         "Australia Privacy Act game",
+        "Australian Consumer Law game refund",
+        "Australia advertising standards game",
+        "ACCC game consumer enforcement",
 
         # === 平台政策 ===
         "app store regulation game DMA antitrust",
@@ -281,6 +331,24 @@ KEYWORDS = {
         "apple app store game policy",
         "third party payment game regulation",
         "app store commission game fee regulation",
+
+        # === AI 内容合规 ===
+        "AI generated content game regulation",
+        "AI deepfake game avatar regulation",
+        "AI recommendation algorithm game transparency law",
+        "synthetic media game regulation disclosure",
+        "AI content labeling game law",
+
+        # === 金融合规与支付 ===
+        "OFAC gaming sanctions compliance",
+        "game company sanctions fine",
+        "AML game virtual currency regulation",
+        "anti-money laundering game payment",
+        "cross-border payment game regulation",
+        "virtual asset game currency regulation",
+        "third-party payment license game",
+        "India DPDP gaming data protection",
+        "India FDI game foreign investment regulation",
 
         # === PC 平台合规 (Steam / Epic / D2C / 驱动级反作弊) ===
         # 注: 该段由 PC_PLATFORM_KEYWORDS_EN 导入，fetcher 会对其单独做 UK/EU 路由
@@ -301,6 +369,10 @@ KEYWORDS = {
         "消費者庁 ゲーム 景品表示法 処分",
         "消費者庁 ガチャ 確率 規制 改正",
         "CESA ゲーム 自主規制 ガチャ 改正",
+        # ステマ / AI 规制
+        "ステルスマーケティング ゲーム 規制 景品表示法",
+        "AI 規制 ゲームコンテンツ 法律",
+        "ゲーム AI 生成 コンテンツ 規制",
     ],
     "ko": [
         "게임 규제 법안",
@@ -317,12 +389,18 @@ KEYWORDS = {
         "게임물관리위원회 확률형 처분 제재",
         "GRAC 게임 등급 규제 제재",
         "확률형 아이템 과징금 처분 게임사",
+        # 개인정보보호위원회 / 소비자보호 细化
+        "개인정보보호위원회 게임 처분 제재",
+        "확률형 아이템 공시 의무 게임사",
+        "게임 소비자 분쟁 조정 법률",
     ],
     "vi": [
         "quy định trò chơi điện tử",
         "luật game mobile đại lý nước ngoài",
         "nghị định trò chơi điện tử",
         "Bộ Thông tin Truyền thông game",
+        "Bộ Thông tin và Truyền thông game di động",
+        "bảo vệ dữ liệu cá nhân trò chơi điện tử",
     ],
     "id": [
         "regulasi game mobile Indonesia",
@@ -330,6 +408,7 @@ KEYWORDS = {
         "IGAC rating game mobile",
         "Kominfo regulasi game",
         "Kemenkominfo penerbit game asing",
+        "perlindungan data pribadi game aplikasi",
     ],
     "de": [
         # 德语 - 德国/奥地利（无硬编码年份）
@@ -340,6 +419,8 @@ KEYWORDS = {
         "Glücksspiel Videospiele Regulierung",
         "Onlinespiele Minderjährige Gesetz",
         "Spielsucht Gesetz Jugendschutz",
+        "NetzDG Spieleplattform Inhalt Regulierung",
+        "KI-Gesetz Videospiele Regulierung",
     ],
     "fr": [
         # 法语 - 法国/比利时（无硬编码年份）
@@ -350,6 +431,8 @@ KEYWORDS = {
         "microtransactions jeux vidéo loi",
         "jeux mobiles mineurs protection loi",
         "dark pattern jeux vidéo France",
+        "DSA jeux vidéo plateforme régulation",
+        "loi IA jeux vidéo contenu généré",
     ],
     "pt": [
         # 葡萄牙语 - 巴西（无硬编码年份）
@@ -360,6 +443,7 @@ KEYWORDS = {
         "regulamentação jogos SENACON Brasil",
         "jogos mobile privacidade crianças lei",
         "microtransação jogo regulação Brasil",
+        "proteção de dados pessoais jogo aplicativo",
     ],
     "es": [
         # 西班牙语 - 墨西哥/西班牙/拉美（无硬编码年份）
@@ -370,6 +454,8 @@ KEYWORDS = {
         "regulación juegos móviles",
         "microtransacciones videojuegos ley",
         "juegos online regulación España",
+        "protección al consumidor videojuegos reembolso",
+        "privacidad de datos juegos móviles regulación",
     ],
     "zh_tw": [
         # 繁体中文 - 台湾/港澳（无硬编码年份）
@@ -379,6 +465,8 @@ KEYWORDS = {
         "個資法 遊戲 App 台灣",
         "遊戲分級 法規 台灣",
         "手機遊戲 廣告 規範",
+        "抽獎合規 遊戲 法規",
+        "未成年保護 手遊 法律 香港",
     ],
     "th": [
         # 泰语（无硬编码年份）
@@ -386,6 +474,8 @@ KEYWORDS = {
         "PDPA เกมออนไลน์ ไทย",
         "ระเบียบเกมมือถือ ผู้เยาว์",
         "คุ้มครองผู้บริโภค เกมออนไลน์ กฎหมาย",
+        "คุ้มครองข้อมูลส่วนบุคคล เกม แอป",
+        "ผู้เยาว์ เกมออนไลน์ กฎหมาย ไทย",
     ],
     "ar": [
         # 阿拉伯语 - 沙特/阿联酋（无硬编码年份）
@@ -394,6 +484,8 @@ KEYWORDS = {
         "حماية الأطفال ألعاب إلكترونية",
         "صناديق الغنائم لعبة قانون",
         "خصوصية البيانات ألعاب الجوال",
+        "ترخيص الألعاب الإلكترونية GCAM السعودية",
+        "هيئة الاتصالات والفضاء ألعاب تنظيم الإمارات",
     ],
 }
 
@@ -483,7 +575,16 @@ RSS_FEEDS = [
     },
 
     # ── 更多官方来源 (Official tier) ──────────────────────────────────
-    # EU Digital Strategy RSS (digital-strategy.ec.europa.eu) — malformed XML，已移除
+    {
+        # EDPB — 欧盟数据保护委员会官方新闻（GDPR 执法、跨境数据传输、标准合同条款）
+        "name": "EDPB News",
+        "url": "https://www.edpb.europa.eu/news/news_en.rss",
+        "lang": "en",
+        "type": "rss",
+        "region": "欧洲",
+        "tier": "official",
+    },
+    # EU Digital Strategy RSS (digital-strategy.ec.europa.eu) — malformed XML，已移除；改用 OFFICIAL_SITE_QUERIES site: 查询替代
     # Australian eSafety Commissioner RSS — timeout，已移除
     # Canada Competition Bureau RSS — timeout，已移除
     # 新加坡 IMDA — 官方 RSS 已下线，由 Google News en_SG 关键词搜索替代
@@ -558,6 +659,7 @@ SOURCE_TIER_MAP = {
     "GRAC":                           "official",
     "KCA":                            "official",
     "GDPR.eu News":                   "official",   # 官方解读机构
+    "EDPB News":                      "official",   # 欧盟数据保护委员会
     # 游戏分级机构 — PC 平台合规关键信源
     "ESRB":                           "official",
     "PEGI":                           "official",
@@ -645,20 +747,29 @@ OFFICIAL_SITE_QUERIES = [
     # ── 北美 ──────────────────────────────────────────────────────────
     "game regulation site:ftc.gov",
     "children privacy game site:ftc.gov",
-    "game privacy site:oag.ca.gov",             # 加州 AG
+    "game privacy site:oag.ca.gov",                        # 加州 AG
     # ── 欧洲 / 英国 ────────────────────────────────────────────────────
     "game online safety regulation site:gov.uk",
     "game age verification site:gov.uk",
-    "game privacy fine site:ico.org.uk",         # UK Information Commissioner
-    "loot box game regulation site:cnil.fr",     # 法国 CNIL
-    "game Datenschutz site:bfdi.bund.de",        # 德国联邦数据保护局
-    "age rating criteria update site:pegi.info", # 欧洲 PEGI 官方公告
+    "game privacy fine site:ico.org.uk",                   # UK ICO（信息专员）
+    "loot box game regulation site:cnil.fr",               # 法国 CNIL
+    "game Datenschutz site:bfdi.bund.de",                  # 德国联邦数据保护局
+    "age rating criteria update site:pegi.info",           # 欧洲 PEGI 官方公告
+    "game data protection site:edpb.europa.eu",            # 欧盟 EDPB
+    "game DSA DMA AI Act site:digital-strategy.ec.europa.eu",  # EU 数字战略（DSA/DMA/AI Act）
     # ── 亚太 ────────────────────────────────────────────────────────────
-    "game regulation site:grac.or.kr",           # 韩国 GRAC
-    "game regulation site:moleg.go.kr",          # 韩국法制处
-    "game regulation site:mic.gov.vn",           # 越南信息通信部
-    "game regulation site:kominfo.go.id",        # 印尼 Kominfo
-    "game regulation site:pdpc.gov.sg",          # 新加坡个人数据保护委员会
-    "game regulation site:accc.gov.au",          # 澳大利亚竞争与消费者委员会
-    "game regulation site:oaic.gov.au",          # 澳大利亚信息专员办公室
+    "game regulation site:grac.or.kr",                     # 韩国 GRAC
+    "game regulation site:moleg.go.kr",                    # 韩국法制处
+    "game consumer site:kftc.go.kr",                       # 韩国公正交易委员会
+    "game regulation site:mic.gov.vn",                     # 越南信息通信部
+    "game regulation site:kominfo.go.id",                  # 印尼 Kominfo
+    "game regulation site:pdpc.gov.sg",                    # 新加坡个人数据保护委员会
+    "game regulation site:imda.gov.sg",                    # 新加坡 IMDA（媒体内容分级）
+    "game regulation site:accc.gov.au",                    # 澳大利亚竞争与消费者委员会
+    "game regulation site:oaic.gov.au",                    # 澳大利亚信息专员办公室
+    "game online safety site:acma.gov.au",                 # 澳大利亚通信和媒体局
+    "game regulation site:meity.gov.in",                   # 印度电子信息技术部
+    # ── 中东 ────────────────────────────────────────────────────────────
+    "game content license site:gcam.gov.sa",               # 沙特 GCAM（游戏内容许可）
+    "game regulation site:tra.gov.ae",                     # 阿联酋 TRA
 ]
