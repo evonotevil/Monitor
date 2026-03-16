@@ -830,8 +830,8 @@ def fetch_gdelt_all(daily_mode: bool = False) -> List[dict]:
     all_items: List[dict] = []
 
     for query, label in _GDELT_QUERIES:
-        # GDELT 免费 API 限速约 1 次/3 秒，先等再发，避免 429
-        time.sleep(3)
+        # GDELT 免费 API 限速约 5 次/分钟，12s 间隔保持在安全范围内
+        time.sleep(12)
         for attempt in range(2):   # 429 时最多重试一次
             try:
                 resp = requests.get(
@@ -847,8 +847,8 @@ def fetch_gdelt_all(daily_mode: bool = False) -> List[dict]:
                     timeout=20,
                 )
                 if resp.status_code == 429:
-                    logger.warning(f"[GDELT] {label} 触发限速，等待 10 秒后重试…")
-                    time.sleep(10)
+                    logger.warning(f"[GDELT] {label} 触发限速，等待 30 秒后重试…")
+                    time.sleep(30)
                     continue
                 resp.raise_for_status()
                 articles = resp.json().get("articles") or []

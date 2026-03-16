@@ -791,7 +791,14 @@ DAILY_GOOGLE_NEWS_EN = [
     'game age (rating OR verification) regulation law',
 ]
 
-# 日报非英文精选（各 1 条，覆盖日韩两大核心市场）
-DAILY_GOOGLE_NEWS_JA = ["ゲーム 規制 法律 OR 法案 OR 処分"]
-DAILY_GOOGLE_NEWS_KO = ["게임 규제 법안 OR 처분 OR 의무"]
+# 日报非英文精选（日韩各 2-3 条，重点覆盖本地监管机构动态）
+DAILY_GOOGLE_NEWS_JA = [
+    "ゲーム 規制 法律 OR 法案 OR 処分",
+    "消費者庁 OR ガチャ OR 景品表示法 ゲーム 規制",
+    "ステルスマーケティング OR AI規制 ゲーム 法律",
+]
+DAILY_GOOGLE_NEWS_KO = [
+    "게임 규제 법안 OR 처분 OR 의무",
+    "확률형 아이템 OR 게임산업진흥법 OR 대리인 규제",
+]
 
