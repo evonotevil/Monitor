@@ -27,6 +27,9 @@ from config import (
     FETCH_TIMEOUT,
     MAX_CONCURRENT_REQUESTS,
     MAX_ARTICLE_AGE_DAYS,
+    DAILY_GOOGLE_NEWS_EN,
+    DAILY_GOOGLE_NEWS_JA,
+    DAILY_GOOGLE_NEWS_KO,
 )
 from models import LegislationItem
 from classifier import classify_article, is_china_mainland
@@ -683,57 +686,59 @@ def fetch_all_rss() -> List[dict]:
 def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = False) -> List[dict]:
     """
     聚合所有语言/地区的 Google News 查询。
-    daily_mode=True 时跳过 Google News：GitHub Actions IP 在高频会话下会被整体限速，
-    而 RSS 已能提供 400+ 条日常覆盖，Google News 对日报无增量价值。
-    weekly 模式仍会执行，以补充 RSS 未覆盖的细分话题。
+    daily_mode=True：使用精选小查询集（约 15 条），控制请求量避免 IP 限速，每查询取前 10 条。
+    weekly 模式：使用全量 KEYWORDS，以获得最大覆盖。
     """
-    if daily_mode:
-        logger.info("日报模式：跳过 Google News（避免 IP 限速，RSS 已足够覆盖）")
-        return []
-
     all_items = []
-    when = f" when:{max_days}d"
-    max_results_per_query = 0
+    when = f" when:{1 if daily_mode else max_days}d"
+    max_results_per_query = 10 if daily_mode else 0
     # 英文通用查询降噪后缀（附加 -conference -summit -funding -investment）
     noise = INDUSTRY_QUERY_NOISE_SUFFIX
 
-    # ── 按 locale 分组，组间冷却 3 秒，避免同一 Google 区域节点触发限速 ──
-    # 组内任务间隔 1.0 秒（原 0.5 秒），请求发出速率减半。
-    locale_groups = [
-        # 1. 英语圈：美国（最大量，优先发出）
-        [(kw + noise + when, "en_US") for kw in KEYWORDS["en"]],
-        # 2. 英语圈：英国 / 澳洲 / 新加坡 补充视角 + PC 平台专项
-        (
-            [(kw + noise + when, "en_UK") for kw in KEYWORDS["en"][30:50]]
-            + [(kw + when, "en_UK") for kw in PC_PLATFORM_KEYWORDS_EN]
-            + [(kw + noise + when, "en_AU") for kw in KEYWORDS["en"][10:30]]
-            + [(kw + noise + when, "en_SG") for kw in KEYWORDS["en"][30:50]]
-        ),
-        # 3. 官方政府域名精准查询（site:，不加降噪后缀）
-        [(kw + when, "en_US") for kw in OFFICIAL_SITE_QUERIES],
-        # 4. 日语
-        [(kw + when, "ja_JP") for kw in KEYWORDS["ja"]],
-        # 5. 韩语
-        [(kw + when, "ko_KR") for kw in KEYWORDS["ko"]],
-        # 6. 越南语 + 印尼语
-        (
-            [(kw + when, "vi_VN") for kw in KEYWORDS.get("vi", [])]
-            + [(kw + when, "en_ID") for kw in KEYWORDS.get("id", [])]
-        ),
-        # 7. 繁中 + 泰语
-        (
-            [(kw + when, "zh_TW") for kw in KEYWORDS.get("zh_tw", [])]
-            + [(kw + when, "th_TH") for kw in KEYWORDS.get("th", [])]
-        ),
-        # 8. 欧洲本地语言 + 南美 + 中东（量少，合并一组）
-        (
-            [(kw + when, "de_DE") for kw in KEYWORDS.get("de", [])]
-            + [(kw + when, "fr_FR") for kw in KEYWORDS.get("fr", [])]
-            + [(kw + when, "pt_BR") for kw in KEYWORDS.get("pt", [])]
-            + [(kw + when, "es_MX") for kw in KEYWORDS.get("es", [])]
-            + [(kw + when, "ar_SA") for kw in KEYWORDS.get("ar", [])]
-        ),
-    ]
+    if daily_mode:
+        # 日报：精选约 15 条宽泛查询，约 30 秒完成，避免 IP 限速
+        locale_groups = [
+            [(kw + when, "en_US") for kw in DAILY_GOOGLE_NEWS_EN],
+            [(kw + when, "ja_JP") for kw in DAILY_GOOGLE_NEWS_JA],
+            [(kw + when, "ko_KR") for kw in DAILY_GOOGLE_NEWS_KO],
+        ]
+    else:
+        # 周报：全量查询，最大覆盖
+        locale_groups = [
+            # 1. 英语圈：美国（最大量，优先发出）
+            [(kw + noise + when, "en_US") for kw in KEYWORDS["en"]],
+            # 2. 英语圈：英国 / 澳洲 / 新加坡 补充视角 + PC 平台专项
+            (
+                [(kw + noise + when, "en_UK") for kw in KEYWORDS["en"][30:50]]
+                + [(kw + when, "en_UK") for kw in PC_PLATFORM_KEYWORDS_EN]
+                + [(kw + noise + when, "en_AU") for kw in KEYWORDS["en"][10:30]]
+                + [(kw + noise + when, "en_SG") for kw in KEYWORDS["en"][30:50]]
+            ),
+            # 3. 官方政府域名精准查询（site:，不加降噪后缀）
+            [(kw + when, "en_US") for kw in OFFICIAL_SITE_QUERIES],
+            # 4. 日语
+            [(kw + when, "ja_JP") for kw in KEYWORDS["ja"]],
+            # 5. 韩语
+            [(kw + when, "ko_KR") for kw in KEYWORDS["ko"]],
+            # 6. 越南语 + 印尼语
+            (
+                [(kw + when, "vi_VN") for kw in KEYWORDS.get("vi", [])]
+                + [(kw + when, "en_ID") for kw in KEYWORDS.get("id", [])]
+            ),
+            # 7. 繁中 + 泰语
+            (
+                [(kw + when, "zh_TW") for kw in KEYWORDS.get("zh_tw", [])]
+                + [(kw + when, "th_TH") for kw in KEYWORDS.get("th", [])]
+            ),
+            # 8. 欧洲本地语言 + 南美 + 中东（量少，合并一组）
+            (
+                [(kw + when, "de_DE") for kw in KEYWORDS.get("de", [])]
+                + [(kw + when, "fr_FR") for kw in KEYWORDS.get("fr", [])]
+                + [(kw + when, "pt_BR") for kw in KEYWORDS.get("pt", [])]
+                + [(kw + when, "es_MX") for kw in KEYWORDS.get("es", [])]
+                + [(kw + when, "ar_SA") for kw in KEYWORDS.get("ar", [])]
+            ),
+        ]
 
     # Google News 所有请求均指向同一域名，并发只会加剧限速。
     # 改为严格顺序执行：同一时刻最多 1 个请求在途，组间额外冷却。

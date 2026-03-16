@@ -758,3 +758,40 @@ OFFICIAL_SITE_QUERIES = [
     "game content license site:gcam.gov.sa",               # 沙特 GCAM（游戏内容许可）
     "game regulation site:tra.gov.ae",                     # 阿联酋 TRA
 ]
+# ── 日报专用精选 Google News 查询（每日 daily_mode=True 时使用）────────────
+# 设计原则：每条覆盖一个大类，用 OR 合并同类关键词，避免长尾细化查询。
+# 目标总量 ≤ 20 条，2s 间隔共计 ≤ 40 秒，不触发 Google IP 限速。
+# 周报模式仍使用全量 KEYWORDS 以获得最大覆盖。
+DAILY_GOOGLE_NEWS_EN = [
+    # 玩法合规（loot box / gacha / 概率）
+    '"loot box" OR gacha regulation OR law OR ban OR fine',
+    # 数据隐私（GDPR / CCPA / 跨境）
+    'game (GDPR OR CCPA OR privacy) enforcement OR fine',
+    # 未成年人保护（COPPA / KOSA / 年龄验证）
+    'game (children OR minor OR COPPA OR KOSA) protection law',
+    # 广告营销（暗黑模式 / 网红披露 / 虚假广告）
+    'game advertising (disclosure OR "dark pattern" OR misleading) enforcement',
+    # 消费者保护（退款 / 微交易 / 订阅）
+    'game (refund OR "in-app purchase" OR microtransaction) consumer regulation',
+    # 平台政策（App Store / DMA / 第三方支付）
+    'game ("App Store" OR "Google Play" OR DMA OR "third party payment") regulation',
+    # EU 数字法规（DSA / DMA / AI Act）
+    'EU (DSA OR DMA OR "AI Act") game compliance',
+    # AI 内容合规（深度合成 / 生成内容标识）
+    'AI (deepfake OR "generated content" OR synthetic) game regulation',
+    # 金融合规（制裁 / AML / 虚拟资产）
+    'game (OFAC OR sanctions OR AML OR "virtual asset") compliance',
+    # 亚洲（韩国 / 东南亚）监管动态
+    '(Korea OR Vietnam OR Indonesia OR Thailand OR Philippines) game regulation OR law',
+    # 澳大利亚 / 大洋洲
+    '(Australia OR "New Zealand") game (online safety OR privacy OR regulation)',
+    # 经营合规（本地代理 / 许可证）
+    'game ("local agent" OR license OR representative) regulation overseas publisher',
+    # 年龄分级（PEGI / ESRB / 各国评级）
+    'game age (rating OR verification) regulation law',
+]
+
+# 日报非英文精选（各 1 条，覆盖日韩两大核心市场）
+DAILY_GOOGLE_NEWS_JA = ["ゲーム 規制 法律 OR 法案 OR 処分"]
+DAILY_GOOGLE_NEWS_KO = ["게임 규제 법안 OR 처분 OR 의무"]
+
