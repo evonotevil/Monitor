@@ -683,14 +683,17 @@ def fetch_all_rss() -> List[dict]:
 def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = False) -> List[dict]:
     """
     聚合所有语言/地区的 Google News 查询。
-    daily_mode=True 时：强制使用 when:1d（过去 24 小时），每查询仅取前 10 条，减少噪音并提速。
+    daily_mode=True 时跳过 Google News：GitHub Actions IP 在高频会话下会被整体限速，
+    而 RSS 已能提供 400+ 条日常覆盖，Google News 对日报无增量价值。
+    weekly 模式仍会执行，以补充 RSS 未覆盖的细分话题。
     """
+    if daily_mode:
+        logger.info("日报模式：跳过 Google News（避免 IP 限速，RSS 已足够覆盖）")
+        return []
+
     all_items = []
-    # 日期过滤参数：日报强制 when:1d，周报/全量用 when:{max_days}d
-    when_days = 1 if daily_mode else max_days
-    when = f" when:{when_days}d"
-    # 日报每查询限制条数（减少无关内容，提升处理速度）
-    max_results_per_query = 10 if daily_mode else 0
+    when = f" when:{max_days}d"
+    max_results_per_query = 0
     # 英文通用查询降噪后缀（附加 -conference -summit -funding -investment）
     noise = INDUSTRY_QUERY_NOISE_SUFFIX
 
