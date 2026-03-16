@@ -732,26 +732,21 @@ def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool
         ),
     ]
 
-    _GROUP_COOLDOWN = 3.0   # 秒，locale 组间冷却，让 Google 限速窗口重置
-    _TASK_INTERVAL  = 1.0   # 秒，组内请求提交间隔（原 0.5s，加倍降低 503 概率）
+    # Google News 所有请求均指向同一域名，并发只会加剧限速。
+    # 改为严格顺序执行：同一时刻最多 1 个请求在途，组间额外冷却。
+    _GROUP_COOLDOWN = 5.0   # 秒，locale 组间冷却
+    _TASK_INTERVAL  = 2.0   # 秒，每次请求后等待（顺序模式）
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as executor:
-        futures = {}
-        for g_idx, group in enumerate(locale_groups):
-            if g_idx > 0:
-                time.sleep(_GROUP_COOLDOWN)
-            for query, region in group:
-                future = executor.submit(fetch_google_news, query, region, max_results_per_query)
-                futures[future] = (query, region)
-                time.sleep(_TASK_INTERVAL)
-
-        for future in concurrent.futures.as_completed(futures):
-            query, region = futures[future]
+    for g_idx, group in enumerate(locale_groups):
+        if g_idx > 0:
+            time.sleep(_GROUP_COOLDOWN)
+        for query, region in group:
             try:
-                items = future.result()
+                items = fetch_google_news(query, region, max_results_per_query)
                 all_items.extend(items)
             except Exception as e:
                 logger.error(f"Google News 搜索失败 '{query}': {e}")
+            time.sleep(_TASK_INTERVAL)
 
     return all_items
 
