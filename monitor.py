@@ -20,7 +20,7 @@ import argparse
 import logging
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from models import Database
 from fetcher import fetch_and_process
@@ -226,7 +226,8 @@ def _filter_valid_dates(items):
 
 def _period_label(period: str) -> str:
     if period == "week":
-        return datetime.utcnow().strftime("%G-W%V")
+        # 用"上一周"：报告在周一发布，数据是前 7 天（上周），取前一周的 ISO 周号
+        return (datetime.utcnow() - timedelta(days=7)).strftime("%G-W%V")
     labels = {"day": "日报（昨日）", "month": "月报（近30天）", "all": "全量报告"}
     return labels.get(period, "全量报告")
 

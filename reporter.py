@@ -12,7 +12,7 @@ import os
 import re
 import html as html_mod
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
@@ -629,7 +629,16 @@ def _week_cn(period_label: str) -> str:
         return period_label
 
 
-def _date_range_str(items: list) -> str:
+def _date_range_str(items: list, period_label: str = "") -> str:
+    # 当 period_label 是 ISO 周格式（如 "2026-W11"）时，直接计算该周的周一至周日
+    if "-W" in period_label:
+        try:
+            y, w = period_label.split("-W")
+            monday = datetime.strptime(f"{y}-W{int(w):02d}-1", "%G-W%V-%u")
+            sunday = monday + timedelta(days=6)
+            return f"{monday.strftime('%Y-%m-%d')} ~ {sunday.strftime('%Y-%m-%d')}"
+        except Exception:
+            pass
     dates = sorted({i.get("date", "") for i in items if i.get("date")})
     return f"{dates[0]} ~ {dates[-1]}" if dates else ""
 
@@ -1151,7 +1160,7 @@ def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dic
     logo_html  = _get_logo_html()
     week_label = _week_cn(period_label) if "-W" in period_label else period_label
     all_items  = archived + news + active
-    date_range = _date_range_str(all_items)
+    date_range = _date_range_str(all_items, period_label)
     total      = len(all_items)
     n_archived = len(archived)
     n_news     = len(news)
