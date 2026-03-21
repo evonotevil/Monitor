@@ -569,7 +569,51 @@ RSS_FEEDS = [
         "region": "欧洲",
         "tier": "official",
     },
-    # EU Digital Strategy RSS (digital-strategy.ec.europa.eu) — malformed XML，已移除；改用 OFFICIAL_SITE_QUERIES site: 查询替代
+    {
+        # EU Digital Strategy — DSA/DMA/AI Act 官方通道（2026-03 验证有效，之前 malformed XML 已修复）
+        "name": "EU Digital Strategy",
+        "url": "https://digital-strategy.ec.europa.eu/en/rss.xml",
+        "lang": "en",
+        "type": "rss",
+        "region": "欧洲",
+        "tier": "official",
+    },
+    {
+        # 法国 CNIL — GDPR 执法、数据保护处罚决定（英文频道）
+        "name": "CNIL (France)",
+        "url": "https://cnil.fr/en/rss.xml",
+        "lang": "en",
+        "type": "rss",
+        "region": "欧洲",
+        "tier": "official",
+    },
+    {
+        # 欧洲 PEGI — 游戏年龄评级标准更新和公告
+        "name": "PEGI",
+        "url": "https://pegi.info/rss.xml",
+        "lang": "en",
+        "type": "rss",
+        "region": "欧洲",
+        "tier": "official",
+    },
+    {
+        # 加州 AG — CCPA 执法、消费者保护诉讼（之前仅靠 site:oag.ca.gov 查询覆盖）
+        "name": "California AG",
+        "url": "https://oag.ca.gov/news/feed",
+        "lang": "en",
+        "type": "rss",
+        "region": "北美",
+        "tier": "official",
+    },
+    {
+        # 澳大利亚信息专员 OAIC — 隐私执法、数据泄露通知（之前 timeout 已移除，2026-03 验证恢复）
+        "name": "OAIC (Australia)",
+        "url": "https://oaic.gov.au/rss",
+        "lang": "en",
+        "type": "rss",
+        "region": "大洋洲",
+        "tier": "official",
+    },
     # Australian eSafety Commissioner RSS — timeout，已移除
     # Canada Competition Bureau RSS — timeout，已移除
     # 新加坡 IMDA — 官方 RSS 已下线，由 Google News en_SG 关键词搜索替代
@@ -737,11 +781,11 @@ OFFICIAL_SITE_QUERIES = [
     "game online safety regulation site:gov.uk",
     "game age verification site:gov.uk",
     "game privacy fine site:ico.org.uk",                   # UK ICO（信息专员）
-    "loot box game regulation site:cnil.fr",               # 法国 CNIL
+    "loot box game regulation site:cnil.fr",               # 法国 CNIL（已有 RSS，此查询作补充）
     "game Datenschutz site:bfdi.bund.de",                  # 德国联邦数据保护局
     "age rating criteria update site:pegi.info",           # 欧洲 PEGI 官方公告
     "game data protection site:edpb.europa.eu",            # 欧盟 EDPB
-    "game DSA DMA AI Act site:digital-strategy.ec.europa.eu",  # EU 数字战略（DSA/DMA/AI Act）
+    "game DSA DMA AI Act site:digital-strategy.ec.europa.eu",  # EU 数字战略（已有 RSS，此查询作补充）
     # ── 亚太 ────────────────────────────────────────────────────────────
     "game regulation site:grac.or.kr",                     # 韩国 GRAC
     "game regulation site:moleg.go.kr",                    # 韩국法制处
