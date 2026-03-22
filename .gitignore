@@ -8,7 +8,8 @@ __pycache__/
 .env
 .env.local
 
-# SQLite 临时文件
+# SQLite 数据库（二进制文件，每天更新会撑大 git 历史，不入库）
+data/*.db
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
