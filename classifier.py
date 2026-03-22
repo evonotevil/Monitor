@@ -114,6 +114,7 @@ CATEGORY_PATTERNS = {
         "_l1": [
             r"privacy|data.?protection|GDPR|CCPA|CPRA|LGPD|DPDPA|隐私|データ保護|개인정보",
             r"data.?breach|data.?transfer|cookie|consent.*data|个人数据|個人資料|跨境数据|data.?local",
+            r"biometric|behavioral.*profil|PIPEDA|POPIA|UK\s*GDPR",
         ],
         "GDPR合规": [r"GDPR|general data protection"],
         "CCPA/各州隐私法": [r"CCPA|CPRA|california.*privacy|state privacy law"],
@@ -121,6 +122,7 @@ CATEGORY_PATTERNS = {
         "跨境数据传输": [r"cross.?border.*data|data.*transfer|跨境数据|数据出境|standard.*contractual"],
         "数据本地化": [r"data.*local\w*|server.*local\w*|数据本地化"],
         "数据泄露通知": [r"data.*breach|breach.*notif|数据泄露"],
+        "生物识别/行为画像": [r"biometric.*data|facial.*recognit|behavio\w+.*profil|player.*profil.*privac"],
     },
 
     # ── 玩法合规（开箱/抽卡/涉赌） ──────────────────────────────────────
@@ -130,6 +132,7 @@ CATEGORY_PATTERNS = {
             r"gambling.*game|game.*gambling|gaming.*gambling",
             r"확률형|ガチャ|开箱|抽奖|抽卡|涉赌|随机道具",
             r"pay.?to.?win|microtransaction|virtual.*currenc|game.*monetiz",
+            r"battle.?pass|season.?pass|FOMO.*game|NFT.*game|blockchain.*game|play.?to.?earn",
         ],
         "抽奖/开箱(Loot Box)": [r"loot.?box|gacha|random.*item|random.*reward|开箱|抽奖|抽卡|ガチャ|확률형"],
         "概率公示": [r"probability.*disclos|odds.*disclos|drop.*rate|概率公示|確率表示"],
@@ -137,6 +140,8 @@ CATEGORY_PATTERNS = {
         "付费随机机制": [r"pay.*random|paid.*random|random.*purchas|random.*paid|무작위.*구매"],
         "涉赌认定": [r"gambling.*game|game.*gambling|gaming.*mechanic.*gambling|类赌博|涉赌|賭博.*ゲーム"],
         "游戏内购规范": [r"in.?app.*purchas|IAP|microtransaction|内购|인앱결제"],
+        "战令/季票(Battle Pass)": [r"battle.?pass|season.?pass|seasonal.*content.*regulat|FOMO.*game.*regulat|time.?limited.*offer.*game"],
+        "NFT/Web3游戏资产": [r"NFT.*game|blockchain.*game|play.?to.?earn|game.*token.*regulat|Web3.*game|crypto.*game.*asset"],
     },
 
     # ── 未成年人保护 ──────────────────────────────────────────────────
@@ -152,6 +157,8 @@ CATEGORY_PATTERNS = {
         "内容分级制度": [r"age.*rat|content.*rat|ESRB|PEGI|CERO|GRAC|IGAC|分级|レーティング|등급"],
         "家长控制": [r"parental.*control|family.*link|parent.*setting|家长控制|保護者"],
         "防沉迷系统": [r"anti.?addiction|防沉迷|addiction.*prevent|game.*addict"],
+        "自我排除机制": [r"self.?exclusion|self.?limit|自我排除|自己排除"],
+        "心理健康/成瘾警告": [r"mental.*health.*game|gambling.*disorder.*game|addiction.*warning|成瘾警告|依存症"],
     },
 
     # ── 广告营销合规 ──────────────────────────────────────────────────
@@ -183,6 +190,8 @@ CATEGORY_PATTERNS = {
         "价格歧视": [r"price.*discrimin|dynamic.*pricing.*unfair|价格歧视|価格差別"],
         "消费者权益诉讼": [r"consumer.*lawsuit|consumer.*litigation|class.*action.*consumer|消费者诉讼|집단소송"],
         "虚假宣传": [r"mislead.*consumer|deceptive.*consumer|false.*claim.*consumer|虚假宣传|不当表示"],
+        "强制仲裁条款": [r"forced.*arbitrat|mandator.*arbitrat|arbitrat.*clause.*game|强制仲裁"],
+        "误触消费/儿童误购": [r"accidental.*purchas|unintend.*purchas|child.*accidental.*buy|误触消费|误购"],
     },
 
     # ── 经营合规（本地代理/代表处/许可/分级） ──────────────────────────
@@ -222,11 +231,13 @@ CATEGORY_PATTERNS = {
             r"content.*regulat|content.*moder|censor|内容监管|内容审查",
             r"game.*rating.*system|classification.*regulat|分级制度",
             r"AI.*(?:act|regulat|law)|copyright.*(?:law|act)|AIGC",
+            r"user.?generated.*content|UGC.*(?:liab|regulat)|game.*mod.*(?:copyright|law)",
         ],
         "内容审查": [r"content.*(?:review|censor|moder).*(?:law|regulat|rule)|内容审查"],
         "AI生成内容": [r"AI.*(?:generat|act|regulat|law)|AIGC|generative.*AI.*(?:law|regulat)"],
         "知识产权保护": [r"intellectual.*property.*(?:law|regulat)|copyright.*(?:law|act)|知识产权|著作権"],
         "版权合规": [r"copyright.*infring|pirac.*(?:law|enforce)|版权合规|著作権侵害"],
+        "UGC用户生成内容责任": [r"user.?generated.*content.*(?:liab|regulat|law)|UGC.*(?:liab|moder|regulat)|game.*mod.*copyright"],
     },
 
     # ── PC & 跨平台合规 ───────────────────────────────────────────────
@@ -265,6 +276,24 @@ CATEGORY_PATTERNS = {
             r"cross.?platform.*(?:data|privac|transfer)\w*.*(?:regulat|restrict|law|limit)",
             r"(?:pc.*mobile|mobile.*pc).*data.*(?:transfer|sync|share).*(?:regulat|restrict|law)",
         ],
+    },
+
+    # ── AI内容合规 ──────────────────────────────────────────────────────
+    # 与"内容监管"的 AI生成内容 子类区别：本类聚焦 AI 专项法规（EU AI Act、
+    # 算法审计、训练数据、深度合成），而非一般性内容审查
+    "AI内容合规": {
+        "_l1": [
+            r"AI\s*act|EU\s*AI|artificial.*intelligence.*(?:act|regulat|law)",
+            r"AI.*bias|algorithm.*(?:audit|fairness|transparen)",
+            r"deepfake|synthetic.*media|deep.*synthe|虚拟数字人|深度合成",
+            r"AI.*(?:train|label|disclos|generat).*(?:regulat|law|comply|mandate)",
+        ],
+        "EU AI Act合规(高风险/通用AI分类)": [r"EU\s*AI\s*act|AI\s*act.*(?:high.?risk|general.?purpose|GPAI)|欧盟.*AI.*法"],
+        "AI生成内容标识义务": [r"AI.*(?:generat|content).*(?:label|disclos|watermark|标识)|AIGC.*标识|AI.*content.*label"],
+        "深度合成/虚拟数字人合规": [r"deepfake|synthetic.*media|deep.*synthe|voice.*clon|虚拟数字人|深度合成|AI.*avatar"],
+        "AI算法推荐透明度": [r"algorithm.*(?:recommend|transparen)|推荐算法.*透明|AI.*recommend.*(?:regulat|disclos)"],
+        "AI偏见/公平性审计": [r"AI.*bias|algorithm.*(?:audit|fairness)|AI.*discriminat|算法.*(?:偏见|公平|审计)"],
+        "AI训练数据合规": [r"train.*data.*(?:consent|copyright|regulat)|AI.*train.*(?:user|player).*data|训练数据.*(?:合规|同意)"],
     },
 }
 
@@ -435,8 +464,8 @@ _GOOGLE_APPLE_CORE_TOPICS = re.compile(
     r"|privacy|data.?protect|consumer|fine|penalt|lawsuit|regulat\w+"
     r"|DMA\b|anti.?trust|monopol|IAP|app.?store.?polic|google.?play.?polic"
     r"|third.?party|side.?load|refund|GDPR|COPPA|children|minor"
-    r"|gacha|loot.?box|random.*item|probabil\w+"
-    r"|支付|分成|分发|分级|隐私|消保|未成年|罚款|处罚|监管|合规|抽卡|抽奖|开箱|概率",
+    r"|gacha|loot.?box|random.*item|probabil\w+|battle.?pass|NFT|blockchain"
+    r"|支付|分成|分发|分级|隐私|消保|未成年|罚款|处罚|监管|合规|抽卡|抽奖|开箱|概率|战令",
     re.IGNORECASE,
 )
 _GOOGLE_APPLE_MENTION = re.compile(

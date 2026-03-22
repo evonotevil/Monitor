@@ -147,6 +147,9 @@ KEYWORDS = {
         "AI recommendation algorithm game transparency law",
         "synthetic media game regulation disclosure",
         "AI content labeling game law",
+        "AI bias audit game algorithm fairness",
+        "AI training data consent game",
+        "voice cloning game regulation",
 
         # === 金融合规与支付 ===
         "OFAC gaming sanctions compliance",
@@ -158,6 +161,51 @@ KEYWORDS = {
         "third-party payment license game",
         "India DPDP gaming data protection",
         "India FDI game foreign investment regulation",
+        "crypto payment game regulation",
+        "KYC game player verification",
+
+        # === 战令/季票/FOMO 机制 ===
+        '"battle pass" game regulation law',
+        '"season pass" game consumer regulation',
+        "FOMO game mechanic regulation dark pattern",
+        "time-limited game content consumer protection",
+
+        # === 电竞监管 ===
+        "esports regulation law prize pool",
+        "esports player contract labor law",
+        "esports match fixing legislation",
+        "esports gambling betting regulation",
+        "professional gamer visa work permit",
+
+        # === NFT/Web3 游戏 ===
+        "NFT game regulation law",
+        "blockchain game token regulation",
+        "play-to-earn game regulation law",
+        "Web3 game virtual asset regulation",
+        "game token securities classification",
+
+        # === 云游戏 ===
+        "cloud gaming regulation law",
+        "cloud gaming data privacy regulation",
+        "game streaming service regulation",
+
+        # === UGC / 用户生成内容 ===
+        "user generated content game liability",
+        "UGC game moderation regulation law",
+        "game mod copyright regulation",
+
+        # === 消费者保护补充 ===
+        "forced arbitration game consumer",
+        "class action game consumer lawsuit",
+        "game self-exclusion mechanism regulation",
+        "accidental in-app purchase child regulation",
+
+        # === 数据隐私补充 ===
+        "biometric data game regulation",
+        "behavioral profiling game privacy law",
+        "POPIA game South Africa data protection",
+        "PIPEDA game Canada privacy",
+        "UK GDPR game divergence",
 
         # === PC 平台合规 (Steam / Epic / D2C / 驱动级反作弊) ===
         # 注: 该段由 PC_PLATFORM_KEYWORDS_EN 导入，fetcher 会对其单独做 UK/EU 路由
@@ -210,6 +258,13 @@ KEYWORDS = {
         "Bộ Thông tin Truyền thông game",
         "Bộ Thông tin và Truyền thông game di động",
         "bảo vệ dữ liệu cá nhân trò chơi điện tử",
+        # 补充：未成年人保护、loot box、消费者保护
+        "bảo vệ trẻ em trò chơi trực tuyến",
+        "hộp chiến lợi phẩm trò chơi quy định",
+        "quảng cáo game di động vi phạm",
+        "giấy phép phát hành trò chơi điện tử",
+        "thanh toán xuyên biên giới game",
+        "quy định esports thể thao điện tử",
     ],
     "id": [
         "regulasi game mobile Indonesia",
@@ -218,6 +273,13 @@ KEYWORDS = {
         "Kominfo regulasi game",
         "Kemenkominfo penerbit game asing",
         "perlindungan data pribadi game aplikasi",
+        # 补充：未成年人保护、loot box、消费者保护
+        "perlindungan anak game online",
+        "loot box gacha regulasi Indonesia",
+        "iklan game menyesatkan regulasi",
+        "lisensi penerbitan game Indonesia",
+        "pembayaran dalam aplikasi game regulasi",
+        "esports regulasi Indonesia",
     ],
     "de": [
         # 德语 - 德国/奥地利（无硬编码年份）
@@ -285,6 +347,13 @@ KEYWORDS = {
         "คุ้มครองผู้บริโภค เกมออนไลน์ กฎหมาย",
         "คุ้มครองข้อมูลส่วนบุคคล เกม แอป",
         "ผู้เยาว์ เกมออนไลน์ กฎหมาย ไทย",
+        # 补充：loot box、广告、许可
+        "กล่องสุ่ม เกม กฎหมาย ไทย",
+        "โฆษณาเกม หลอกลวง กฎหมาย",
+        "ใบอนุญาต เกมออนไลน์ ไทย",
+        "การชำระเงินข้ามพรมแดน เกม",
+        "อีสปอร์ต กฎหมาย ไทย",
+        "NFT เกม กฎระเบียบ ไทย",
     ],
     "ar": [
         # 阿拉伯语 - 沙特/阿联酋（无硬编码年份）
@@ -295,5 +364,12 @@ KEYWORDS = {
         "خصوصية البيانات ألعاب الجوال",
         "ترخيص الألعاب الإلكترونية GCAM السعودية",
         "هيئة الاتصالات والفضاء ألعاب تنظيم الإمارات",
+        # 补充：未成年人、消费者保护、电竞
+        "حماية القاصرين ألعاب فيديو قانون",
+        "حماية المستهلك ألعاب إلكترونية",
+        "الرياضات الإلكترونية تنظيم قانون",
+        "صندوق الحظ لعبة تنظيم",
+        "الدفع الإلكتروني ألعاب تنظيم",
+        "محتوى الذكاء الاصطناعي ألعاب قانون",
     ],
 }
