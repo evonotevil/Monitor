@@ -178,6 +178,7 @@ _VALID_REGIONS: set = set(_REGION_GROUP_MAP.keys())
 _VALID_CATEGORIES_L1 = {
     "数据隐私", "玩法合规", "未成年人保护", "广告营销合规",
     "消费者保护", "经营合规", "平台政策", "内容监管", "PC & 跨平台合规",
+    "AI内容合规", "金融合规与支付",
 }
 
 _VALID_STATUSES = {

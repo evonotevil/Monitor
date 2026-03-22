@@ -220,7 +220,8 @@ class TestValidSets:
 
     def test_valid_categories_l1(self):
         expected = {"数据隐私", "玩法合规", "未成年人保护", "广告营销合规",
-                    "消费者保护", "经营合规", "平台政策", "内容监管", "PC & 跨平台合规"}
+                    "消费者保护", "经营合规", "平台政策", "内容监管", "PC & 跨平台合规",
+                    "AI内容合规", "金融合规与支付"}
         assert expected == _VALID_CATEGORIES_L1
 
     def test_valid_statuses(self):

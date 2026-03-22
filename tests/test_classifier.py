@@ -161,9 +161,9 @@ class TestDetectCategory:
         assert l1 in ("数据隐私", "玩法合规")
 
     def test_default_when_no_match(self):
-        """完全无匹配时默认归入内容监管"""
+        """完全无匹配时默认归入经营合规"""
         l1, _ = _detect_category("completely unrelated text about cooking recipes")
-        assert l1 == "内容监管"
+        assert l1 == "经营合规"
 
 
 # ═══════════════════════════════════════════════════════════════════════

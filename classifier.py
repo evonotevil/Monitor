@@ -228,9 +228,9 @@ CATEGORY_PATTERNS = {
     # ── 内容监管 ──────────────────────────────────────────────────────
     "内容监管": {
         "_l1": [
-            r"content.*regulat|content.*moder|censor|内容监管|内容审查",
-            r"game.*rating.*system|classification.*regulat|分级制度",
-            r"AI.*(?:act|regulat|law)|copyright.*(?:law|act)|AIGC",
+            r"content.*(?:moder|censor|review|classif)|censor\w*|内容监管|内容审查",
+            r"game.*rating.*system|classification.*(?:regulat|system)|分级制度",
+            r"copyright.*(?:law|act|infring)|pirac\w*.*(?:law|enforce)|知识产权|著作権",
             r"user.?generated.*content|UGC.*(?:liab|regulat)|game.*mod.*(?:copyright|law)",
         ],
         "内容审查": [r"content.*(?:review|censor|moder).*(?:law|regulat|rule)|内容审查"],
@@ -283,10 +283,10 @@ CATEGORY_PATTERNS = {
     # 算法审计、训练数据、深度合成），而非一般性内容审查
     "AI内容合规": {
         "_l1": [
-            r"AI\s*act|EU\s*AI|artificial.*intelligence.*(?:act|regulat|law)",
-            r"AI.*bias|algorithm.*(?:audit|fairness|transparen)",
+            r"\bAI\s*act|EU\s*AI\b|artificial.*intelligence.*(?:act|regulat|law)",
+            r"\bAI\b.*bias|algorithm.*(?:audit|fairness|transparen)",
             r"deepfake|synthetic.*media|deep.*synthe|虚拟数字人|深度合成",
-            r"AI.*(?:train|label|disclos|generat).*(?:regulat|law|comply|mandate)",
+            r"\bAI\b.*(?:train|label|disclos|generat).*(?:regulat|law|comply|mandate)",
         ],
         "EU AI Act合规(高风险/通用AI分类)": [r"EU\s*AI\s*act|AI\s*act.*(?:high.?risk|general.?purpose|GPAI)|欧盟.*AI.*法"],
         "AI生成内容标识义务": [r"AI.*(?:generat|content).*(?:label|disclos|watermark|标识)|AIGC.*标识|AI.*content.*label"],
@@ -661,7 +661,7 @@ def is_china_mainland(text: str) -> bool:
 def _detect_category(text: str) -> Tuple[str, str]:
     """检测一级/二级分类"""
     text_lower = text.lower()
-    best_l1 = "内容监管"
+    best_l1 = "经营合规"  # 默认兜底：通用监管动态归入经营合规，避免"内容监管"成垃圾桶
     best_l1_score = 0
     best_l2 = ""
 
