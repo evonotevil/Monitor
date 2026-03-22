@@ -85,7 +85,32 @@
       "Bash(git add monitor.py reporter.py)",
       "Bash(git pull --rebase)",
       "Bash(python -c \":*)",
-      "Bash(git add classifier.py reporter.py)"
+      "Bash(git add classifier.py reporter.py)",
+      "Bash(git fetch origin)",
+      "Bash(git rebase origin/main)",
+      "Bash(git add .github/workflows/daily_check.yml .github/workflows/weekly_report.yml README.md daily_check.py feishu_notify.py monitor.py translator.py utils.py)",
+      "Bash(git add data/bitable_synced_urls.json)",
+      "Bash(git add fetcher.py)",
+      "Bash(sqlite3 /Users/lilithgames/Desktop/Legal-tools/Monitor/data/monitor.db \"SELECT date, created_at, impact_score, title_zh, source_url FROM legislation WHERE title_zh LIKE ''%iOS%'' AND title_zh LIKE ''%市场%'' ORDER BY created_at DESC LIMIT 5;\")",
+      "Bash(git add daily_check.py)",
+      "Bash(gh repo view --json nameWithOwner,url)",
+      "Bash(grep -rn \"fetch_valid_records\\\\|reporter\" /Users/lilithgames/Desktop/Legal-tools/Monitor/*.py)",
+      "Bash(git add classifier.py daily_check.py feishu_bitable.py reporter.py translator.py utils.py)",
+      "WebFetch(domain:evonotevil.github.io)",
+      "Bash(gh run list --repo evonotevil/Monitor --limit 5)",
+      "Bash(grep -n \"log-conclusion\\\\|_MOBILE_CSS.*=\\\\|^\"\"\"\"\"\"$\\\\|log-summary\" /Users/lilithgames/Desktop/Legal-tools/Monitor/reporter.py)",
+      "Bash(git add feishu_bitable.py reporter.py)",
+      "Bash(git add feishu_notify.py translator.py)",
+      "WebFetch(domain:pegi.info)",
+      "Bash(git add config.py)",
+      "Bash(git add feishu_notify.py utils.py)",
+      "Bash(git add daily_check.py translator.py)",
+      "WebFetch(domain:www.edpb.europa.eu)",
+      "Bash(git add fetcher.py classifier.py feishu_bitable.py models.py monitor.py)",
+      "Bash(git add .github/workflows/publish_report.yml README.md)",
+      "Bash(git add fetcher.py .github/workflows/daily_check.yml .github/workflows/publish_report.yml)",
+      "Bash(git add fetcher.py config.py)",
+      "Bash(git add .github/workflows/publish_report.yml config.py fetcher.py README.md)"
     ]
   }
 }

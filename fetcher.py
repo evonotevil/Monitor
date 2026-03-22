@@ -151,7 +151,19 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
 
     items = []
     try:
-        root = ET.fromstring(resp.content)
+        # 部分 RSS（如日本総務省）使用 Shift_JIS 等非 UTF-8 编码，
+        # ET.fromstring(bytes) 不支持非 UTF-8 multi-byte 编码。
+        # 策略：先用声明的编码解码为文本，去掉 encoding 声明，再解析。
+        raw = resp.content
+        import re as _re
+        enc_match = _re.search(rb'encoding=["\']([^"\']+)["\']', raw[:200])
+        if enc_match:
+            declared_enc = enc_match.group(1).decode("ascii")
+            if declared_enc.lower() not in ("utf-8", "utf8"):
+                xml_str = raw.decode(declared_enc, errors="replace")
+                xml_str = _re.sub(r'encoding=["\'][^"\']+["\']', 'encoding="utf-8"', xml_str)
+                raw = xml_str.encode("utf-8")
+        root = ET.fromstring(raw)
         ns = {"atom": "http://www.w3.org/2005/Atom"}
 
         for item in root.findall(".//item"):
