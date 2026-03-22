@@ -178,9 +178,30 @@ def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = Fals
             region_parts.append(f"{emoji} {group} **{cnt}**")
     region_line = "　".join(region_parts) if region_parts else "暂无数据"
 
+    # 全局跨区域去重：同一事件被多家媒体报道时，保留信源最权威的那条
+    # 优先级：official(4) > legal(3) > industry(2) > news(1)，同级比 impact_score
+    deduped: list = []
+    for item in items:
+        title = (item.get("title_zh") or item.get("title") or "")
+        tier  = _TIER_SORT.get(get_source_tier(item.get("source_name", "")), 1)
+        score = float(item.get("impact_score", 1.0))
+        is_dup = False
+        for j, kept in enumerate(deduped):
+            kept_title = (kept.get("title_zh") or kept.get("title") or "")
+            if _bigram_sim(title, kept_title) > 0.45:
+                # 保留更权威的：先比 tier，再比 score
+                kept_tier  = _TIER_SORT.get(get_source_tier(kept.get("source_name", "")), 1)
+                kept_score = float(kept.get("impact_score", 1.0))
+                if (tier, score) > (kept_tier, kept_score):
+                    deduped[j] = item  # 替换为更权威的
+                is_dup = True
+                break
+        if not is_dup:
+            deduped.append(item)
+
     # 按区域分组，每组 bigram 去重 + 同分类限 1 条
     raw_grouped: dict = defaultdict(list)
-    for item in items:
+    for item in deduped:
         raw_grouped[_get_region_group(item.get("region", "其他"))].append(item)
     grouped = {g: _pick_group_items(v, _MAX_PER_GROUP) for g, v in raw_grouped.items()}
 
