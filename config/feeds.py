@@ -178,6 +178,44 @@ RSS_FEEDS = [
         "tier": "official",
     },
 
+    # ── 欧洲立法 & 隐私执法补充 (Official / Legal tier) ────────────────
+    {
+        # EUR-Lex — 欧盟议会与理事会立法公报（DSA/DMA/AI Act 等法案原文，极稳定）
+        "name": "EUR-Lex Legislation",
+        "url": "https://eur-lex.europa.eu/EN/display-feed.rss?rssId=162",
+        "lang": "en",
+        "type": "rss",
+        "region": "欧洲",
+        "tier": "official",
+    },
+    {
+        # GDPRHub — GDPR 执法案例数据库（noyb 维护，替代已失效的 ICO/GDPR.eu RSS）
+        "name": "GDPRHub",
+        "url": "https://gdprhub.eu/index.php?title=Special:NewPages&feed=atom&hideredirs=1&limit=20&render=1",
+        "lang": "en",
+        "type": "rss",   # fetcher 兼容 Atom 格式
+        "region": "欧洲",
+        "tier": "legal",
+    },
+    {
+        # noyb.eu — Max Schrems 隐私执法组织（重大 GDPR 案件第一手报道）
+        "name": "noyb",
+        "url": "https://noyb.eu/en/rss",
+        "lang": "en",
+        "type": "rss",
+        "region": "欧洲",
+        "tier": "legal",
+    },
+    {
+        # JD Supra — 美国律所法律分析聚合（Privacy 主题，免费无需登录）
+        "name": "JD Supra (Privacy)",
+        "url": "https://www.jdsupra.com/resources/syndication/docsRSSfeed.aspx?ftype=Privacy",
+        "lang": "en",
+        "type": "rss",
+        "region": "全球",
+        "tier": "legal",
+    },
+
     # ── 更多行业媒体 (Industry tier) ──────────────────────────────────
     {
         "name": "Pocket Gamer",

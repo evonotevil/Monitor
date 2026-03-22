@@ -23,9 +23,12 @@ SOURCE_TIER_MAP = {
     "PEGI":                           "official",
     "CESA":                           "official",   # 日本コンピュータエンターテインメント協会
     "消費者庁":                        "official",   # 日本消費者庁
+    "EUR-Lex Legislation":            "official",   # 欧盟立法公报
     # 平台官方 — 出海"宪法"
     "Apple Developer News":           "official",
     # ── legal ─────────────────────────────────────────────────────────
+    "GDPRHub":                        "legal",     # GDPR 执法案例库
+    "noyb":                           "legal",     # 隐私执法组织
     "IAPP News":                      "legal",
     "IAPP":                           "legal",
     "Lexology":                       "legal",
@@ -54,6 +57,7 @@ SOURCE_TIER_PATTERNS = [
         r"|\bESRB\b|\bPEGI\b|\bCESA\b"
         r"|消費者庁|게임물관리위원회"
         r"|Federal Register"
+        r"|EUR-Lex|eur-lex"
         r"|Ministry of (?:Culture|Information|Communication|Justice)"
         r"|Kominfo|KemenKominfo"
         r"|MIC.*Viet|Bộ Thông tin"
@@ -65,7 +69,7 @@ SOURCE_TIER_PATTERNS = [
         r"|Apple Developer"
     )),
     ("legal", (
-        r"\bIAPP\b|Lexology|JD Supra|Law360"
+        r"\bIAPP\b|Lexology|JD Supra|Law360|GDPRHub|gdprhub|\bnoyb\b"
         r"|Baker McKenzie|Latham & Watkins|White & Case"
         r"|Clifford Chance|Dentons|Covington"
         r"|law firm|law office|legal (?:news|update|alert)"
