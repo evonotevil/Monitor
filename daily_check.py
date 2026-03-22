@@ -66,19 +66,31 @@ def get_daily_items() -> list:
         return []
 
     now_cst = datetime.now(_TZ_CST)
-    yesterday_str = (now_cst - timedelta(days=1)).strftime("%Y-%m-%d")
-    today_str     = now_cst.strftime("%Y-%m-%d")
+    today_str = now_cst.strftime("%Y-%m-%d")
+
+    # 周一覆盖周六+周日+周一（74h），其余工作日只覆盖昨天（26h）
+    is_monday = now_cst.weekday() == 0
+    lookback_days = 3 if is_monday else 1
+    lookback_hours = 74 if is_monday else 26
+
+    date_list = [
+        (now_cst - timedelta(days=d)).strftime("%Y-%m-%d")
+        for d in range(lookback_days + 1)  # 含今天
+    ]
 
     from datetime import timezone as _tz
-    cutoff_utc = (datetime.now(_tz.utc) - timedelta(hours=26)).strftime("%Y-%m-%d %H:%M:%S")
+    cutoff_utc = (datetime.now(_tz.utc) - timedelta(hours=lookback_hours)).strftime("%Y-%m-%d %H:%M:%S")
 
-    print(f"📅 日报筛选：date IN [{yesterday_str}, {today_str}]，created_at >= {cutoff_utc} (UTC)")
+    date_range_label = f"{date_list[-1]} ~ {date_list[0]}" if is_monday else f"{date_list[-1]}, {date_list[0]}"
+    print(f"📅 日报筛选：date IN [{date_range_label}]，created_at >= {cutoff_utc} (UTC)"
+          + (" (周一含周末)" if is_monday else ""))
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
+    placeholders = ",".join("?" for _ in date_list)
     rows = conn.execute(
-        """
+        f"""
         SELECT title, title_zh, summary_zh, summary, region, status, category_l1,
                source_url, date, created_at,
                COALESCE(impact_score, 1.0) AS impact_score,
@@ -89,12 +101,12 @@ def get_daily_items() -> list:
                COALESCE(risk_scope, 0)     AS risk_scope,
                COALESCE(risk_source, 'regex') AS risk_source
         FROM legislation
-        WHERE date IN (?, ?)
+        WHERE date IN ({placeholders})
           AND created_at >= ?
           AND COALESCE(impact_score, 1.0) > 0
           AND title_zh IS NOT NULL AND TRIM(title_zh) != ''
         """,
-        (yesterday_str, today_str, cutoff_utc),
+        (*date_list, cutoff_utc),
     ).fetchall()
 
     conn.close()
@@ -139,10 +151,9 @@ def _build_risk_tags(item: dict) -> str:
     return "·".join(tags)
 
 
-def build_daily_card(items: list, exec_summary: str = "") -> dict:
+def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = False) -> dict:
     now_cst   = datetime.now(_TZ_CST)
     yesterday = now_cst - timedelta(days=1)
-    yesterday_date = yesterday.strftime("%Y-%m-%d")
 
     # Header 颜色：按最高 impact_score 分级
     max_score = max((float(i.get("impact_score", 1.0)) for i in items), default=0.0)
@@ -177,10 +188,18 @@ def build_daily_card(items: list, exec_summary: str = "") -> dict:
     elements: list = []
 
     # 统计概览
+    if is_monday:
+        saturday = (now_cst - timedelta(days=2)).strftime("%Y-%m-%d")
+        date_label = f"{saturday} ~ {yesterday.strftime('%Y-%m-%d')}"
+        count_label = f"周末至今新增 **{len(items)}** 条合规动态"
+    else:
+        date_label = yesterday.strftime("%Y-%m-%d")
+        count_label = f"昨日新增 **{len(items)}** 条合规动态"
+
     elements.append({
         "tag": "markdown",
         "content": (
-            f"昨日新增 **{len(items)}** 条合规动态　**{yesterday_date}**\n\n"
+            f"{count_label}　**{date_label}**\n\n"
             f"**🗺️ 按地区**　{region_line}"
         ),
     })
@@ -252,7 +271,7 @@ def build_daily_card(items: list, exec_summary: str = "") -> dict:
             "template": header_color,
             "title": {
                 "tag": "plain_text",
-                "content": f"📅 [日报] 全球游戏合规动态 ({yesterday_date})",
+                "content": f"📅 [日报] 全球游戏合规动态 ({date_label})",
             },
         },
         "elements": elements,
@@ -267,10 +286,44 @@ def main():
         print("❌ 未设置 FEISHU_WEBHOOK_URL 环境变量")
         sys.exit(1)
 
+    now_cst = datetime.now(_TZ_CST)
+    weekday = now_cst.weekday()  # 0=周一, 6=周日
+    is_monday = weekday == 0
+
     items = get_daily_items()
+
+    # ── 写入飞书多维表格（每天写入，包含周末，有数据才写）────────────────
+    if items:
+        from feishu_bitable import sync_items_to_bitable
+        sync_items_to_bitable(items)
+
+    # ── 飞书机器人推送（仅工作日：周一至周五）─────────────────────────
+    if weekday >= 5:
+        print(f"📅 今天是{'周六' if weekday == 5 else '周日'}，跳过飞书机器人推送")
+        return
+
     if not items:
-        print("✅ 过去 24 小时内无新增立法监管动态，无需推送")
-        sys.exit(0)
+        # 无新增动态也推送一张简洁卡片，让团队知道系统正常运行
+        print("✅ 无新增动态，推送'今日无新增'卡片")
+        yesterday = now_cst - timedelta(days=1)
+        if is_monday:
+            date_label = f"{(now_cst - timedelta(days=2)).strftime('%Y-%m-%d')} ~ {yesterday.strftime('%Y-%m-%d')}"
+            no_update_text = "周末至今无新增合规动态"
+        else:
+            date_label = yesterday.strftime("%Y-%m-%d")
+            no_update_text = "昨日无新增合规动态"
+        empty_card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "template": "green",
+                "title": {"tag": "plain_text", "content": f"📅 [日报] 全球游戏合规动态 ({date_label})"},
+            },
+            "elements": [
+                {"tag": "markdown", "content": f"✅ {no_update_text}"},
+            ],
+        }
+        send_card(webhook_url, empty_card)
+        return
 
     print(f"📡 发现 {len(items)} 条新增动态，发送飞书通知...")
 
@@ -286,17 +339,7 @@ def main():
     except Exception as e:
         print(f"⚠️  综述生成失败（将跳过）: {e}")
 
-    # ── 写入飞书多维表格（每天写入，包含周末）──────────────────────────
-    from feishu_bitable import sync_items_to_bitable
-    sync_items_to_bitable(items)
-
-    # ── 飞书机器人推送（仅工作日：周一至周五）─────────────────────────
-    weekday = datetime.now(_TZ_CST).weekday()  # 0=周一, 6=周日
-    if weekday >= 5:
-        print(f"📅 今天是{'周六' if weekday == 5 else '周日'}，跳过飞书机器人推送")
-        return
-
-    card = build_daily_card(items, exec_summary=exec_summary)
+    card = build_daily_card(items, exec_summary=exec_summary, is_monday=is_monday)
     send_card(webhook_url, card)
 
 
