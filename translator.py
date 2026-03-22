@@ -98,6 +98,14 @@ _TERM_CORRECTIONS: dict[str, str] = {
 }
 
 
+def _clamp_risk(val) -> int:
+    """将风险维度值钳位到 0-3 整数。"""
+    try:
+        return max(0, min(3, int(val)))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _apply_term_corrections(text: str) -> str:
     """将 AI 常见音译/意译错误替换回受保护的英文原文。"""
     for wrong, right in _TERM_CORRECTIONS.items():
@@ -264,7 +272,7 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
     try:
         resp = _AI_CLIENT.chat.completions.create(
             model=_LLM_MODEL,
-            max_tokens=450,
+            max_tokens=500,
             extra_body=_LLM_EXTRA_BODY,
             messages=[
                 {"role": "system", "content": _AI_SYSTEM},
@@ -393,6 +401,10 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
                     "region":        llm_region,
                     "category_l1":   llm_category_l1,
                     "status":        llm_status,
+                    "risk_revenue":  _clamp_risk(data.get("risk_revenue")),
+                    "risk_product":  _clamp_risk(data.get("risk_product")),
+                    "risk_urgency":  _clamp_risk(data.get("risk_urgency")),
+                    "risk_scope":    _clamp_risk(data.get("risk_scope")),
                 }
             logger.warning(f"[AI] JSON 字段为空: {json_str[:100]}")
         else:
@@ -593,7 +605,7 @@ def _ai_process_batch(items_data: list) -> list:
     try:
         resp = _AI_CLIENT.chat.completions.create(
             model=_LLM_MODEL,
-            max_tokens=350 * n,
+            max_tokens=380 * n,
             extra_body=_LLM_EXTRA_BODY,
             messages=[
                 {"role": "system", "content": _AI_SYSTEM},
@@ -743,6 +755,10 @@ def translate_items_batch(items_dicts: list, batch_size: int = 3) -> list:
             item_dict["_llm_region"]      = llm_region
             item_dict["_llm_category_l1"] = llm_category
             item_dict["_llm_status"]      = llm_status
+            item_dict["_llm_risk_revenue"] = _clamp_risk(raw.get("risk_revenue"))
+            item_dict["_llm_risk_product"] = _clamp_risk(raw.get("risk_product"))
+            item_dict["_llm_risk_urgency"] = _clamp_risk(raw.get("risk_urgency"))
+            item_dict["_llm_risk_scope"]   = _clamp_risk(raw.get("risk_scope"))
             results.append(item_dict)
 
         # 每批次 sleep 一次（代替原来每条 sleep）
@@ -1105,6 +1121,10 @@ def translate_item_fields(item_dict: dict) -> dict:
             item_dict["_llm_region"]      = result.get("region", "")
             item_dict["_llm_category_l1"] = result.get("category_l1", "")
             item_dict["_llm_status"]      = result.get("status", "")
+            item_dict["_llm_risk_revenue"] = result.get("risk_revenue", 0)
+            item_dict["_llm_risk_product"] = result.get("risk_product", 0)
+            item_dict["_llm_risk_urgency"] = result.get("risk_urgency", 0)
+            item_dict["_llm_risk_scope"]   = result.get("risk_scope", 0)
             time.sleep(4)   # 硅基流动免费层限速，4s 间隔确保不超限
             return item_dict
         logger.warning(f"AI 处理未返回有效结果，回退到 Google Translate: {title[:50]}")

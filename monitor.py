@@ -255,7 +255,7 @@ def cmd_run(args):
             if no_translate:
                 logger.info("已跳过翻译 (--no-translate)")
             else:
-                from classifier import score_impact
+                from classifier import score_impact, compute_composite_score
                 logger.info(f"正在批量翻译并分类 ({len(items)} 条，每批 3 篇)...")
                 kept_items = []
                 llm_filtered = 0
@@ -292,6 +292,24 @@ def cmd_run(args):
                             item.status,
                             item.source_name,
                             region=item.region,
+                            text=f"{item.title} {item.summary_zh}",
+                        )
+
+                    # ── LLM 四维风险评估覆盖 ────────────────────────────
+                    r_rev = translated.get("_llm_risk_revenue", 0)
+                    r_pro = translated.get("_llm_risk_product", 0)
+                    r_urg = translated.get("_llm_risk_urgency", 0)
+                    r_sco = translated.get("_llm_risk_scope", 0)
+                    if r_rev + r_pro + r_urg + r_sco > 0:
+                        item.risk_revenue = r_rev
+                        item.risk_product = r_pro
+                        item.risk_urgency = r_urg
+                        item.risk_scope = r_sco
+                        item.risk_source = "llm"
+                        item.impact_score = compute_composite_score(
+                            r_rev, r_pro, r_urg, r_sco,
+                            region=item.region,
+                            source_name=item.source_name,
                             text=f"{item.title} {item.summary_zh}",
                         )
 

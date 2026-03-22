@@ -27,6 +27,11 @@ class LegislationItem:
     title_zh: str = ""      # 标题中文翻译
     summary_zh: str = ""    # 摘要中文翻译
     impact_score: float = 1.0  # 影响评分 1.0–10.0 (状态 × 信源层级 × 核心市场 × 高风险内容)
+    risk_revenue: int = 0     # 营收影响 0-3
+    risk_product: int = 0     # 产品改动 0-3
+    risk_urgency: int = 0     # 时间紧迫性 0-3
+    risk_scope: int = 0       # 影响范围 0-3
+    risk_source: str = "regex"  # 评分来源: "regex" / "llm"
     id: Optional[int] = None
 
     def to_dict(self):
@@ -82,6 +87,11 @@ class Database:
             ("title_zh",     "TEXT DEFAULT ''"),
             ("summary_zh",   "TEXT DEFAULT ''"),
             ("impact_score", "REAL DEFAULT 1.0"),
+            ("risk_revenue", "INTEGER DEFAULT 0"),
+            ("risk_product", "INTEGER DEFAULT 0"),
+            ("risk_urgency", "INTEGER DEFAULT 0"),
+            ("risk_scope",   "INTEGER DEFAULT 0"),
+            ("risk_source",  "TEXT DEFAULT 'regex'"),
         ]:
             try:
                 self.conn.execute(f"SELECT {col} FROM legislation LIMIT 1")
@@ -100,16 +110,24 @@ class Database:
             self.conn.execute("""
                 INSERT INTO legislation
                     (region, category_l1, category_l2, title, date, status, summary,
-                     source_name, source_url, lang, title_zh, summary_zh, impact_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     source_name, source_url, lang, title_zh, summary_zh, impact_score,
+                     risk_revenue, risk_product, risk_urgency, risk_scope, risk_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(title, source_url) DO UPDATE SET
                     title_zh   = CASE WHEN excluded.title_zh   != '' THEN excluded.title_zh   ELSE legislation.title_zh   END,
-                    summary_zh = CASE WHEN excluded.summary_zh != '' THEN excluded.summary_zh ELSE legislation.summary_zh END
+                    summary_zh = CASE WHEN excluded.summary_zh != '' THEN excluded.summary_zh ELSE legislation.summary_zh END,
+                    risk_revenue = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_revenue ELSE legislation.risk_revenue END,
+                    risk_product = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_product ELSE legislation.risk_product END,
+                    risk_urgency = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_urgency ELSE legislation.risk_urgency END,
+                    risk_scope   = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_scope   ELSE legislation.risk_scope   END,
+                    risk_source  = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_source  ELSE legislation.risk_source  END
             """, (
                 item.region, item.category_l1, item.category_l2,
                 item.title, item.date, item.status, item.summary,
                 item.source_name, item.source_url, item.lang,
                 item.title_zh, item.summary_zh, item.impact_score,
+                item.risk_revenue, item.risk_product, item.risk_urgency,
+                item.risk_scope, item.risk_source,
             ))
             self.conn.commit()
             return self.conn.total_changes > 0
@@ -257,6 +275,11 @@ class Database:
                 title_zh TEXT,
                 summary_zh TEXT,
                 impact_score REAL,
+                risk_revenue INTEGER DEFAULT 0,
+                risk_product INTEGER DEFAULT 0,
+                risk_urgency INTEGER DEFAULT 0,
+                risk_scope INTEGER DEFAULT 0,
+                risk_source TEXT DEFAULT 'regex',
                 created_at TEXT,
                 archived_at TEXT DEFAULT (datetime('now')),
                 PRIMARY KEY (id)
@@ -271,10 +294,15 @@ class Database:
             INSERT OR IGNORE INTO legislation_archive
                 (id, region, category_l1, category_l2, title, date, status,
                  summary, source_name, source_url, lang, title_zh, summary_zh,
-                 impact_score, created_at)
+                 impact_score, risk_revenue, risk_product, risk_urgency,
+                 risk_scope, risk_source, created_at)
             SELECT id, region, category_l1, category_l2, title, date, status,
                    summary, source_name, source_url, lang, title_zh, summary_zh,
-                   impact_score, created_at
+                   impact_score,
+                   COALESCE(risk_revenue, 0), COALESCE(risk_product, 0),
+                   COALESCE(risk_urgency, 0), COALESCE(risk_scope, 0),
+                   COALESCE(risk_source, 'regex'),
+                   created_at
             FROM legislation
             WHERE date < ?
         """, (cutoff,))

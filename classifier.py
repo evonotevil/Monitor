@@ -520,6 +520,43 @@ def _high_risk_bonus(text: str) -> float:
     return bonus
 
 
+def compute_composite_score(
+    risk_revenue: int,
+    risk_product: int,
+    risk_urgency: int,
+    risk_scope: int,
+    region: str = "",
+    source_name: str = "",
+    text: str = "",
+) -> float:
+    """
+    基于 LLM 四维风险评估计算综合影响评分 (1.0–10.0)。
+
+    公式：
+      weighted = revenue×0.35 + product×0.25 + urgency×0.25 + scope×0.15
+      composite = weighted / 3.0 × 9.0 + 1.0    → [1.0, 10.0]
+
+    噪音过滤和高噪音来源降分逻辑与 score_impact() 保持一致。
+    """
+    # 硬件噪音 / Google-Apple 非核心文章 → 直接归零
+    if text and (_is_hardware_noise(text) or _is_google_apple_non_core(text)):
+        return 0.0
+
+    weighted = (
+        risk_revenue * 0.35
+        + risk_product * 0.25
+        + risk_urgency * 0.25
+        + risk_scope * 0.15
+    )
+    composite = weighted / 3.0 * 9.0 + 1.0
+
+    # 高噪音来源降分
+    if source_name and source_name in _HIGH_NOISE_SOURCES:
+        composite = max(1.0, composite * 0.5)
+
+    return round(min(10.0, max(1.0, composite)), 1)
+
+
 def score_impact(
     status: str,
     source_name: str,

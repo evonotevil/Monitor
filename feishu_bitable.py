@@ -190,6 +190,13 @@ def _build_record(item: dict) -> dict:
     if date_ms:
         fields["发布日期"] = date_ms
 
+    # LLM 四维风险评估（数值字段，Bitable 表需手动添加对应数字列）
+    if item.get("risk_source") == "llm":
+        fields["营收影响"]   = item.get("risk_revenue", 0)
+        fields["产品改动"]   = item.get("risk_product", 0)
+        fields["时间紧迫性"] = item.get("risk_urgency", 0)
+        fields["影响范围"]   = item.get("risk_scope", 0)
+
     return {"fields": fields}
 
 

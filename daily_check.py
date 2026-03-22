@@ -82,7 +82,12 @@ def get_daily_items() -> list:
         SELECT title, title_zh, summary_zh, summary, region, status, category_l1,
                source_url, date, created_at,
                COALESCE(impact_score, 1.0) AS impact_score,
-               COALESCE(source_name, '')   AS source_name
+               COALESCE(source_name, '')   AS source_name,
+               COALESCE(risk_revenue, 0)   AS risk_revenue,
+               COALESCE(risk_product, 0)   AS risk_product,
+               COALESCE(risk_urgency, 0)   AS risk_urgency,
+               COALESCE(risk_scope, 0)     AS risk_scope,
+               COALESCE(risk_source, 'regex') AS risk_source
         FROM legislation
         WHERE date IN (?, ?)
           AND created_at >= ?
@@ -113,6 +118,25 @@ def get_daily_items() -> list:
 
 _MAX_PER_GROUP = int(os.environ.get("DAILY_MAX_PER_GROUP", "3"))   # 日报每区域最多展示条数
 _MAX_TOTAL     = int(os.environ.get("DAILY_MAX_ITEMS", "12"))     # 日报全局上限
+
+# 风险维度标签（仅 LLM 评估且维度 ≥2 时展示）
+_RISK_DIM_LABELS = {
+    "risk_revenue": ("营收", "🔴"),
+    "risk_product": ("改动", "🟠"),
+    "risk_urgency": ("紧迫", "⚠️"),
+    "risk_scope":   ("范围", "🌐"),
+}
+
+
+def _build_risk_tags(item: dict) -> str:
+    """为 LLM 评估的高风险维度生成标签串，如"营收🔴·紧迫⚠️"。"""
+    if item.get("risk_source") != "llm":
+        return ""
+    tags = []
+    for dim, (label, emoji) in _RISK_DIM_LABELS.items():
+        if item.get(dim, 0) >= 2:
+            tags.append(f"{label}{emoji}")
+    return "·".join(tags)
 
 
 def build_daily_card(items: list, exec_summary: str = "") -> dict:
@@ -207,10 +231,13 @@ def build_daily_card(items: list, exec_summary: str = "") -> dict:
             summary_zh = (item.get("summary_zh") or item.get("summary") or "").strip()
             mechanism  = _smart_truncate(summary_zh, 100)
 
+            risk_tags = _build_risk_tags(item)
+            risk_line = f"　**{risk_tags}**" if risk_tags else ""
+
             elements.append({
                 "tag": "markdown",
                 "content": (
-                    f"{risk_em} **[{region}]** {status} · {cat_em} {cat}\n"
+                    f"{risk_em} **[{region}]** {status} · {cat_em} {cat}{risk_line}\n"
                     f"{title_md}\n"
                     f"🔧 **机制变动**：{mechanism}"
                 ),
