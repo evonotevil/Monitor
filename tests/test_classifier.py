@@ -292,26 +292,26 @@ class TestScoreImpact:
 
     def test_effective_official_core_market(self):
         """已生效 + 官方源 + 核心市场 = 高分"""
-        score = score_impact("已生效", "FTC News", region="美国", text="game regulation fine")
+        score = score_impact("已生效", "FTC News", region="北美", text="game regulation fine")
         assert score >= 9.0
 
     def test_draft_news_non_core(self):
         """草案 + 媒体源 + 非核心市场 = 低分"""
-        score = score_impact("草案/征求意见", "Random Blog", region="尼日利亚", text="game draft")
+        score = score_impact("草案/征求意见", "Random Blog", region="其他", text="game draft")
         assert score < 7.0
 
     def test_core_market_bonus(self):
         """核心市场（北美/欧洲/日韩/东南亚）应获得 +2.0 加成"""
-        score_core = score_impact("立法动态", "Random News", region="美国", text="game regulation")
-        score_non = score_impact("立法动态", "Random News", region="尼日利亚", text="game regulation")
+        score_core = score_impact("立法动态", "Random News", region="北美", text="game regulation")
+        score_non = score_impact("立法动态", "Random News", region="其他", text="game regulation")
         assert score_core > score_non
 
     def test_high_risk_gacha_fine(self):
         """概率公示处罚 = +1.5 高风险加成"""
         text_risk = "gacha fine penalty enforcement probability disclosure violation"
         text_safe = "game regulation general discussion"
-        score_risk = score_impact("执法动态", "FTC News", region="美国", text=text_risk)
-        score_safe = score_impact("执法动态", "FTC News", region="美国", text=text_safe)
+        score_risk = score_impact("执法动态", "FTC News", region="北美", text=text_risk)
+        score_safe = score_impact("执法动态", "FTC News", region="北美", text=text_safe)
         assert score_risk > score_safe
 
     def test_high_risk_app_store_delist(self):
@@ -334,20 +334,20 @@ class TestScoreImpact:
 
     def test_hardware_noise_zero_score(self):
         """硬件噪音文章 → 0 分"""
-        score = score_impact("已生效", "FTC News", region="美国",
+        score = score_impact("已生效", "FTC News", region="北美",
                              text="battery optimization mobile device energy saving")
         assert score == 0.0
 
     def test_google_non_core_zero_score(self):
         """Google 非核心话题 → 0 分"""
-        score = score_impact("已生效", "FTC News", region="美国",
+        score = score_impact("已生效", "FTC News", region="北美",
                              text="Google launches new Pixel phone camera")
         assert score == 0.0
 
     def test_score_clamped_to_10(self):
         """分数上限 10.0"""
         score = score_impact(
-            "已生效", "FTC News", region="美国",
+            "已生效", "FTC News", region="北美",
             text="gacha fine penalty probability disclosure App Store removed delisted "
                  "kernel-level anti-cheat privacy mandatory age verification"
         )

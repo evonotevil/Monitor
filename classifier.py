@@ -20,6 +20,7 @@ from config import (
     SOURCE_TIER_MAP, SOURCE_TIER_PATTERNS,
 )
 from models import LegislationItem
+from utils import _get_region_group
 
 # ── 噪音来源加载（由 monitor.py noise-sync 命令生成）───────────────────
 # 若文件不存在则静默忽略，不影响正常分类流程。
@@ -348,21 +349,7 @@ _IMPACT_STATUS_BASE = {
 # 同时包含显示分组名（北美/欧洲/东南亚）和具体国家名（美国/英国/越南等），
 # 因为 DB region 字段可能是 LLM 返回的国家名，而非显示分组名。
 _CORE_MARKETS = {
-    # 显示分组名
     "北美", "欧洲", "日韩", "港澳台", "东南亚", "大洋洲",
-    # 北美
-    "美国", "加拿大",
-    # 欧洲
-    "欧盟", "英国", "德国", "法国", "荷兰", "比利时", "奥地利",
-    "意大利", "西班牙", "波兰", "瑞典", "挪威",
-    # 东南亚
-    "越南", "印度尼西亚", "泰国", "菲律宾", "马来西亚", "新加坡",
-    # 南亚（印度是重要移动市场）
-    "印度", "南亚",
-    # 日韩台
-    "日本", "韩国", "台湾", "香港",
-    # 大洋洲
-    "澳大利亚", "新西兰",
 }
 
 # 高风险内容检测规则 (addon_score, patterns)
@@ -603,7 +590,7 @@ def classify_article(article: dict) -> LegislationItem:
     """对一篇文章进行区域、分类、状态、影响评分判定"""
     text = f"{article.get('title', '')} {article.get('summary', '')}".strip()
 
-    region = _detect_region(text, article.get("region", ""))
+    region = _get_region_group(_detect_region(text, article.get("region", "")))
     l1, l2 = _detect_category(text)
     status = _detect_status(text)
     source_name = article.get("source", "")

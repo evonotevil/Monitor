@@ -69,13 +69,20 @@ def _make_timeline_note(items_group: list) -> str:
 
 def _deduplicate_items(items):
     """
-    两阶段去重 + 事件级时间轴合并：
+    三阶段去重 + 事件级时间轴合并：
+
+    【阶段 0 — 同源限流】
+      同 source_name + 同 region + 日期差 ≤2 天 → 最多保留 3 条（按 impact_score 排序）。
+      防止单一 RSS 源（如 OAIC 官网）一次灌入几十条同质文章。
 
     【阶段 1 — 当日去重（2 天窗口）】
-      同 region + 日期差 ≤2 天 + bigram 相似度 >0.8 → 确定重复，保留高分项。
+      同 region + 日期差 ≤2 天：
+        - 标题 bigram 相似度 >0.8 → 直接合并（标题高度雷同）
+        - 同 category_l1 + 标题 bigram >0.55 → 合并（同主题同分类，措辞略有不同）
+      保留高分项。
 
-    【阶段 2 — 事件级聚类（14 天窗口）】
-      同 region + 同 category_l1 + 日期差 2–14 天 + 相似度 0.5–0.8
+    【阶段 2 — 事件级聚类（30 天窗口）】
+      同 region + 同 category_l1 + 日期差 2–30 天 + 相似度 ≥0.5
       → 候选为"同一监管事件的不同进展阶段"
       → 用 LLM verify_duplicate_pairs 确认（无 LLM 则用相似度 >0.65 启发式判断）
       → 确认后：保留状态权重最高项，并在其 summary_zh 末尾追加时间轴进展注释
@@ -84,9 +91,31 @@ def _deduplicate_items(items):
     """
     from models import LegislationItem
     from datetime import date as _date
+    from collections import defaultdict
     dropped: set[int] = set()
 
-    # ── 阶段 1：2 天窗口，高置信去重 ────────────────────────────────────
+    _SOURCE_CAP = 3  # 同源 + 同区域每日最多保留条数
+
+    # ── 阶段 0：同源限流 ─────────────────────────────────────────────────
+    # 按 (source_name, region) 分桶，桶内按 impact_score 降序，超过 cap 的丢弃
+    buckets: dict = defaultdict(list)
+    for i, item in enumerate(items):
+        key = (item.source_name or "", item.region or "")
+        buckets[key].append(i)
+
+    for key, indices in buckets.items():
+        if len(indices) <= _SOURCE_CAP:
+            continue
+        # 按 impact_score 降序排序，保留前 _SOURCE_CAP 条
+        indices.sort(key=lambda idx: -items[idx].impact_score)
+        for idx in indices[_SOURCE_CAP:]:
+            dropped.add(idx)
+        src, rgn = key
+        logger.info(
+            f"[同源限流] {src} × {rgn}：{len(indices)} 条 → 保留 {_SOURCE_CAP} 条"
+        )
+
+    # ── 阶段 1：2 天窗口，标题去重 ────────────────────────────────────
     for i, item_i in enumerate(items):
         if i in dropped:
             continue
@@ -105,7 +134,10 @@ def _deduplicate_items(items):
             except ValueError:
                 continue
             sim = _bigram_sim(item_i.title, item_j.title)
+            # 高相似标题直接合并（>0.8）；同分类则放宽到 0.55
             if sim > 0.8:
+                duplicates.append((j, sim))
+            elif sim > 0.55 and item_i.category_l1 == item_j.category_l1:
                 duplicates.append((j, sim))
         if duplicates:
             group = [(i, 0.0)] + duplicates
@@ -312,6 +344,9 @@ def cmd_run(args):
                             source_name=item.source_name,
                             text=f"{item.title} {item.summary_zh}",
                         )
+
+                    # ── 区域归一化：统一写入 9 大显示分组名 ────────
+                    item.region = _get_region_group(item.region)
 
                     kept_items.append(item)
 
