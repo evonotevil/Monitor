@@ -627,6 +627,15 @@ def _ai_process_batch(items_data: list) -> list:
             except json.JSONDecodeError as je:
                 logger.warning(f"[AI batch] JSON 解析失败 ({je})，降级逐条处理")
         else:
+            # LLM 可能返回单个 JSON 对象（批次为 1 条或忽略数组格式）
+            obj_m = re.search(r'\{.*\}', text, re.DOTALL)
+            if obj_m and n == 1:
+                try:
+                    obj = json.loads(obj_m.group())
+                    if isinstance(obj, dict):
+                        return [obj]
+                except json.JSONDecodeError:
+                    pass
             logger.warning(f"[AI batch] 未找到 JSON 数组，降级逐条处理: {text[:150]}")
 
     except Exception as e:
