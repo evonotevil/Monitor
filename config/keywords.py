@@ -1,5 +1,46 @@
 """搜索关键词库：多语言搜索关键词（聚焦手游出海合规）"""
 
+# ─── 数字行业信号词（官方/法律信源宽松过滤用）────────────────────────────
+#
+# 官方监管机构（如消費者庁、FTC、OAIC）发布的内容不要求包含严格的"游戏"关键词，
+# 但必须至少与数字/互联网行业相关，避免传统行业监管新闻（食品、通信贩卖等）混入。
+#
+# 纯字符串匹配（小写化后 in text_lower），无需正则语法，方便维护。
+# 添加新词只需追加一行字符串即可。
+#
+DIGITAL_INDUSTRY_SIGNALS = [
+    # ── 英语 ──
+    "game", "gaming", "video game", "mobile game",
+    "app", "application", "mobile app",
+    "online", "internet", "digital", "software", "platform",
+    "streaming", "e-commerce", "ecommerce",
+    "in-app", "iap", "microtransaction", "loot box", "gacha",
+    "virtual", "metaverse", "nft", "crypto", "blockchain",
+    "ai", "artificial intelligence", "algorithm",
+    "social media", "user-generated", "ugc",
+    "app store", "google play", "steam", "playstation", "xbox", "nintendo",
+    "esports", "e-sports",
+    # ── 日语 ──
+    "ゲーム", "アプリ", "オンライン", "インターネット", "デジタル",
+    "ソフトウェア", "プラットフォーム", "課金", "ガチャ",
+    "未成年", "sns", "人工知能", "電子商取引",
+    "ストリーミング", "コンテンツ",
+    # ── 韩语 ──
+    "게임", "앱", "온라인", "인터넷", "디지털",
+    "소프트웨어", "플랫폼", "과금", "미성년",
+    "콘텐츠", "전자상거래",
+    # ── 越南语 ──
+    "trò chơi", "ứng dụng", "trực tuyến",
+    # ── 泰语 ──
+    "เกม", "แอป", "ออนไลน์",
+    # ── 印尼语 ──
+    "permainan", "aplikasi",
+    # ── 阿拉伯语 ──
+    "ألعاب", "لعبة", "تطبيق",
+    # ── 中文（繁体，港澳台） ──
+    "遊戲", "應用程式", "線上",
+]
+
 # ─── PC 平台合规关键词（独立导出，供 fetcher 路由使用）────────────────────────
 #
 # 覆盖米哈游/Lilith/鹰角等中资游戏在 PC 端的合规风险：

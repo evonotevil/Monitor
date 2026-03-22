@@ -20,6 +20,7 @@ from config import (
     RSS_FEEDS,
     KEYWORDS,
     PC_PLATFORM_KEYWORDS_EN,
+    DIGITAL_INDUSTRY_SIGNALS,
     OFFICIAL_SITE_QUERIES,
     INDUSTRY_QUERY_NOISE_SUFFIX,
     GOOGLE_NEWS_SEARCH_TEMPLATE,
@@ -447,11 +448,21 @@ def is_legislation_relevant(article: dict) -> bool:
     if not has_regulatory:
         return False
 
-    # 官方/法律信源：只要有法规信号就通过，不强制要求游戏关键词
-    # 这些来源发布的内容本身就是法规/监管动态，即使标题没写"game"也值得收录
+    # 官方/法律信源：放宽但不取消数字行业关键词检查
+    # 避免传统行业监管新闻（食品、通信贩卖等）混入，但不要求严格的"游戏"关键词
+    # 信号词列表维护在 config/keywords.py → DIGITAL_INDUSTRY_SIGNALS
     source_tier = article.get("tier", "")
     if source_tier in ("official", "legal"):
-        return True
+        for signal in DIGITAL_INDUSTRY_SIGNALS:
+            if signal.isascii():
+                # ASCII 词用词边界匹配，避免 "ai" 误中 "oaic"、"complaint" 等
+                if re.search(r"\b" + re.escape(signal) + r"\b", text_lower, re.IGNORECASE):
+                    return True
+            else:
+                # CJK 等非 ASCII 直接子串匹配（每个字本身就是词边界）
+                if signal in text_lower:
+                    return True
+        return False
 
     # 其他信源：必须有游戏信号
     has_game = False

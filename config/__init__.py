@@ -8,7 +8,7 @@
 
 from config.regions import MONITORED_REGIONS, REGION_DISPLAY_ORDER
 from config.categories import CATEGORIES, STATUS_LABELS
-from config.keywords import PC_PLATFORM_KEYWORDS_EN, KEYWORDS
+from config.keywords import PC_PLATFORM_KEYWORDS_EN, KEYWORDS, DIGITAL_INDUSTRY_SIGNALS
 from config.feeds import RSS_FEEDS, GOOGLE_NEWS_SEARCH_TEMPLATE, GOOGLE_NEWS_REGIONS
 from config.sources import SOURCE_TIER_MAP, SOURCE_TIER_PATTERNS
 from config.settings import (
