@@ -30,6 +30,9 @@ from config import (
     DAILY_GOOGLE_NEWS_EN,
     DAILY_GOOGLE_NEWS_JA,
     DAILY_GOOGLE_NEWS_KO,
+    DAILY_GOOGLE_NEWS_VI,
+    DAILY_GOOGLE_NEWS_PT,
+    DAILY_GOOGLE_NEWS_TH,
 )
 from models import LegislationItem
 from classifier import classify_article, is_china_mainland
@@ -48,14 +51,25 @@ HEADERS = {
 }
 
 
-def safe_get(url: str, timeout: int = FETCH_TIMEOUT) -> Optional[requests.Response]:
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=timeout, allow_redirects=True)
-        resp.raise_for_status()
-        return resp
-    except requests.RequestException as e:
-        logger.warning(f"请求失败 {url}: {e}")
-        return None
+def safe_get(url: str, timeout: int = FETCH_TIMEOUT, max_retries: int = 3) -> Optional[requests.Response]:
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=timeout, allow_redirects=True)
+            if resp.status_code == 429:
+                wait = min(2 ** attempt * 5, 60)
+                logger.warning(f"请求限速(429) {url}，等待 {wait}s 后重试 ({attempt+1}/{max_retries})")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            return resp
+        except requests.RequestException as e:
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt * 2  # 2s, 4s, 8s
+                logger.warning(f"请求失败 {url}: {e}，{wait}s 后重试 ({attempt+1}/{max_retries})")
+                time.sleep(wait)
+            else:
+                logger.warning(f"请求失败 {url}: {e}（已重试 {max_retries} 次）")
+    return None
 
 
 # ─── RSS 解析 ─────────────────────────────────────────────────────────
@@ -153,6 +167,7 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
                 "source": feed_config["name"],
                 "region": feed_config.get("region", ""),
                 "lang": feed_config.get("lang", "en"),
+                "tier": feed_config.get("tier", ""),
             })
 
         for entry in root.findall(".//atom:entry", ns):
@@ -169,6 +184,7 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
                 "source": feed_config["name"],
                 "region": feed_config.get("region", ""),
                 "lang": feed_config.get("lang", "en"),
+                "tier": feed_config.get("tier", ""),
             })
 
     except ET.ParseError as e:
@@ -183,7 +199,7 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
 def fetch_google_news(query: str, region_key: str = "en_US", max_results: int = 0) -> List[dict]:
     """
     抓取 Google News RSS 结果。
-    max_results: 每个查询最多返回条数（0 = 不限，日报模式建议 10）。
+    max_results: 每个查询最多返回条数（0 = 不限，日报模式建议 20）。
     """
     region = GOOGLE_NEWS_REGIONS.get(region_key, GOOGLE_NEWS_REGIONS["en_US"])
     url = GOOGLE_NEWS_SEARCH_TEMPLATE.format(
@@ -392,7 +408,7 @@ def is_legislation_relevant(article: dict) -> bool:
     """
     严格过滤：必须同时满足:
     1. 包含法规/监管行动信号词
-    2. 包含游戏/互动娱乐信号词
+    2. 包含游戏/互动娱乐信号词（官方/法律信源可豁免此条件）
     3. 不匹配排除词模式
     4. 非中国大陆内容
     """
@@ -419,7 +435,13 @@ def is_legislation_relevant(article: dict) -> bool:
     if not has_regulatory:
         return False
 
-    # 必须有游戏信号
+    # 官方/法律信源：只要有法规信号就通过，不强制要求游戏关键词
+    # 这些来源发布的内容本身就是法规/监管动态，即使标题没写"game"也值得收录
+    source_tier = article.get("tier", "")
+    if source_tier in ("official", "legal"):
+        return True
+
+    # 其他信源：必须有游戏信号
     has_game = False
     for p in GAME_SIGNALS:
         if re.search(p, text_lower, re.IGNORECASE):
@@ -686,21 +708,26 @@ def fetch_all_rss() -> List[dict]:
 def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = False) -> List[dict]:
     """
     聚合所有语言/地区的 Google News 查询。
-    daily_mode=True：使用精选小查询集（约 15 条），控制请求量避免 IP 限速，每查询取前 10 条。
+    daily_mode=True：使用精选小查询集（约 15 条），控制请求量避免 IP 限速，每查询取前 20 条。
     weekly 模式：使用全量 KEYWORDS，以获得最大覆盖。
     """
     all_items = []
     when = f" when:{1 if daily_mode else max_days}d"
-    max_results_per_query = 10 if daily_mode else 0
+    max_results_per_query = 20 if daily_mode else 0
     # 英文通用查询降噪后缀（附加 -conference -summit -funding -investment）
     noise = INDUSTRY_QUERY_NOISE_SUFFIX
 
     if daily_mode:
-        # 日报：精选约 15 条宽泛查询，约 30 秒完成，避免 IP 限速
+        # 日报：精选查询，约 40 秒完成，避免 IP 限速
         locale_groups = [
             [(kw + when, "en_US") for kw in DAILY_GOOGLE_NEWS_EN],
             [(kw + when, "ja_JP") for kw in DAILY_GOOGLE_NEWS_JA],
             [(kw + when, "ko_KR") for kw in DAILY_GOOGLE_NEWS_KO],
+            (
+                [(kw + when, "vi_VN") for kw in DAILY_GOOGLE_NEWS_VI]
+                + [(kw + when, "pt_BR") for kw in DAILY_GOOGLE_NEWS_PT]
+                + [(kw + when, "th_TH") for kw in DAILY_GOOGLE_NEWS_TH]
+            ),
         ]
     else:
         # 周报：全量查询，最大覆盖
@@ -809,6 +836,29 @@ _GDELT_QUERIES = [
     (
         "(game OR gaming OR ألعاب) (regulation OR law OR تنظيم OR قانون) sourcecountry:AE",
         "阿联酋",
+    ),
+    # ── 日韩补充 ──
+    (
+        "(game OR gaming OR ゲーム OR ガチャ) (regulation OR law OR 規制 OR 法律 OR 処分) sourcecountry:JP",
+        "日本",
+    ),
+    (
+        "(game OR gaming OR 게임) (regulation OR law OR 규제 OR 법안) sourcecountry:KR",
+        "韩国",
+    ),
+    # ── 南美补充 ──
+    (
+        "(game OR gaming OR jogo) (regulation OR law OR regulação OR lei) sourcecountry:BR",
+        "巴西",
+    ),
+    # ── 东南亚补充 ──
+    (
+        "(game OR gaming) (regulation OR law OR privacy) sourcecountry:PH",
+        "菲律宾",
+    ),
+    (
+        "(game OR gaming) (regulation OR law OR privacy) sourcecountry:MY",
+        "马来西亚",
     ),
 ]
 

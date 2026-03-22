@@ -129,6 +129,55 @@ RSS_FEEDS = [
     # Canada Competition Bureau RSS — timeout，已移除
     # 新加坡 IMDA — 官方 RSS 已下线，由 Google News en_SG 关键词搜索替代
 
+    # ── 日本官方 (Official tier) ──────────────────────────────────────────
+    {
+        # 消費者庁 — ガチャ/景品表示法処分、未成年保護、広告規制
+        "name": "消費者庁 (CAA Japan)",
+        "url": "https://www.caa.go.jp/news.rss",
+        "lang": "ja",
+        "type": "rss",
+        "region": "日韩",
+        "tier": "official",
+    },
+    {
+        # 総務省 — 通信・放送規制、オンラインサービス、データ保護
+        "name": "総務省 (MIC Japan)",
+        "url": "https://www.soumu.go.jp/news.rdf",
+        "lang": "ja",
+        "type": "rss",
+        "region": "日韩",
+        "tier": "official",
+    },
+
+    # ── 東南アジア / 南米 / 大洋洲 官方 (Official tier) ──────────────────
+    {
+        # フィリピン国家プライバシー委員会 — データ保護執法
+        "name": "Philippines NPC",
+        "url": "https://privacy.gov.ph/feed/",
+        "lang": "en",
+        "type": "rss",
+        "region": "东南亚",
+        "tier": "official",
+    },
+    {
+        # ブラジル ANPD — LGPD 執法、データ保護規制
+        "name": "Brazil ANPD",
+        "url": "https://www.gov.br/anpd/RSS",
+        "lang": "pt",
+        "type": "rss",
+        "region": "南美",
+        "tier": "official",
+    },
+    {
+        # オーストラリア ACCC — 消費者保護執法、競争法
+        "name": "ACCC (Australia)",
+        "url": "https://www.accc.gov.au/rss/media_releases.xml",
+        "lang": "en",
+        "type": "rss",
+        "region": "大洋洲",
+        "tier": "official",
+    },
+
     # ── 更多行业媒体 (Industry tier) ──────────────────────────────────
     {
         "name": "Pocket Gamer",

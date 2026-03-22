@@ -34,6 +34,18 @@ OFFICIAL_SITE_QUERIES = [
     "game regulation site:oaic.gov.au",                    # 澳大利亚信息专员办公室
     "game online safety site:acma.gov.au",                 # 澳大利亚通信和媒体局
     "game regulation site:meity.gov.in",                   # 印度电子信息技术部
+    # ── 日本 ────────────────────────────────────────────────────────────
+    "ゲーム 規制 site:caa.go.jp",                            # 消費者庁
+    "ゲーム OR ガチャ site:soumu.go.jp",                     # 総務省
+    # ── 韩国 ────────────────────────────────────────────────────────────
+    "게임 규제 site:grac.or.kr",                              # GRAC 游戏管理委员会
+    "게임 site:kcc.go.kr",                                    # 放送通信委员会
+    # ── 南美 ────────────────────────────────────────────────────────────
+    "jogo regulação site:gov.br/anpd",                       # 巴西 ANPD
+    "game regulation site:gob.mx",                            # 墨西哥政府
+    # ── 东南亚补充 ──────────────────────────────────────────────────────
+    "game regulation site:privacy.gov.ph",                    # 菲律宾 NPC
+    "game regulation site:pdpc.or.th",                        # 泰国 PDPC
     # ── 中东 ────────────────────────────────────────────────────────────
     "game content license site:gcam.gov.sa",               # 沙特 GCAM（游戏内容许可）
     "game regulation site:tra.gov.ae",                     # 阿联酋 TRA
@@ -64,6 +76,10 @@ DAILY_GOOGLE_NEWS_EN = [
     'game (OFAC OR sanctions OR AML OR "virtual asset") compliance',
     # 亚洲（韩国 / 东南亚）监管动态
     '(Korea OR Vietnam OR Indonesia OR Thailand OR Philippines) game regulation OR law',
+    # 日本监管动态（英文媒体对日本的报道）
+    'Japan game (regulation OR law OR "age rating" OR gacha OR privacy)',
+    # 南美监管动态
+    '(Brazil OR Mexico OR Argentina) game (regulation OR law OR LGPD OR privacy)',
     # 澳大利亚 / 大洋洲
     '(Australia OR "New Zealand") game (online safety OR privacy OR regulation)',
     # 经营合规（本地代理 / 许可证）
@@ -81,4 +97,15 @@ DAILY_GOOGLE_NEWS_JA = [
 DAILY_GOOGLE_NEWS_KO = [
     "게임 규제 법안 OR 처분 OR 의무",
     "확률형 아이템 OR 게임산업진흥법 OR 대리인 규제",
+]
+
+# 日报东南亚/南美精选（补充薄弱地区的日常覆盖）
+DAILY_GOOGLE_NEWS_VI = [
+    "trò chơi điện tử quy định OR nghị định OR luật",
+]
+DAILY_GOOGLE_NEWS_PT = [
+    "jogo regulação OR lei OR LGPD OR proteção",
+]
+DAILY_GOOGLE_NEWS_TH = [
+    "เกม กฎหมาย OR ระเบียบ OR PDPA",
 ]
