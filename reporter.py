@@ -996,6 +996,9 @@ def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dic
         f'<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n'
         f'<meta charset="UTF-8">\n'
         f'<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+        f'<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">\n'
+        f'<meta http-equiv="Pragma" content="no-cache">\n'
+        f'<meta http-equiv="Expires" content="0">\n'
         f'<title>Lilith Legal 全球合规动态周报</title>\n'
         f'<style>{_MOBILE_CSS}</style>\n</head>\n<body>\n'
         f'<div class="app-view">\n'
@@ -1260,6 +1263,9 @@ def generate_html(items: List[dict], title: str = "全球游戏行业立法动�
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>{html_mod.escape(title)}</title>
 <style>
 /* ── 基础 Reset ── */

@@ -76,9 +76,10 @@ jobs:
           REPO_NAME="${REPO##*/}"
           OWNER="${REPO%%/*}"
           PAGES_BASE="https://${OWNER}.github.io/${REPO_NAME}/reports"
-          echo "MOBILE_URL=${PAGES_BASE}/latest-mobile.html" >> $GITHUB_ENV
-          echo "PC_URL=${PAGES_BASE}/latest-pc.html" >> $GITHUB_ENV
-          echo "HTML_URL=${PAGES_BASE}/latest-mobile.html" >> $GITHUB_ENV
+          CACHE_BUST="v=$(date +%s)"
+          echo "MOBILE_URL=${PAGES_BASE}/latest-mobile.html?${CACHE_BUST}" >> $GITHUB_ENV
+          echo "PC_URL=${PAGES_BASE}/latest-pc.html?${CACHE_BUST}" >> $GITHUB_ENV
+          echo "HTML_URL=${PAGES_BASE}/latest-mobile.html?${CACHE_BUST}" >> $GITHUB_ENV
           python -c "
           from datetime import datetime, timedelta
           import urllib.parse, os
