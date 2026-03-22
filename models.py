@@ -114,6 +114,10 @@ class Database:
                      risk_revenue, risk_product, risk_urgency, risk_scope, risk_source)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(title, source_url) DO UPDATE SET
+                    region     = excluded.region,
+                    category_l1 = CASE WHEN excluded.category_l1 != '' THEN excluded.category_l1 ELSE legislation.category_l1 END,
+                    status     = CASE WHEN excluded.status     != '' THEN excluded.status     ELSE legislation.status     END,
+                    impact_score = CASE WHEN excluded.impact_score > 0 THEN excluded.impact_score ELSE legislation.impact_score END,
                     title_zh   = CASE WHEN excluded.title_zh   != '' THEN excluded.title_zh   ELSE legislation.title_zh   END,
                     summary_zh = CASE WHEN excluded.summary_zh != '' THEN excluded.summary_zh ELSE legislation.summary_zh END,
                     risk_revenue = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_revenue ELSE legislation.risk_revenue END,
@@ -240,12 +244,33 @@ class Database:
         """, (limit,)).fetchall()
         return [dict(row) for row in rows]
 
-    def update_translation(self, item_id: int, title_zh: str, summary_zh: str):
-        """直接按 id 更新翻译字段。"""
-        self.conn.execute(
-            "UPDATE legislation SET title_zh = ?, summary_zh = ? WHERE id = ?",
-            (title_zh, summary_zh, item_id),
-        )
+    def update_translation(self, item_id: int, title_zh: str, summary_zh: str,
+                           region: str = "", category_l1: str = "",
+                           status: str = "", impact_score: float = 0.0,
+                           risk_revenue: int = 0, risk_product: int = 0,
+                           risk_urgency: int = 0, risk_scope: int = 0,
+                           risk_source: str = ""):
+        """直接按 id 更新翻译字段，可选更新分类/地区/风险评估。"""
+        sql = "UPDATE legislation SET title_zh = ?, summary_zh = ?"
+        params: list = [title_zh, summary_zh]
+        if region:
+            sql += ", region = ?"
+            params.append(region)
+        if category_l1:
+            sql += ", category_l1 = ?"
+            params.append(category_l1)
+        if status:
+            sql += ", status = ?"
+            params.append(status)
+        if impact_score > 0:
+            sql += ", impact_score = ?"
+            params.append(impact_score)
+        if risk_source:
+            sql += ", risk_revenue = ?, risk_product = ?, risk_urgency = ?, risk_scope = ?, risk_source = ?"
+            params.extend([risk_revenue, risk_product, risk_urgency, risk_scope, risk_source])
+        sql += " WHERE id = ?"
+        params.append(item_id)
+        self.conn.execute(sql, params)
         self.conn.commit()
 
     def delete_item(self, item_id: int):

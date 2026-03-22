@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from models import Database
 from fetcher import fetch_and_process
 from translator import translate_items_batch
-from reporter import print_table, save_markdown, save_html, generate_markdown
+from reporter import print_table, save_markdown, save_html
 from utils import _get_region_group, _bigram_sim
 from config import PERIOD_DAYS
 
@@ -234,7 +234,7 @@ def _deduplicate_items(items):
     merged = len(items) - len(result)
     if merged:
         logger.info(
-            f"[去重] 两阶段去重：{len(items)} 条 → {len(result)} 条（合并 {merged} 条）"
+            f"[去重] 三阶段去重：{len(items)} 条 → {len(result)} 条（合并 {merged} 条）"
         )
     return result
 
@@ -504,6 +504,7 @@ def cmd_retranslate(args):
     让旧数据库条目也能享受最新翻译质量。
     """
     from translator import _TERM_CORRECTIONS, translate_item_fields
+    from classifier import score_impact, compute_composite_score
 
     db = Database()
     try:
@@ -535,13 +536,42 @@ def cmd_retranslate(args):
                 logger.info(f"  ✗ [删除] [{item_dict.get('region','')}] {item_dict.get('title','')[:40]}")
                 continue
             if translated.get("title_zh"):
+                # 提取 LLM 分类结果
+                llm_region   = translated.get("_llm_region", "")
+                llm_category = translated.get("_llm_category_l1", "")
+                llm_status   = translated.get("_llm_status", "")
+                region = _get_region_group(llm_region) if llm_region else _get_region_group(item_dict.get("region", ""))
+
+                # 提取 LLM 风险评估
+                r_rev = translated.get("_llm_risk_revenue", 0)
+                r_pro = translated.get("_llm_risk_product", 0)
+                r_urg = translated.get("_llm_risk_urgency", 0)
+                r_sco = translated.get("_llm_risk_scope", 0)
+                risk_source = "llm" if r_rev + r_pro + r_urg + r_sco > 0 else ""
+
+                # 计算影响评分
+                text = f"{item_dict.get('title', '')} {translated.get('summary_zh', '')}"
+                if risk_source:
+                    impact = compute_composite_score(r_rev, r_pro, r_urg, r_sco,
+                                                     region=region, source_name=item_dict.get("source_name", ""), text=text)
+                else:
+                    status = llm_status or item_dict.get("status", "立法动态")
+                    impact = score_impact(status, item_dict.get("source_name", ""), region=region, text=text)
+
                 db.update_translation(
                     item_dict["id"],
                     translated["title_zh"],
                     translated.get("summary_zh", ""),
+                    region=region,
+                    category_l1=llm_category,
+                    status=llm_status,
+                    impact_score=impact,
+                    risk_revenue=r_rev, risk_product=r_pro,
+                    risk_urgency=r_urg, risk_scope=r_sco,
+                    risk_source=risk_source,
                 )
                 updated += 1
-                logger.info(f"  ✓ [{item_dict.get('region','')}] {translated['title_zh'][:40]}")
+                logger.info(f"  ✓ [{region}] {translated['title_zh'][:40]}")
         if deleted:
             logger.info(f"[重译] 删除 {deleted} 条 LLM 判定不相关条目")
         logger.info(f"[重译] 完成，共更新 {updated} 条。")

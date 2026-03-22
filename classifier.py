@@ -6,7 +6,7 @@
 影响评分 (1.0–10.0, 面向中资游戏出海):
   高风险 ≥9.0 — 概率公示处罚 / 应用商店下架 / 移动端平台强制政策(DMA/IDFA/IAP) / PC反作弊隐私被诉
   中风险 ≥7.0 — 跨平台数据限制 / 强制年龄验证
-  核心市场 (北美/欧洲/日本/韩国/东南亚) 自动 +2.0
+  核心市场 (北美/欧洲/日韩/港澳台/东南亚/大洋洲) 自动 +2.0
   移动端优先：App Store/Google Play 政策变更 ≥ PC 合规风险（移动端是 Lilith/鹰角/米哈游营收主渠道）
 """
 
@@ -296,6 +296,23 @@ CATEGORY_PATTERNS = {
         "AI偏见/公平性审计": [r"AI.*bias|algorithm.*(?:audit|fairness)|AI.*discriminat|算法.*(?:偏见|公平|审计)"],
         "AI训练数据合规": [r"train.*data.*(?:consent|copyright|regulat)|AI.*train.*(?:user|player).*data|训练数据.*(?:合规|同意)"],
     },
+
+    # ── 金融合规与支付 ────────────────────────────────────────────────────
+    # OFAC 制裁、AML/反洗钱、虚拟资产/游戏币跨境监管、加密货币支付、KYC
+    "金融合规与支付": {
+        "_l1": [
+            r"OFAC|sanction.*(?:game|developer|publisher)|制裁.*(?:游戏|开发)",
+            r"AML|anti.?money.?launder|反洗钱|money.?launder.*(?:game|virtual|online)",
+            r"KYC|know.?your.?customer|身份验证.*(?:支付|金融)",
+            r"virtual.*(?:asset|currency).*(?:regulat|law|comply)|游戏币.*(?:跨境|监管|合规)",
+            r"crypto.*(?:pay|game|regulat)|blockchain.*(?:pay|regulat|comply)",
+        ],
+        "OFAC/制裁合规": [r"OFAC|sanction.*(?:game|developer|publisher|country)|制裁.*(?:游戏|开发商)"],
+        "AML/反洗钱": [r"AML|anti.?money.?launder|反洗钱|money.?launder.*(?:game|virtual)"],
+        "KYC身份验证": [r"KYC|know.?your.?customer|identity.*verif.*(?:pay|financ)|身份验证.*(?:支付|金融)"],
+        "虚拟资产/游戏币监管": [r"virtual.*(?:asset|currency).*(?:regulat|law)|游戏币.*(?:跨境|监管)|virtual.*item.*(?:regulat|law)"],
+        "加密货币支付合规": [r"crypto.*(?:pay|game|regulat)|blockchain.*(?:pay|regulat)|NFT.*(?:pay|financ|regulat)"],
+    },
 }
 
 
@@ -346,8 +363,7 @@ _IMPACT_STATUS_BASE = {
 }
 
 # 核心市场 — Lilith/米哈游/鹰角出海核心营收来源
-# 同时包含显示分组名（北美/欧洲/东南亚）和具体国家名（美国/英国/越南等），
-# 因为 DB region 字段可能是 LLM 返回的国家名，而非显示分组名。
+# region 字段已归一化为 9 大显示分组名，此处只需列出核心分组。
 _CORE_MARKETS = {
     "北美", "欧洲", "日韩", "港澳台", "东南亚", "大洋洲",
 }

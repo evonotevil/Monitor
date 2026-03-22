@@ -122,7 +122,7 @@ def normalize_status(status: str) -> str:
 
 
 def _get_region_group(region: str) -> str:
-    """将原始 region 字段值映射到 5 大显示分组，找不到时返回'其他'。"""
+    """将原始 region 字段值映射到 9 大显示分组，找不到时返回'其他'。"""
     if region in _REGION_GROUP_MAP:
         return _REGION_GROUP_MAP[region]
     # 模糊匹配（处理子串、组合名称等边界情况）

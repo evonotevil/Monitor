@@ -1122,10 +1122,10 @@ def translate_item_fields(item_dict: dict) -> dict:
             item_dict["_llm_region"]      = result.get("region", "")
             item_dict["_llm_category_l1"] = result.get("category_l1", "")
             item_dict["_llm_status"]      = result.get("status", "")
-            item_dict["_llm_risk_revenue"] = result.get("risk_revenue", 0)
-            item_dict["_llm_risk_product"] = result.get("risk_product", 0)
-            item_dict["_llm_risk_urgency"] = result.get("risk_urgency", 0)
-            item_dict["_llm_risk_scope"]   = result.get("risk_scope", 0)
+            item_dict["_llm_risk_revenue"] = _clamp_risk(result.get("risk_revenue", 0))
+            item_dict["_llm_risk_product"] = _clamp_risk(result.get("risk_product", 0))
+            item_dict["_llm_risk_urgency"] = _clamp_risk(result.get("risk_urgency", 0))
+            item_dict["_llm_risk_scope"]   = _clamp_risk(result.get("risk_scope", 0))
             time.sleep(4)   # 硅基流动免费层限速，4s 间隔确保不超限
             return item_dict
         logger.warning(f"AI 处理未返回有效结果，回退到 Google Translate: {title[:50]}")
