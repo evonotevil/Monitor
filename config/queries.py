@@ -86,6 +86,8 @@ DAILY_GOOGLE_NEWS_EN = [
     'game ("local agent" OR license OR representative) regulation overseas publisher',
     # 年龄分级（PEGI / ESRB / 各国评级）
     'game age (rating OR verification) regulation law',
+    # 消费上限 / VIP / 保底机制 / 社交消费压力
+    'game (spending cap OR "spending limit" OR "pity system" OR VIP) regulation consumer',
 ]
 
 # 日报非英文精选（日韩各 2-3 条，重点覆盖本地监管机构动态）

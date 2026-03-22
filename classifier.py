@@ -83,7 +83,7 @@ COUNTRY_PATTERNS = {
     # 韩国
     "韩国": [r"korea|korean|韩国|한국|GRAC|게임|게임산업진흥|확률형|문화체육관광부"],
     # 大洋洲
-    "澳大利亚": [r"australia|australian|澳大利亚|澳洲|ACCC|eSafety"],
+    "澳大利亚": [r"australia|australian|澳大利亚|澳洲|ACCC|eSafety|OAIC"],
     "新西兰": [r"new zealand|新西兰"],
     # 中东/非洲
     "沙特": [r"saudi|沙特|GAMERS"],
@@ -134,6 +134,7 @@ CATEGORY_PATTERNS = {
             r"확률형|ガチャ|开箱|抽奖|抽卡|涉赌|随机道具",
             r"pay.?to.?win|microtransaction|virtual.*currenc|game.*monetiz",
             r"battle.?pass|season.?pass|FOMO.*game|NFT.*game|blockchain.*game|play.?to.?earn",
+            r"VIP.*(?:system|tier|spend|monetiz).*(?:game|regulat)|pity.*system.*(?:game|gacha)|天井.*(?:公示|規制)|천장.*공시",
         ],
         "抽奖/开箱(Loot Box)": [r"loot.?box|gacha|random.*item|random.*reward|开箱|抽奖|抽卡|ガチャ|확률형"],
         "概率公示": [r"probability.*disclos|odds.*disclos|drop.*rate|概率公示|確率表示"],
@@ -141,6 +142,8 @@ CATEGORY_PATTERNS = {
         "付费随机机制": [r"pay.*random|paid.*random|random.*purchas|random.*paid|무작위.*구매"],
         "涉赌认定": [r"gambling.*game|game.*gambling|gaming.*mechanic.*gambling|类赌博|涉赌|賭博.*ゲーム"],
         "游戏内购规范": [r"in.?app.*purchas|IAP|microtransaction|内购|인앱결제"],
+        "VIP消费分层": [r"VIP.*(?:system|tier|level|spend|monetiz).*(?:game|regulat|predator|consumer)|VIP.*課金|VIP.*과금"],
+        "保底机制公示": [r"pity.*(?:system|rate|guarantee).*(?:disclos|regulat|law|transpar)|guaranteed.*drop.*(?:disclos|regulat)|天井.*(?:公示|義務|規制)|천장.*(?:공시|의무)"],
         "战令/季票(Battle Pass)": [r"battle.?pass|season.?pass|seasonal.*content.*regulat|FOMO.*game.*regulat|time.?limited.*offer.*game"],
         "NFT/Web3游戏资产": [r"NFT.*game|blockchain.*game|play.?to.?earn|game.*token.*regulat|Web3.*game|crypto.*game.*asset"],
     },
@@ -169,22 +172,25 @@ CATEGORY_PATTERNS = {
             r"dark.?pattern|misleading.*ad|deceptive.*ad|false.*advertis",
             r"influencer.*disclos|sponsorship.*disclos|KOL.*comply|网红.*合规",
             r"广告.*合规|广告.*规定|广告.*法|营销.*合规",
+            r"engagement.*(?:manipulat|mechanic|exploit).*(?:game|regulat|dark)",
         ],
         "虚假广告": [r"misleading.*ad|false.*advertis|deceptive.*ad|虚假广告|誤認表示|허위광고"],
         "营销披露": [r"advertis.*disclos|marketing.*disclos|sponsor.*disclos|营销披露|広告表示"],
         "网红/KOL合规": [r"influencer.*(?:law|rule|disclos|comply)|KOL.*comply|streamer.*disclos|网红|YouTuber.*rule"],
         "价格透明度": [r"price.*transparen|pricing.*disclos|price.*disclos|价格透明|価格表示"],
-        "暗黑模式": [r"dark.?pattern|manipulat.*design|deceptive.*design|暗黑模式|다크패턴"],
+        "暗黑模式": [r"dark.?pattern|manipulat.*design|deceptive.*design|暗黑模式|다크패턴|engagement.*(?:manipulat|exploit).*(?:game|regulat)"],
         "促销活动合规": [r"promotion.*law|promotion.*rule|sale.*law|促销.*合规|景品表示"],
     },
 
     # ── 消费者保护 ──────────────────────────────────────────────────
     "消费者保护": {
         "_l1": [
-            r"consumer.*protect|consumer.*right|消费者保护|消費者保護|소비자 보호",
+            r"consumer.*protect|consumer.*right|消费者保護|消費者保護|소비자 보호",
             r"refund.*game|chargeback.*game|game.*refund",
             r"subscription.*auto.?renew|auto.?renew.*subscript",
             r"FTC.*consumer|consumer.*fine|consumer.*law",
+            r"spending.*(?:cap|limit|ceiling|cool).*(?:game|regulat|law)|課金.*(?:上限|制限)|과금.*(?:상한|제한)",
+            r"(?:social|guild|alliance|clan).*(?:pressure|spend|donat).*(?:game|regulat|consumer)",
         ],
         "退款政策": [r"refund|chargeback|退款|返金|환불"],
         "订阅自动续费": [r"auto.?renew|subscription.*renew|自动续费|自動更新|자동갱신"],
@@ -193,6 +199,8 @@ CATEGORY_PATTERNS = {
         "虚假宣传": [r"mislead.*consumer|deceptive.*consumer|false.*claim.*consumer|虚假宣传|不当表示"],
         "强制仲裁条款": [r"forced.*arbitrat|mandator.*arbitrat|arbitrat.*clause.*game|强制仲裁"],
         "误触消费/儿童误购": [r"accidental.*purchas|unintend.*purchas|child.*accidental.*buy|误触消费|误购"],
+        "消费上限/冷却期": [r"spending.*(?:cap|limit|ceiling).*(?:game|regulat|law)|cool(?:ing)?.?(?:off|down).*(?:period|purchas).*(?:game|regulat)|課金.*(?:上限|制限)|과금.*(?:상한|제한)"],
+        "社交消费压力": [r"(?:social|guild|alliance|clan).*(?:pressure|spend|donat).*(?:game|regulat|consumer)|ギルド.*課金.*圧力|길드.*과금.*압력"],
     },
 
     # ── 经营合规（本地代理/代表处/许可/分级） ──────────────────────────
@@ -203,6 +211,7 @@ CATEGORY_PATTERNS = {
             r"foreign.*(?:game|developer|publisher).*(?:require|registr|agent|licens)",
             r"本地代理|本地代表|本地发行|经营合规|대리인.*게임|게임.*대리인",
             r"market.*access.*game|game.*market.*entry|game.*operation.*permit",
+            r"(?:account|アカウント|계정).*(?:trad|sell|buy|RMT).*(?:game|regulat|ban|law)",
         ],
         "本地代理/代表处": [r"local.*agent|local.*represent|대리인|게임.*대리인|local.*entity.*game|本地代理"],
         "游戏许可/牌照": [r"game.*licens|game.*permit|游戏许可|游戏牌照|게임 사업자|사업자 등록"],
@@ -210,6 +219,7 @@ CATEGORY_PATTERNS = {
         "税务合规": [r"(?:digital|game).*tax|数字税|税务合规|GST.*game|VAT.*game|游戏税"],
         "外资限制": [r"foreign.*(?:invest|own|company).*restrict|外资限制|FDI.*game"],
         "本地发行商要求": [r"local.*publisher.*require|local.*distributor|overseas.*publisher.*local|海外.*本地发行"],
+        "账号交易/RMT": [r"(?:account|アカウント|계정).*(?:trad|sell|buy|RMT).*(?:game|regulat|ban|law)|real.?money.*trad.*(?:game|regulat|ban)|RMT.*(?:game|regulat|ban)"],
     },
 
     # ── 平台政策 ──────────────────────────────────────────────────────
@@ -412,6 +422,14 @@ _HIGH_RISK_PATTERNS: list = [
         r"kernel.?level.*anti.?cheat.*(?:privac|sued|lawsuit|ban|fine|regulat)",
         r"anti.?cheat.*(?:privac\w*.*violat|sued|lawsuit|fine|regulat)",
         r"(?:driver|kernel).*anti.?cheat.*(?:privac|data.*collect|ban)",
+    ]),
+    # (+1.0) 消费上限/冷却期立法 — 直接限制付费天花板，影响 Lilith 全线产品营收模型
+    (1.0, [
+        r"spending.*(?:cap|limit|ceiling).*(?:game|mobile|online).*(?:law|legislat|regulat|mandate|ban)",
+        r"(?:law|legislat|regulat|mandate)\w*.*spending.*(?:cap|limit|ceiling).*(?:game|mobile)",
+        r"(?:purchas|pay\w+).*(?:cool\w*.*(?:off|down)|waiting.*period).*(?:game|law|regulat|mandate)",
+        r"課金.*上限.*(?:法律|規制|義務|法案)",
+        r"과금.*상한.*(?:법안|규제|의무|법률)",
     ]),
     # (+0.5) PC/移动端跨平台数据转移限制
     (0.5, [

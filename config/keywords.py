@@ -164,6 +164,42 @@ KEYWORDS = {
         "crypto payment game regulation",
         "KYC game player verification",
 
+        # === VIP 等级 / 消费分层 / 消费上限 ===
+        "game VIP system spending tier regulation consumer",
+        '"VIP level" game predatory monetization regulation',
+        "game spending cap limit cooldown regulation law",
+        "mobile game spending limit consumer protection",
+        "game purchase cooling-off period regulation",
+
+        # === 保底机制 / Pity System 公示 ===
+        '"pity system" OR "guaranteed drop" gacha game regulation disclosure',
+        "gacha pity rate disclosure transparency law",
+        "game drop rate guarantee consumer regulation",
+
+        # === Idle / 放置类参与度操纵 ===
+        "idle game engagement manipulation regulation",
+        '"engagement mechanic" game consumer regulation dark pattern',
+        "game addiction mechanic idle reward regulation",
+
+        # === 联盟 / 公会社交消费压力 ===
+        '"social pressure" game spending guild alliance regulation',
+        "game social spending mechanic consumer protection",
+        "guild alliance donation game consumer regulation",
+
+        # === SLG / 策略游戏竞争公平 ===
+        '"pay to win" strategy game consumer regulation law',
+        "mobile strategy game competitive fairness regulation",
+        "game power advantage spending consumer protection",
+
+        # === 射击游戏年龄分级 ===
+        "shooter game age rating regulation violence",
+        "FPS game content rating minor restriction",
+        "battle royale game age restriction regulation",
+
+        # === 账号交易 / RMT ===
+        "game account trading regulation law",
+        "real money trading game virtual item regulation",
+
         # === 战令/季票/FOMO 机制 ===
         '"battle pass" game regulation law',
         '"season pass" game consumer regulation',
@@ -230,6 +266,12 @@ KEYWORDS = {
         "ステルスマーケティング ゲーム 規制 景品表示法",
         "AI 規制 ゲームコンテンツ 法律",
         "ゲーム AI 生成 コンテンツ 規制",
+        # VIP / 課金上限 / 天井（保底）/ 放置ゲーム
+        "ゲーム 課金 上限 規制 法律",
+        "ガチャ 天井 確率表示 義務 規制",
+        "ゲーム 課金 冷却期間 消費者保護",
+        "放置ゲーム 課金 規制",
+        "ゲーム アカウント売買 RMT 規制",
     ],
     "ko": [
         "게임 규제 법안",
@@ -250,6 +292,12 @@ KEYWORDS = {
         "개인정보보호위원회 게임 처분 제재",
         "확률형 아이템 공시 의무 게임사",
         "게임 소비자 분쟁 조정 법률",
+        # VIP / 과금 상한 / 천장(보底) / 방치게임 / 계정거래
+        "게임 과금 상한 규제 법안",
+        "확률형 아이템 천장 공시 의무",
+        "게임 결제 냉각기간 소비자 보호",
+        "방치형 게임 과금 규제",
+        "게임 계정 거래 RMT 규제 법률",
     ],
     "vi": [
         "quy định trò chơi điện tử",
