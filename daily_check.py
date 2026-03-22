@@ -37,6 +37,19 @@ from utils import (
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
 
+def _smart_truncate(text: str, max_len: int = 100) -> str:
+    """在句号/分号/逗号处智能截断，避免在词语中间切断。"""
+    if len(text) <= max_len:
+        return text
+    # 在 max_len 范围内找最后一个断句符
+    chunk = text[:max_len]
+    for sep in ("。", "；", "；", "，", ",", "、", ". ", "; "):
+        pos = chunk.rfind(sep)
+        if pos >= max_len // 2:  # 至少保留一半长度
+            return chunk[:pos + len(sep)].rstrip() + "…"
+    # 没找到合适断句符，硬切
+    return chunk.rstrip() + "…"
+
 
 # ── 数据库查询 ────────────────────────────────────────────────────────
 
@@ -98,8 +111,8 @@ def get_daily_items() -> list:
 
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
 
-_MAX_PER_GROUP = 2   # 日报每区域最多展示条数
-_MAX_TOTAL     = 8   # 日报全局上限
+_MAX_PER_GROUP = int(os.environ.get("DAILY_MAX_PER_GROUP", "3"))   # 日报每区域最多展示条数
+_MAX_TOTAL     = int(os.environ.get("DAILY_MAX_ITEMS", "12"))     # 日报全局上限
 
 
 def build_daily_card(items: list, exec_summary: str = "") -> dict:
@@ -190,9 +203,9 @@ def build_daily_card(items: list, exec_summary: str = "") -> dict:
             url      = item.get("source_url", "")
             title_md = f"[{title_zh}]({url})" if url else title_zh
 
-            # 机制变动：从 summary_zh 提取前 75 字（已含监管核心要求）
+            # 机制变动：从 summary_zh 提取摘要，在句号/分号/逗号处智能截断
             summary_zh = (item.get("summary_zh") or item.get("summary") or "").strip()
-            mechanism  = summary_zh[:75] + "…" if len(summary_zh) > 75 else summary_zh
+            mechanism  = _smart_truncate(summary_zh, 100)
 
             elements.append({
                 "tag": "markdown",

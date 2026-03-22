@@ -49,9 +49,9 @@ _BITABLE_REGION_LABEL = {
     "其他":   "其他",
 }
 
-# ── 本地去重文件（记录已写入的 source_url，最多保留 5000 条）─────────────
+# ── 本地去重文件（记录已写入的 source_url，最多保留 20000 条）────────────
 _SYNCED_FILE = Path(__file__).parent / "data" / "bitable_synced_urls.json"
-_MAX_SYNCED  = 5000
+_MAX_SYNCED  = 20000
 
 # ── 飞书 API ──────────────────────────────────────────────────────────
 _TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
