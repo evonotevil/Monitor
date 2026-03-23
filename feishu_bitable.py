@@ -543,11 +543,9 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
                     ref_date = mapped["date"]
                 if ref_date and ref_date < date_cutoff:
                     skipped_date += 1
-                    print(f"   ✗ 超期跳过 [{status_val}] {mapped['title_zh'][:30]}… (ref_date={ref_date}, cutoff={date_cutoff})")
                     continue
 
             valid.append(mapped)
-            print(f"   ✓ [{status_val}] {mapped['title_zh'][:30]}… (date={mapped['date']}, archive={mapped['archive_date']})")
 
         print(
             f"✅ 过滤完成：有效 {len(valid)} 条 "
