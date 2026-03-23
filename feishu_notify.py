@@ -43,23 +43,23 @@ def build_card(
     """
     elements: list = []
 
-    # ── ① 上周已归档完成 ─────────────────────────────────────────────
+    # ── ① 上周已归档完成（0 条时隐藏整个区块）────────────────────────
     n_archived = len(archived)
-    # 收集去重后的地区标签（保持 _GROUP_ORDER 顺序）
-    seen_groups: dict = {}
-    for item in archived:
-        group = _get_region_group(item.get("region", ""))
-        if group not in seen_groups:
-            seen_groups[group] = f"{_GROUP_EMOJI.get(group, '🌐')} {group}"
-    # 按标准顺序排列
-    region_tags = "　".join(
-        seen_groups[g] for g in _GROUP_ORDER if g in seen_groups
-    ) or "—"
+    if n_archived > 0:
+        # 收集去重后的地区标签（保持 _GROUP_ORDER 顺序）
+        seen_groups: dict = {}
+        for item in archived:
+            group = _get_region_group(item.get("region", ""))
+            if group not in seen_groups:
+                seen_groups[group] = f"{_GROUP_EMOJI.get(group, '🌐')} {group}"
+        region_tags = "　".join(
+            seen_groups[g] for g in _GROUP_ORDER if g in seen_groups
+        ) or ""
 
-    content = f"✅ **上周已归档完成 · {n_archived} 条**"
-    if n_archived > 0 and region_tags != "—":
-        content += f"\n{region_tags}"
-    elements.append({"tag": "markdown", "content": content})
+        content = f"✅ **上周已归档完成 · {n_archived} 条**"
+        if region_tags:
+            content += f"\n{region_tags}"
+        elements.append({"tag": "markdown", "content": content})
 
     # ── ② AI 摘要（A+B：关键词 + 风险提示）──────────────────────────
     if ai_summary:
@@ -69,28 +69,27 @@ def build_card(
         )
         elements.append({"tag": "markdown", "content": quoted})
 
-    # ── ③ 本周仍在跟进 ───────────────────────────────────────────────
-    n_active     = len(active)
-    n_pending    = sum(1 for i in active if "待研判" in (i.get("bitable_status") or ""))
-    n_processing = n_active - n_pending
-
-    followup_line = ""
-    parts = []
-    if n_pending:
-        parts.append(f"👤 待研判 {n_pending} 条")
-    if n_processing:
-        parts.append(f"🏃 处理中 {n_processing} 条")
-    if parts:
-        followup_line = "　".join(parts)
-
+    # ── ③ 本周跟进任务（按 BP 分组展示）──────────────────────────────
     elements.append({"tag": "hr"})
-    elements.append({
-        "tag": "markdown",
-        "content": (
-            f"🎯 **本周仍在跟进 · {n_active} 条**"
-            + (f"\n{followup_line}" if followup_line else "")
-        ),
-    })
+    if not active:
+        elements.append({
+            "tag": "markdown",
+            "content": "🎯 **本周无跟进任务**",
+        })
+    else:
+        from collections import OrderedDict
+        bp_groups: OrderedDict = OrderedDict()
+        for item in active:
+            bp = (item.get("assignee") or "").strip() or "未分配"
+            bp_groups.setdefault(bp, 0)
+            bp_groups[bp] += 1
+        bp_lines = "\n".join(
+            f"👤 {bp} · {count} 条" for bp, count in bp_groups.items()
+        )
+        elements.append({
+            "tag": "markdown",
+            "content": f"🎯 **本周跟进任务 · {len(active)} 条**\n{bp_lines}",
+        })
 
     # ── ④ 按钮行 ─────────────────────────────────────────────────────
     elements.append({"tag": "hr"})

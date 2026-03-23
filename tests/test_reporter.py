@@ -273,15 +273,21 @@ class TestSplitThreeWays:
         archived, news, active = _split_three_ways(items)
         assert len(news) == 1
 
-    def test_active_default(self):
+    def test_pending_review_skipped(self):
+        """「待研判」不纳入周报三分区"""
         items = [{"bitable_status": "👤 待研判"}]
         archived, news, active = _split_three_ways(items)
-        assert len(active) == 1
+        assert len(archived) == 0
+        assert len(news) == 0
+        assert len(active) == 0
 
-    def test_unknown_status_goes_to_active(self):
+    def test_unknown_status_skipped(self):
+        """未知状态不纳入周报三分区"""
         items = [{"bitable_status": ""}]
-        _, _, active = _split_three_ways(items)
-        assert len(active) == 1
+        archived, news, active = _split_three_ways(items)
+        assert len(archived) == 0
+        assert len(news) == 0
+        assert len(active) == 0
 
     def test_mixed(self):
         items = [
@@ -293,7 +299,7 @@ class TestSplitThreeWays:
         archived, news, active = _split_three_ways(items)
         assert len(archived) == 1
         assert len(news) == 1
-        assert len(active) == 2
+        assert len(active) == 1
 
 
 # ═══════════════════════════════════════════════════════════════════════
