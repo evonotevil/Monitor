@@ -56,13 +56,10 @@ def build_card(
         seen_groups[g] for g in _GROUP_ORDER if g in seen_groups
     ) or "—"
 
-    elements.append({
-        "tag": "markdown",
-        "content": (
-            f"✅ **上周已归档完成 · {n_archived} 条**\n"
-            f"{region_tags}"
-        ),
-    })
+    content = f"✅ **上周已归档完成 · {n_archived} 条**"
+    if n_archived > 0 and region_tags != "—":
+        content += f"\n{region_tags}"
+    elements.append({"tag": "markdown", "content": content})
 
     # ── ② AI 摘要（A+B：关键词 + 风险提示）──────────────────────────
     if ai_summary:
