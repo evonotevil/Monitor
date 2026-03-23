@@ -531,17 +531,23 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
                 continue
 
             # 按日期过滤（仅当指定了 days 时）
-            # 归档条目用「归档日期」，其余条目用「发布日期」
+            # 归档条目用「归档日期」；若归档日期为空则不过滤（无法判断归档时间）
+            # 其余条目用「发布日期」
             if date_cutoff:
                 if "归档" in status_val:
-                    ref_date = mapped["archive_date"] or mapped["date"]
+                    ref_date = mapped["archive_date"]
+                    # 归档条目没有归档日期时不过滤，保留供周报展示
+                    if not ref_date:
+                        ref_date = ""
                 else:
                     ref_date = mapped["date"]
                 if ref_date and ref_date < date_cutoff:
                     skipped_date += 1
+                    print(f"   ✗ 超期跳过 [{status_val}] {mapped['title_zh'][:30]}… (ref_date={ref_date}, cutoff={date_cutoff})")
                     continue
 
             valid.append(mapped)
+            print(f"   ✓ [{status_val}] {mapped['title_zh'][:30]}… (date={mapped['date']}, archive={mapped['archive_date']})")
 
         print(
             f"✅ 过滤完成：有效 {len(valid)} 条 "

@@ -749,14 +749,18 @@ def _split_three_ways(items: List[dict]) -> tuple:
     archived: List[dict] = []
     news:     List[dict] = []
     active:   List[dict] = []
+    status_values: set = set()
     for item in items:
         ws = item.get("bitable_status", "")
+        status_values.add(ws)
         if "归档" in ws:
             archived.append(item)
         elif "行业动态" in ws:
             news.append(item)
         else:
             active.append(item)
+    print(f"📊 三分区结果：归档 {len(archived)} / 动态 {len(news)} / 跟进 {len(active)}")
+    print(f"   所有 bitable_status 值: {status_values}")
     return archived, news, active
 
 
