@@ -144,6 +144,15 @@ def _sanitize_title(title: str) -> str:
     return t
 
 
+def _oaic_title_to_url(title: str) -> str:
+    """OAIC RSS 不提供 <link>，根据标题生成媒体中心 URL（slug 规则与官网一致）。"""
+    slug = title.lower()
+    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
+    slug = re.sub(r"\s+", "-", slug.strip())
+    slug = re.sub(r"-+", "-", slug)
+    return f"https://www.oaic.gov.au/news/media-centre/{slug}"
+
+
 def fetch_rss_feed(feed_config: dict) -> List[dict]:
     url = feed_config["url"]
     resp = safe_get(url)
@@ -202,6 +211,12 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
 
     except ET.ParseError as e:
         logger.warning(f"RSS 解析失败 {url}: {e}")
+
+    # OAIC RSS 不含 <link>，用标题生成 URL
+    if feed_config.get("name") == "OAIC (Australia)":
+        for it in items:
+            if not it.get("url"):
+                it["url"] = _oaic_title_to_url(it["title"])
 
     logger.info(f"[RSS] {feed_config['name']}: 获取 {len(items)} 条")
     return items
