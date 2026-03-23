@@ -743,12 +743,13 @@ def _split_three_ways(items: List[dict]) -> tuple:
     按 bitable_status 将条目分为三类：
     - archived : 已合规/归档（上周已完成任务）
     - news     : 行业动态（全球合规动态汇总，仅供阅读）
-    - active   : 待研判/处理/跟进中（本周跟进任务）
-    未知状态归入 active。
+    - active   : 处理中/跟进中（本周跟进任务）
+    「待研判」等未明确归类的状态不纳入周报。
     """
     archived: List[dict] = []
     news:     List[dict] = []
     active:   List[dict] = []
+    skipped:  List[dict] = []
     status_values: set = set()
     for item in items:
         ws = item.get("bitable_status", "")
@@ -757,9 +758,11 @@ def _split_three_ways(items: List[dict]) -> tuple:
             archived.append(item)
         elif "行业动态" in ws:
             news.append(item)
-        else:
+        elif "处理" in ws or "跟进" in ws:
             active.append(item)
-    print(f"📊 三分区结果：归档 {len(archived)} / 动态 {len(news)} / 跟进 {len(active)}")
+        else:
+            skipped.append(item)
+    print(f"📊 三分区结果：归档 {len(archived)} / 动态 {len(news)} / 跟进 {len(active)} / 未纳入 {len(skipped)}")
     print(f"   所有 bitable_status 值: {status_values}")
     return archived, news, active
 
