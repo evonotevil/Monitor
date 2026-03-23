@@ -135,7 +135,7 @@ jobs:
       # ── 8. 提交多维表格去重记录（feishu_notify.py 可能写入新条目）──
       - name: Commit bitable sync state
         run: |
-          git add data/bitable_synced_urls.json 2>/dev/null || true
+          git add -f data/bitable_synced_urls.json 2>/dev/null || true
           git diff --staged --quiet || \
             git commit -m "🔄 周报多维表格同步记录更新 $(date -u +%Y-%m-%d) [skip ci]"
           git push
