@@ -66,5 +66,7 @@ jobs:
           git add -f data/bitable_synced_urls.json 2>/dev/null || true
           git diff --staged --quiet || \
             git commit -m "🔄 每日数据更新 $(date -u +%Y-%m-%d) [skip ci]"
+          git stash --include-untracked || true
           git pull --rebase
+          git stash pop || true
           git push
