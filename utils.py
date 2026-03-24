@@ -1,11 +1,13 @@
 """
-共享工具模块 — 区域分组配置
+共享工具模块 — 区域分组配置 & 公共正则
 
 统一维护地区 → 显示分组的映射关系，供以下模块引用：
   reporter.py / feishu_notify.py / daily_check.py / monitor.py
 
 修改区域配置时只需改此文件，无需逐一同步。
 """
+
+import re
 
 # ── 区域分组映射（region 字段值 → 9 大显示分组）──────────────────────
 #
@@ -215,3 +217,14 @@ def _pick_group_items(candidates: list, max_items: int) -> list:
         if len(selected) >= max_items:
             break
     return selected
+
+
+# ── 媒体后缀正则（标题末尾的来源名清洗）─────────────────────────────
+# fetcher._sanitize_title 和 reporter._clean_title 共用
+MEDIA_SUFFIX_RE = re.compile(
+    r"\s*[-–|]\s*(?:GamesIndustry(?:\.biz)?|Eurogamer|Kotaku|IGN|Polygon"
+    r"|PC Gamer|GamesBeat|VentureBeat|Reuters|BBC|The Guardian|Forbes"
+    r"|TechCrunch|Bloomberg|Axios|Politico|The Verge|Ars Technica"
+    r"|Game Developer|Develop(?:er)?|MCV|Pocketgamer(?:\.biz)?|Pocket Gamer)\s*$",
+    re.IGNORECASE,
+)

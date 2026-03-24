@@ -77,8 +77,7 @@ def build_card(
             "content": "🎯 **本周无跟进任务**",
         })
     else:
-        from collections import OrderedDict
-        bp_groups: OrderedDict = OrderedDict()
+        bp_groups: dict = {}
         for item in active:
             bp = (item.get("assignee") or "").strip() or "未分配"
             bp_groups.setdefault(bp, 0)

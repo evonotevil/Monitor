@@ -13,6 +13,8 @@ from typing import List, Optional
 from urllib.parse import quote_plus
 import concurrent.futures
 
+from utils import MEDIA_SUFFIX_RE
+
 import requests
 from bs4 import BeautifulSoup
 
@@ -107,14 +109,7 @@ def clean_html(html_text: str) -> str:
 # 处理以下问题:
 #   1. Unicode 替换字符（U+FFFD）和控制字符
 #   2. 高密度非 ASCII 连续段（mojibake 特征）
-#   3. 媒体机构名称后缀（reporter.py 的 _clean_title 在渲染时也做，这里提前清洗入库数据）
-_MEDIA_SUFFIX_STRIP = re.compile(
-    r"\s*[-–|]\s*(?:GamesIndustry(?:\.biz)?|Eurogamer|Kotaku|IGN|Polygon"
-    r"|PC Gamer|GamesBeat|VentureBeat|Reuters|BBC|The Guardian|Forbes"
-    r"|TechCrunch|Bloomberg|Axios|Politico|The Verge|Ars Technica"
-    r"|Game Developer|Develop(?:er)?|MCV|Pocketgamer(?:\.biz)?|Pocket Gamer)\s*$",
-    re.IGNORECASE,
-)
+#   3. 媒体机构名称后缀（utils.MEDIA_SUFFIX_RE，reporter._clean_title 在渲染时也用）
 # 连续≥4个非 ASCII 非中日韩字符 → 疑似乱码段
 _GARBLED_SEGMENT = re.compile(r"[^\x00-\x7F\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7a3]{4,}")
 
@@ -138,7 +133,7 @@ def _sanitize_title(title: str) -> str:
         # 保留 ASCII 和中日韩部分，其余删除
         t = re.sub(r"[^\x20-\x7E\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7a3\s]", "", t)
     # 3. 媒体机构后缀
-    t = _MEDIA_SUFFIX_STRIP.sub("", t)
+    t = MEDIA_SUFFIX_RE.sub("", t)
     # 4. 整理空白
     t = re.sub(r"\s+", " ", t).strip()
     return t
@@ -212,8 +207,8 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
     except ET.ParseError as e:
         logger.warning(f"RSS 解析失败 {url}: {e}")
 
-    # OAIC RSS 不含 <link>，用标题生成 URL
-    if feed_config.get("name") == "OAIC (Australia)":
+    # 部分 RSS 源不含 <link>，根据标题生成 URL（feeds.py 中声明 url_from_title）
+    if feed_config.get("url_from_title"):
         for it in items:
             if not it.get("url"):
                 it["url"] = _oaic_title_to_url(it["title"])

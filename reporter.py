@@ -28,7 +28,7 @@ from config import OUTPUT_DIR, REGION_DISPLAY_ORDER
 from classifier import get_source_tier
 from utils import (
     _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status,
-    _bigram_sim, _TIER_SORT,
+    _bigram_sim, _TIER_SORT, MEDIA_SUFFIX_RE,
 )
 
 
@@ -46,14 +46,6 @@ def _truncate(s: str, max_len: int) -> str:
     return s[:max_len - 1] + "…"
 
 
-# 常见媒体机构后缀（Google News 有时把来源附在标题末尾）
-_MEDIA_SUFFIXES = re.compile(
-    r"\s*[-–|]\s*(?:GamesIndustry(?:\.biz)?|Eurogamer|Kotaku|IGN|Polygon"
-    r"|PC Gamer|GamesBeat|VentureBeat|Reuters|BBC|The Guardian|Forbes"
-    r"|TechCrunch|Bloomberg|Axios|Politico|The Verge|Ars Technica"
-    r"|Game Developer|Develop(?:er)?|MCV|Pocketgamer(?:\.biz)?)\s*$",
-    re.IGNORECASE,
-)
 # HTML 数字/命名实体（包括截断的实体如 Türk... → Türkiye）
 _HTML_ENTITY = re.compile(r"&#?\w+;?")
 
@@ -66,7 +58,7 @@ def _clean_title(title: str) -> str:
     3. 去除不完整的 HTML 实体残留（如截断的 Türk...）
     """
     t = html_mod.unescape(title or "")
-    t = _MEDIA_SUFFIXES.sub("", t).strip()
+    t = MEDIA_SUFFIX_RE.sub("", t).strip()
     # 去除仍残留的不完整实体（如 &amp 没有分号）
     t = re.sub(r"&\w{2,8}$", "", t).strip()
     return t
@@ -749,7 +741,7 @@ def _split_three_ways(items: List[dict]) -> tuple:
     archived: List[dict] = []
     news:     List[dict] = []
     active:   List[dict] = []
-    skipped:  List[dict] = []
+    skipped_count = 0
     status_values: set = set()
     for item in items:
         ws = item.get("bitable_status", "")
@@ -761,8 +753,8 @@ def _split_three_ways(items: List[dict]) -> tuple:
         elif "处理" in ws or "跟进" in ws:
             active.append(item)
         else:
-            skipped.append(item)
-    print(f"📊 三分区结果：归档 {len(archived)} / 动态 {len(news)} / 跟进 {len(active)} / 未纳入 {len(skipped)}")
+            skipped_count += 1
+    print(f"📊 三分区结果：归档 {len(archived)} / 动态 {len(news)} / 跟进 {len(active)} / 未纳入 {skipped_count}")
     print(f"   所有 bitable_status 值: {status_values}")
     return archived, news, active
 

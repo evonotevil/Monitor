@@ -124,6 +124,7 @@ RSS_FEEDS = [
         "type": "rss",
         "region": "大洋洲",
         "tier": "official",
+        "url_from_title": True,   # RSS 不含 <link>，由标题生成 slug URL
     },
     # Australian eSafety Commissioner RSS — timeout，已移除
     # Canada Competition Bureau RSS — timeout，已移除
