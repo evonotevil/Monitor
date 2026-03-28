@@ -3,7 +3,9 @@
 飞书机器人通知 — 每周合规简报卡片
 
 必需环境变量:
-    FEISHU_WEBHOOK_URL   飞书自定义机器人的 Webhook 地址
+    FEISHU_APP_ID        飞书自建应用 App ID
+    FEISHU_APP_SECRET    飞书自建应用 App Secret
+    FEISHU_CHAT_ID       目标群聊的 chat_id
 
 可选环境变量:
     REPORT_MOBILE_URL    移动端 HTML 周报 URL
@@ -11,7 +13,8 @@
     REPORT_HTML_URL      HTML 简报 URL（兼容旧配置，指向移动端）
 
 本地调试:
-    FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx \
+    FEISHU_APP_ID=cli_xxx FEISHU_APP_SECRET=xxx \
+    FEISHU_CHAT_ID=oc_xxx \
     REPORT_MOBILE_URL=https://... \
     REPORT_PC_URL=https://... \
     python feishu_notify.py
@@ -20,7 +23,8 @@
 import os
 import sys
 
-from utils import _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, send_card
+from utils import _GROUP_ORDER, _GROUP_EMOJI, _get_region_group
+from feishu_client import send_card
 
 
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
@@ -127,13 +131,13 @@ def build_card(
 # ── 入口 ─────────────────────────────────────────────────────────────
 
 def main():
-    webhook_url = os.environ.get("FEISHU_WEBHOOK_URL", "")
+    chat_id     = os.environ.get("FEISHU_CHAT_ID", "")
     mobile_url  = os.environ.get("REPORT_MOBILE_URL", "") or os.environ.get("MOBILE_URL", "")
     pc_url      = os.environ.get("REPORT_PC_URL", "")    or os.environ.get("PC_URL", "")
     html_url    = os.environ.get("REPORT_HTML_URL", "")
 
-    if not webhook_url:
-        print("❌ 未设置 FEISHU_WEBHOOK_URL 环境变量")
+    if not chat_id:
+        print("❌ 未设置 FEISHU_CHAT_ID 环境变量")
         sys.exit(1)
 
     # ── 从 Bitable 读取已审核条目，作为唯一数据源 ────────────────────
@@ -166,7 +170,7 @@ def main():
         archived, news, active, ai_summary,
         mobile_url=mobile_url, pc_url=pc_url, html_url=html_url,
     )
-    send_card(webhook_url, card)
+    send_card(chat_id, card)
 
 
 if __name__ == "__main__":

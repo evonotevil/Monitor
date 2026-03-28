@@ -48,7 +48,7 @@ jobs:
       # ── 4. 检查昨日新增，有则推送飞书 + 写入多维表格 ──────────────
       - name: Check and notify daily updates
         env:
-          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          FEISHU_CHAT_ID: ${{ secrets.FEISHU_CHAT_ID }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}

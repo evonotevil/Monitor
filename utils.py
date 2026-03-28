@@ -174,32 +174,6 @@ def _bigram_sim(a: str, b: str) -> float:
     return len(bg_a & bg_b) / len(union) if union else 0.0
 
 
-def send_card(webhook_url: str, card: dict, max_retries: int = 3) -> None:
-    """向飞书自定义机器人 Webhook 发送交互卡片，失败指数退避重试。"""
-    import requests
-    import time
-    payload = {"msg_type": "interactive", "card": card}
-    for attempt in range(max_retries):
-        try:
-            resp = requests.post(webhook_url, json=payload, timeout=15)
-            resp.raise_for_status()
-            result = resp.json()
-            code = result.get("code", result.get("StatusCode", -1))
-            if code == 0:
-                print("✅ 飞书通知发送成功")
-                return
-            else:
-                print(f"⚠️  飞书返回异常: {result}")
-                return  # 业务层错误不重试
-        except Exception as e:
-            if attempt < max_retries - 1:
-                wait = 2 ** attempt * 2  # 2s, 4s, 8s
-                print(f"⚠️  发送失败: {e}，{wait}s 后重试 ({attempt+1}/{max_retries})")
-                time.sleep(wait)
-            else:
-                print(f"❌ 发送失败（已重试 {max_retries} 次）: {e}")
-
-
 def _pick_group_items(candidates: list, max_items: int) -> list:
     """Bigram 去重 + 同分类限 1 条，取 max_items 条。"""
     selected: list = []

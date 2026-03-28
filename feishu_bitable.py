@@ -35,6 +35,7 @@ from typing import List, Optional
 import requests
 
 from utils import _get_region_group
+from feishu_client import get_tenant_access_token
 
 # 将内部分组名映射到多维表格单选选项名（9 大分组，内部名与 Bitable 显示名一致）
 _BITABLE_REGION_LABEL = {
@@ -54,7 +55,6 @@ _SYNCED_FILE = Path(__file__).parent / "data" / "bitable_synced_urls.json"
 _MAX_SYNCED  = 20000
 
 # ── 飞书 API ──────────────────────────────────────────────────────────
-_TOKEN_URL = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
 _WIKI_NODE_URL = "https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node"
 _BATCH_URL = (
     "https://open.feishu.cn/open-apis/bitable/v1/apps"
@@ -85,21 +85,7 @@ def _save_synced_urls(urls: set) -> None:
     )
 
 
-# ── 认证 ──────────────────────────────────────────────────────────────
-
-def get_tenant_access_token(app_id: str, app_secret: str) -> str:
-    """获取 tenant_access_token（有效期 2 小时）。"""
-    resp = requests.post(
-        _TOKEN_URL,
-        json={"app_id": app_id, "app_secret": app_secret},
-        timeout=10,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    if data.get("code") != 0:
-        raise RuntimeError(f"获取 access token 失败: {data}")
-    return data["tenant_access_token"]
-
+# ── Wiki 解析 ────────────────────────────────────────────────────────
 
 def resolve_wiki_app_token(wiki_token: str, access_token: str) -> str:
     """

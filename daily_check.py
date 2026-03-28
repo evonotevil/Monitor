@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """
 每日合规动态检查 - 检查过去 24 小时内新增的立法监管动态
-有新增条目则通过飞书机器人推送；无新增则静默退出。
+有新增条目则通过飞书应用机器人推送；无新增则静默退出。
 
 必需环境变量:
-    FEISHU_WEBHOOK_URL   飞书自定义机器人的 Webhook 地址
+    FEISHU_APP_ID                飞书自建应用 App ID
+    FEISHU_APP_SECRET            飞书自建应用 App Secret
+    FEISHU_CHAT_ID               目标群聊的 chat_id（消息推送用）
 
 可选环境变量:
     LLM_API_KEY                  用于生成 AI 综述（未设置时跳过综述）
-    FEISHU_APP_ID                飞书自建应用 App ID（多维表格写入）
-    FEISHU_APP_SECRET            飞书自建应用 App Secret（多维表格写入）
     FEISHU_BITABLE_APP_TOKEN     多维表格 app_token（多维表格写入）
     FEISHU_BITABLE_TABLE_ID      多维表格 table_id（多维表格写入）
 
 本地调试:
-    FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx \
+    FEISHU_APP_ID=cli_xxx FEISHU_APP_SECRET=xxx \
+    FEISHU_CHAT_ID=oc_xxx \
     python daily_check.py
 """
 
@@ -32,8 +33,9 @@ DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
 from utils import (
     _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status,
-    CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items, send_card,
+    CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items,
 )
+from feishu_client import send_card
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
 
@@ -302,9 +304,9 @@ def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = Fals
 # ── 入口 ─────────────────────────────────────────────────────────────
 
 def main():
-    webhook_url = os.environ.get("FEISHU_WEBHOOK_URL", "")
-    if not webhook_url:
-        print("❌ 未设置 FEISHU_WEBHOOK_URL 环境变量")
+    chat_id = os.environ.get("FEISHU_CHAT_ID", "")
+    if not chat_id:
+        print("❌ 未设置 FEISHU_CHAT_ID 环境变量")
         sys.exit(1)
 
     now_cst = datetime.now(_TZ_CST)
@@ -343,7 +345,7 @@ def main():
                 {"tag": "markdown", "content": f"✅ {no_update_text}"},
             ],
         }
-        send_card(webhook_url, empty_card)
+        send_card(chat_id, empty_card)
         return
 
     print(f"📡 发现 {len(items)} 条新增动态，发送飞书通知...")
@@ -361,7 +363,7 @@ def main():
         print(f"⚠️  综述生成失败（将跳过）: {e}")
 
     card = build_daily_card(items, exec_summary=exec_summary, is_monday=is_monday)
-    send_card(webhook_url, card)
+    send_card(chat_id, card)
 
 
 if __name__ == "__main__":

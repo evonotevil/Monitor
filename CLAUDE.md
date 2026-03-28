@@ -86,7 +86,7 @@ RSS Feeds (100+) + Google News → fetcher.py → classifier.py → translator.p
 | Variable | Purpose |
 |----------|---------|
 | `LLM_API_KEY` | Silicon Flow API key (required) |
-| `FEISHU_WEBHOOK_URL` | Feishu bot webhook (required) |
+| `FEISHU_CHAT_ID` | 目标群聊的 chat_id（消息推送用） |
 | `FEISHU_APP_ID` / `FEISHU_APP_SECRET` | Feishu app credentials (for Bitable) |
 | `FEISHU_BITABLE_APP_TOKEN` | Bitable app token |
 | `FEISHU_BITABLE_TABLE_ID` | Bitable table ID |

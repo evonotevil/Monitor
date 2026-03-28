@@ -119,7 +119,7 @@ jobs:
       # ── 7. 发送飞书卡片通知 ─────────────────────────────────────────
       - name: Send Feishu notification
         env:
-          FEISHU_WEBHOOK_URL:          ${{ secrets.FEISHU_WEBHOOK_URL }}
+          FEISHU_CHAT_ID:              ${{ secrets.FEISHU_CHAT_ID }}
           REPORT_MOBILE_URL:           ${{ env.MOBILE_URL }}
           REPORT_PC_URL:               ${{ env.PC_URL }}
           REPORT_HTML_URL:             ${{ env.HTML_URL }}
