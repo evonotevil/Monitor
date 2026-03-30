@@ -377,6 +377,16 @@ def _map_bitable_record(
     else:
         assignee = str(bp_raw).strip()
 
+    # ── 协助 BP（协同支持的 BP，人员字段 list 或文本）───────────────────
+    co_bp_raw = fields.get("协助BP") or ""
+    if isinstance(co_bp_raw, list):
+        co_assignee = "、".join(
+            (p.get("name") or p.get("cn_name") or "")
+            for p in co_bp_raw if isinstance(p, dict)
+        ).strip()
+    else:
+        co_assignee = str(co_bp_raw).strip()
+
     # ── 法务结论（独立于「摘要」和「💡 核心结论」）──────────────────────
     legal_conclusion = str(fields.get("法务结论") or fields.get("💡 法务结论") or "").strip()
 
@@ -398,6 +408,7 @@ def _map_bitable_record(
         "status":           "",             # 法规生命周期状态（Bitable 未单独维护，留空）
         "bitable_status":   bitable_status, # 工作流状态：用于三分区
         "assignee":         assignee,       # 跟进 BP
+        "co_assignee":      co_assignee,    # 协助 BP
         "legal_conclusion": legal_conclusion,
         "category_l1":      category,
         "source_url":       source_url,

@@ -841,17 +841,19 @@ def _render_region_sections_mobile(grouped: dict, zone_type: str) -> str:
 
             extra_html = ""
             if zone_type == "archived":
-                # 归档区：跟进 BP + 核心结论 + 专项合规文档按钮 + 跳转到 Bitable 卡片按钮
+                # 归档区：跟进 BP + 协助 BP + 核心结论 + 专项合规文档按钮 + 跳转到 Bitable 卡片按钮
                 assignee    = html_mod.escape((item.get("assignee") or "").strip())
+                co_assignee = html_mod.escape((item.get("co_assignee") or "").strip())
                 conclusion  = html_mod.escape((item.get("legal_conclusion") or "").strip())
                 doc_url     = html_mod.escape((item.get("doc_url") or "").strip())
                 doc_text    = html_mod.escape((item.get("doc_text") or "专项合规文档").strip())
                 bitable_url = html_mod.escape((item.get("bitable_url") or "").strip())
                 if assignee:
+                    bp_display = assignee + (f'、{co_assignee}' if co_assignee else '')
                     extra_html += (
                         f'<div class="log-bp-row">'
                         f'<span class="log-bp-label">跟进</span>'
-                        f'<span class="log-bp-value">{assignee}</span>'
+                        f'<span class="log-bp-value">{bp_display}</span>'
                         f'</div>'
                     )
                 if conclusion:
@@ -870,13 +872,15 @@ def _render_region_sections_mobile(grouped: dict, zone_type: str) -> str:
                 if buttons:
                     extra_html += f'<div class="log-btn-row">{buttons}</div>'
             elif zone_type == "active":
-                # 跟进任务区：只展示跟进 BP
+                # 跟进任务区：跟进 BP + 协助 BP
                 assignee = html_mod.escape((item.get("assignee") or "").strip())
+                co_assignee = html_mod.escape((item.get("co_assignee") or "").strip())
                 if assignee:
+                    bp_display = assignee + (f'、{co_assignee}' if co_assignee else '')
                     extra_html += (
                         f'<div class="log-bp-row">'
                         f'<span class="log-bp-label">跟进</span>'
-                        f'<span class="log-bp-value">{assignee}</span>'
+                        f'<span class="log-bp-value">{bp_display}</span>'
                         f'</div>'
                     )
             # news 区：不展示额外信息
@@ -1061,16 +1065,18 @@ def _render_region_sections_pc(grouped: dict, is_action: bool) -> str:
             meta = " · ".join(meta_parts)
             title_tag = (f'<a href="{url}" target="_blank" rel="noopener">{zh}</a>' if url else zh)
 
-            # 跟进 BP 和法务结论（仅 action 区块）
+            # 跟进 BP、协助 BP 和法务结论（仅 action 区块）
             extra_html = ""
             if is_action:
-                assignee   = html_mod.escape((item.get("assignee") or "").strip())
-                conclusion = html_mod.escape((item.get("legal_conclusion") or "").strip())
+                assignee    = html_mod.escape((item.get("assignee") or "").strip())
+                co_assignee = html_mod.escape((item.get("co_assignee") or "").strip())
+                conclusion  = html_mod.escape((item.get("legal_conclusion") or "").strip())
                 if assignee:
+                    bp_display = assignee + (f'、{co_assignee}' if co_assignee else '')
                     extra_html += (
                         f'<div class="card-bp-row">'
                         f'<span class="card-bp-label">跟进</span>'
-                        f'<span class="card-bp-value">{assignee}</span>'
+                        f'<span class="card-bp-value">{bp_display}</span>'
                         f'</div>'
                     )
                 if conclusion:
