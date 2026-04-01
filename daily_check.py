@@ -19,6 +19,7 @@
     python daily_check.py
 """
 
+import json
 import os
 import sqlite3
 import sys
@@ -37,6 +38,30 @@ from utils import (
 )
 from feishu_client import send_card
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
+
+
+# ── 机器人推送去重（记录已推送的 source_url，避免跨天重复推送）────────────
+_PUSHED_FILE = Path(__file__).parent / "data" / "daily_pushed_urls.json"
+_MAX_PUSHED  = 5000  # 保留上限，防止文件无限增长
+
+
+def _load_pushed_urls() -> set:
+    if _PUSHED_FILE.exists():
+        try:
+            return set(json.loads(_PUSHED_FILE.read_text(encoding="utf-8")))
+        except Exception:
+            return set()
+    return set()
+
+
+def _save_pushed_urls(urls: set) -> None:
+    _PUSHED_FILE.parent.mkdir(parents=True, exist_ok=True)
+    url_list = list(urls)
+    if len(url_list) > _MAX_PUSHED:
+        url_list = url_list[-_MAX_PUSHED:]
+    _PUSHED_FILE.write_text(
+        json.dumps(url_list, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def _smart_truncate(text: str, max_len: int = 100) -> str:
@@ -325,9 +350,16 @@ def main():
         print(f"📅 今天是{'周六' if weekday == 5 else '周日'}，跳过飞书机器人推送")
         return
 
-    if not items:
+    # ── 机器人推送去重：过滤已推送过的条目 ────────────────────────────
+    pushed_urls = _load_pushed_urls()
+    push_items = [i for i in items if i.get("source_url") not in pushed_urls]
+
+    if push_items:
+        print(f"📡 机器人推送去重：{len(items)} 条中 {len(items) - len(push_items)} 条已推送，本次推送 {len(push_items)} 条")
+
+    if not push_items:
         # 无新增动态也推送一张简洁卡片，让团队知道系统正常运行
-        print("✅ 无新增动态，推送'今日无新增'卡片")
+        print("✅ 无新增动态（或均已推送），推送'今日无新增'卡片")
         yesterday = now_cst - timedelta(days=1)
         if is_monday:
             date_label = f"{(now_cst - timedelta(days=2)).strftime('%Y-%m-%d')} ~ {yesterday.strftime('%Y-%m-%d')}"
@@ -348,13 +380,13 @@ def main():
         send_card(chat_id, empty_card)
         return
 
-    print(f"📡 发现 {len(items)} 条新增动态，发送飞书通知...")
+    print(f"📡 发现 {len(push_items)} 条新增动态，发送飞书通知...")
 
     # AI 综述（150 字以内，失败不阻断）
     exec_summary = ""
     try:
         from translator import generate_daily_summary
-        exec_summary = generate_daily_summary(items)
+        exec_summary = generate_daily_summary(push_items)
         if exec_summary:
             print(f"📝 日报综述生成成功，{len(exec_summary)} 字")
         else:
@@ -362,8 +394,15 @@ def main():
     except Exception as e:
         print(f"⚠️  综述生成失败（将跳过）: {e}")
 
-    card = build_daily_card(items, exec_summary=exec_summary, is_monday=is_monday)
+    card = build_daily_card(push_items, exec_summary=exec_summary, is_monday=is_monday)
     send_card(chat_id, card)
+
+    # 推送成功后记录已推送的 URL
+    for item in push_items:
+        url = item.get("source_url")
+        if url:
+            pushed_urls.add(url)
+    _save_pushed_urls(pushed_urls)
 
 
 if __name__ == "__main__":
