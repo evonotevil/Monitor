@@ -105,7 +105,11 @@
         .zone-divider-action   { background: #2D1F0E; border: 1px solid #4A3520; }
         .zone-divider-news     { background: #18181B; border: 1px solid #3F3F46; }
         .zone-inner { padding: 16px 18px; display: flex; align-items: center; gap: 12px; }
-        .zone-icon { font-size: 22px; flex-shrink: 0; line-height: 1; }
+        .zone-icon { flex-shrink: 0; line-height: 0; }
+        .zone-svg { width: 22px; height: 22px; }
+        .zone-divider-archived .zone-svg { stroke: #A7F3D0; }
+        .zone-divider-action .zone-svg   { stroke: #FCD34D; }
+        .zone-divider-news .zone-svg     { stroke: #FAFAFA; }
         .zone-info { flex: 1; min-width: 0; }
         .zone-title-archived { font-family: var(--font-sans); font-size: 15px; font-weight: 600; color: #A7F3D0; letter-spacing: -0.02em; line-height: 1.2; }
         .zone-title-action   { font-family: var(--font-sans); font-size: 15px; font-weight: 600; color: #FCD34D; letter-spacing: -0.02em; line-height: 1.2; }
@@ -131,6 +135,7 @@
         .log-conclusion { margin-top: 8px; font-size: 11px; line-height: 1.7; color: var(--text-secondary); padding: 8px 12px; background: rgba(99,102,241,0.06); border-radius: 6px; border: 1px solid rgba(99,102,241,0.14); border-left: 3px solid #6366F1; }
         .log-btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
         .log-btn { display: inline-flex; align-items: center; gap: 4px; padding: 8px 14px; border-radius: 6px; font-size: 11px; font-weight: 500; text-decoration: none; transition: opacity 0.15s; }
+        .btn-svg { width: 12px; height: 12px; flex-shrink: 0; }
         .log-btn:hover { opacity: 0.8; }
         .log-btn-doc     { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
         .log-btn-bitable { background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; }

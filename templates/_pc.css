@@ -103,7 +103,11 @@
         .zone-banner-action   { background: linear-gradient(to right, #F59E0B 4px, #2D1F0E 4px); border: 1px solid #4A3520; }
         .zone-banner-news     { background: linear-gradient(to right, #94A3B8 4px, #F8FAFC 4px); border: 1px solid #E2E8F0; }
         .zone-banner-inner { display: flex; align-items: center; gap: 16px; padding: 18px 24px; }
-        .zone-banner-icon  { font-size: 26px; flex-shrink: 0; line-height: 1; }
+        .zone-banner-icon  { flex-shrink: 0; line-height: 0; }
+        .zone-banner-icon .zone-svg { width: 26px; height: 26px; }
+        .zone-banner-archived .zone-svg { stroke: #A7F3D0; }
+        .zone-banner-action .zone-svg   { stroke: #FCD34D; }
+        .zone-banner-news .zone-svg     { stroke: #1E293B; }
         .zone-banner-info  { flex: 1; min-width: 0; }
         .zone-banner-title-archived { font-size: 17px; font-weight: 600; color: #A7F3D0; letter-spacing: -0.02em; }
         .zone-banner-title-action   { font-size: 17px; font-weight: 600; color: #FCD34D; letter-spacing: -0.02em; }

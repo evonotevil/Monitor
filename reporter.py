@@ -802,8 +802,13 @@ _MOBILE_CSS = _load_template_file("_mobile.css")
 
 _MOBILE_JS = _load_template_file("_mobile.js")
 
-_ICON_DOC = '<svg class="icon-doc" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'
-_ICON_DL   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
+_ICON_DOC = '<svg class="icon-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>'
+_ICON_DL   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>'
+_ICON_CHECK  = '<svg class="zone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>'
+_ICON_GLOBE  = '<svg class="zone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>'
+_ICON_TARGET = '<svg class="zone-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>'
+_ICON_FILE   = '<svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>'
+_ICON_EXT    = '<svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m10 14 11-11"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>'
 
 
 def _render_region_sections_mobile(grouped: dict, zone_type: str) -> str:
@@ -858,12 +863,12 @@ def _render_region_sections_mobile(grouped: dict, zone_type: str) -> str:
                 if doc_url:
                     buttons += (
                         f'<a class="log-btn log-btn-doc" href="{doc_url}" '
-                        f'target="_blank" rel="noopener">📄 {doc_text}</a>'
+                        f'target="_blank" rel="noopener">{_ICON_FILE} {doc_text}</a>'
                     )
                 if bitable_url:
                     buttons += (
                         f'<a class="log-btn log-btn-bitable" href="{bitable_url}" '
-                        f'target="_blank" rel="noopener">↗ 查看卡片</a>'
+                        f'target="_blank" rel="noopener">{_ICON_EXT} 查看卡片</a>'
                     )
                 if buttons:
                     extra_html += f'<div class="log-btn-row">{buttons}</div>'
@@ -947,7 +952,7 @@ def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dic
             f'<section class="zone" data-zone="archived">'
             f'<div class="zone-divider zone-divider-archived">'
             f'<div class="zone-inner">'
-            f'<div class="zone-icon">🎉</div>'
+            f'<div class="zone-icon">{_ICON_CHECK}</div>'
             f'<div class="zone-info">'
             f'<h2 class="zone-title-archived">上周已完成任务</h2>'
             f'</div>'
@@ -966,7 +971,7 @@ def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dic
             f'<section class="zone" data-zone="news">'
             f'<div class="zone-divider zone-divider-news">'
             f'<div class="zone-inner">'
-            f'<div class="zone-icon">🌏</div>'
+            f'<div class="zone-icon">{_ICON_GLOBE}</div>'
             f'<div class="zone-info">'
             f'<h2 class="zone-title-news">上周全球合规动态汇总</h2>'
             f'</div>'
@@ -985,7 +990,7 @@ def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dic
             f'<section class="zone" data-zone="active">'
             f'<div class="zone-divider zone-divider-action">'
             f'<div class="zone-inner">'
-            f'<div class="zone-icon">🎯</div>'
+            f'<div class="zone-icon">{_ICON_TARGET}</div>'
             f'<div class="zone-info">'
             f'<h2 class="zone-title-action">本周跟进任务</h2>'
             f'</div>'
