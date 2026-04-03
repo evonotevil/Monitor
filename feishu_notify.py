@@ -143,10 +143,17 @@ def main():
     mobile_url  = os.environ.get("REPORT_MOBILE_URL", "") or os.environ.get("MOBILE_URL", "")
     pc_url      = os.environ.get("REPORT_PC_URL", "")    or os.environ.get("PC_URL", "")
     html_url    = os.environ.get("REPORT_HTML_URL", "")
-    # 多维表格概览链接（从 app_token + table_id 拼接）
+    # 多维表格概览链接（优先 wiki_token → /wiki/ 路径；否则用 app_token → /base/ 路径）
+    bt_wiki     = os.environ.get("FEISHU_BITABLE_WIKI_TOKEN", "")
     bt_app      = os.environ.get("FEISHU_BITABLE_APP_TOKEN", "")
     bt_table    = os.environ.get("FEISHU_BITABLE_TABLE_ID", "")
-    bitable_url = f"https://feishu.cn/base/{bt_app}?table={bt_table}" if bt_app and bt_table else ""
+    if bt_wiki and bt_table:
+        bitable_url = f"https://feishu.cn/wiki/{bt_wiki}?table={bt_table}"
+    elif bt_app and bt_table:
+        bitable_url = f"https://feishu.cn/base/{bt_app}?table={bt_table}"
+    else:
+        bitable_url = ""
+    print(f"📊 Bitable: wiki_token={'✓' if bt_wiki else '✗'} app_token={'✓' if bt_app else '✗'} table_id={'✓' if bt_table else '✗'} → URL={'已构建' if bitable_url else '未构建'}")
 
     if not chat_id:
         print("❌ 未设置 FEISHU_CHAT_ID 环境变量")
