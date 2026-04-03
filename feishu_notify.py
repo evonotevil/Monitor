@@ -113,15 +113,15 @@ def build_card(
             "type": "default",
             "url": pc_url,
         })
-    if actions:
-        elements.append({"tag": "action", "actions": actions})
     if bitable_url:
-        elements.append({"tag": "action", "actions": [{
+        actions.append({
             "tag": "button",
             "text": {"tag": "plain_text", "content": "📊 查看多维表格"},
             "type": "default",
             "url": bitable_url,
-        }]})
+        })
+    if actions:
+        elements.append({"tag": "action", "actions": actions})
 
     return {
         "config": {"wide_screen_mode": True},
