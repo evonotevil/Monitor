@@ -802,10 +802,6 @@ _MOBILE_CSS = _load_template_file("_mobile.css")
 
 _MOBILE_JS = _load_template_file("_mobile.js")
 
-_PC_CSS = _load_template_file("_pc.css")
-
-_REPORT_JS = _load_template_file("_report.js")
-
 _ICON_DOC = '<svg class="icon-doc" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'
 _ICON_DL   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
 
@@ -900,7 +896,7 @@ def _render_region_sections_mobile(grouped: dict, zone_type: str) -> str:
         sections_html += (
             f'<div class="section-group" data-region="{group_esc}">'
             f'<div class="section-header">'
-            f'<span class="section-title">{group_esc}</span>'
+            f'<h3 class="section-title">{group_esc}</h3>'
             f'<span class="section-count">{len(group_items)} 条</span>'
             f'<div class="section-dots">{dots}</div>'
             f'</div>'
@@ -948,15 +944,17 @@ def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dic
     if archived:
         archived_sections = _render_region_sections_mobile(archived_grouped, zone_type="archived")
         archived_zone = (
-            f'<div class="zone-divider zone-divider-action">'
+            f'<section class="zone" data-zone="archived">'
+            f'<div class="zone-divider zone-divider-archived">'
             f'<div class="zone-inner">'
             f'<div class="zone-icon">🎉</div>'
             f'<div class="zone-info">'
-            f'<div class="zone-title-action">上周已完成任务</div>'
+            f'<h2 class="zone-title-archived">上周已完成任务</h2>'
             f'</div>'
-            f'<div class="zone-count-action">{n_archived} 条</div>'
+            f'<div class="zone-count-archived">{n_archived} 条</div>'
             f'</div></div>\n'
             f'{archived_sections}'
+            f'</section>\n'
         )
     else:
         archived_zone = ""
@@ -965,15 +963,17 @@ def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dic
     if news:
         news_sections = _render_region_sections_mobile(news_grouped, zone_type="news")
         news_zone = (
+            f'<section class="zone" data-zone="news">'
             f'<div class="zone-divider zone-divider-news">'
             f'<div class="zone-inner">'
             f'<div class="zone-icon">🌏</div>'
             f'<div class="zone-info">'
-            f'<div class="zone-title-news">上周全球合规动态汇总</div>'
+            f'<h2 class="zone-title-news">上周全球合规动态汇总</h2>'
             f'</div>'
             f'<div class="zone-count-news">{n_news} 条</div>'
             f'</div></div>\n'
             f'{news_sections}'
+            f'</section>\n'
         )
     else:
         news_zone = ""
@@ -982,15 +982,17 @@ def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dic
     if active:
         active_sections = _render_region_sections_mobile(active_grouped, zone_type="active")
         active_zone = (
+            f'<section class="zone" data-zone="active">'
             f'<div class="zone-divider zone-divider-action">'
             f'<div class="zone-inner">'
             f'<div class="zone-icon">🎯</div>'
             f'<div class="zone-info">'
-            f'<div class="zone-title-action">本周跟进任务</div>'
+            f'<h2 class="zone-title-action">本周跟进任务</h2>'
             f'</div>'
             f'<div class="zone-count-action">{n_active} 条</div>'
             f'</div></div>\n'
             f'{active_sections}'
+            f'</section>\n'
         )
     else:
         active_zone = ""
@@ -1003,13 +1005,14 @@ def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dic
         f'<meta http-equiv="Pragma" content="no-cache">\n'
         f'<meta http-equiv="Expires" content="0">\n'
         f'<title>Lilith Legal 全球合规动态周报</title>\n'
+        f'<meta name="description" content="Lilith Games 全球游戏合规动态周报 · {week_esc} · {total} 条动态">\n'
         f'<style>{_MOBILE_CSS}</style>\n</head>\n<body>\n'
         f'<div class="app-view">\n'
         f'<header class="global-header">{logo_html}'
         f'<div class="header-version">{range_esc}</div></header>\n'
         f'<main class="main-content">\n'
         f'<div class="page-title-block">'
-        f'<div class="page-week">{week_esc}</div>'
+        f'<h1 class="page-week">{week_esc}</h1>'
         f'<div class="page-subtitle">全球游戏合规动态周报</div>'
         f'<div class="stat-chips">'
         f'<span class="stat-chip">{total} 条动态</span>'
@@ -1020,6 +1023,8 @@ def _render_mobile_html(archived: List[dict], news: List[dict], active: List[dic
         f'<button class="filter-btn active" data-filter="all" onclick="filterRegion(\'all\', this)">全部</button>'
         f'{filter_btns}'
         f'</div>\n'
+        f'<div class="empty-state" id="emptyState" style="display:none;">'
+        f'<p class="empty-state-text">该区域本周暂无合规动态</p></div>\n'
         f'{archived_zone}'
         f'{news_zone}'
         f'{active_zone}'
@@ -1111,7 +1116,7 @@ def _render_pc_html(archived: List[dict], news: List[dict], active: List[dict],
                     exec_summary: str,
                     archived_grouped: dict, news_grouped: dict, active_grouped: dict,
                     period_label: str = "") -> str:
-    # PC 端复用 mobile 渲染，仅注入更宽的容器尺寸
+    # PC 端复用 mobile 渲染，注入宽屏适配样式
     mobile_html = _render_mobile_html(
         archived, news, active, exec_summary,
         archived_grouped, news_grouped, active_grouped, period_label
@@ -1119,7 +1124,11 @@ def _render_pc_html(archived: List[dict], news: List[dict], active: List[dict],
     pc_override = (
         "<style>"
         "@media(min-width:600px){.app-view{max-width:860px;}}"
-        "@media(min-width:1000px){.app-view{max-width:1080px;}}"
+        "@media(min-width:1000px){"
+        ".app-view{max-width:1080px;}"
+        ".log-list{display:grid;grid-template-columns:repeat(2,1fr);}"
+        ".log-item{margin:0;}"
+        "}"
         "@media(min-width:1400px){.app-view{max-width:1280px;}}"
         "</style>"
     )
@@ -1637,7 +1646,7 @@ td {{ padding: 9px 12px; font-size: 12px; vertical-align: top; }}
 
 </div>
 <script>
-{_REPORT_JS}
+{_load_template_file("_report.js")}
 </script>
 </body>
 </html>"""

@@ -96,3 +96,26 @@ RSS Feeds (100+) + Google News → fetcher.py → classifier.py → translator.p
 - `test.yml` — runs pytest on push/PR to main
 - `daily_check.yml` — daily 8am (UTC+8) fetch + Feishu notification
 - `publish_report.yml` — manual trigger for weekly report publication
+
+## Design Context
+
+### Users
+- **Primary audience**: Lilith Games compliance team (legal BPs) and department leadership
+- **Context**: BPs check on mobile throughout the week; leadership reviews on desktop during meetings. Both equally important.
+- **Job to be done**: Quickly scan global gaming regulatory changes, assess risk priority, track follow-up tasks
+
+### Brand Personality
+- **Voice**: Warm, approachable, informative — like a well-designed internal newsletter
+- **3 words**: Clear, Trustworthy, Efficient
+
+### Aesthetic Direction
+- Light theme with dark header, color-coded accents, card-based layout — refine, don't reinvent
+- Inter (variable) + JetBrains Mono + PingFang SC/Noto Sans SC CJK fallback
+- Light mode only (report is often printed/PDF'd)
+
+### Design Principles
+1. **Scan-first hierarchy**: Risk level, region, status visible without reading full text
+2. **Mobile-desktop parity**: Equally effective on 375px phone and 1400px desktop
+3. **Quiet confidence**: Color signals category, not decoration
+4. **Content density over chrome**: Every pixel serves information or navigation
+5. **Three-zone integrity**: Archived/news/active structure is the backbone — reinforce visually

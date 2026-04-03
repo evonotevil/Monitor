@@ -97,19 +97,23 @@
         .page-footer { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-meta); text-align: center; }
         @media (max-width: 900px) { .header-inner { padding: 0 24px; } .page-shell { padding: 32px 24px 60px; } .hero { flex-direction: column; align-items: flex-start; gap: 16px; } .exec-inner { grid-template-columns: 1fr; } .exec-sidebar { padding: 20px 24px; } .card-grid { grid-template-columns: 1fr; } .card.span-2 { grid-column: auto; } h1 { font-size: 26px; } }
         @media (max-width: 560px) { .header-inner { padding: 0 16px; } .header-badge { display: none; } .page-shell { padding: 24px 16px 60px; } }
-        /* ── 双区块横幅 ── */
+        /* ── 三区块横幅 ── */
         .zone-banner { border-radius: var(--radius); margin-bottom: 28px; overflow: hidden; }
-        .zone-banner-action { background: linear-gradient(to right, #F59E0B 4px, #18181B 4px); border: 1px solid #3F3F46; }
-        .zone-banner-news   { background: linear-gradient(to right, #94A3B8 4px, #F8FAFC 4px); border: 1px solid #E2E8F0; }
+        .zone-banner-archived { background: linear-gradient(to right, #27AE60 4px, #14352A 4px); border: 1px solid #1E4D3D; }
+        .zone-banner-action   { background: linear-gradient(to right, #F59E0B 4px, #2D1F0E 4px); border: 1px solid #4A3520; }
+        .zone-banner-news     { background: linear-gradient(to right, #94A3B8 4px, #F8FAFC 4px); border: 1px solid #E2E8F0; }
         .zone-banner-inner { display: flex; align-items: center; gap: 16px; padding: 18px 24px; }
         .zone-banner-icon  { font-size: 26px; flex-shrink: 0; line-height: 1; }
         .zone-banner-info  { flex: 1; min-width: 0; }
-        .zone-banner-title-action { font-size: 17px; font-weight: 600; color: #FAFAFA; letter-spacing: -0.02em; }
-        .zone-banner-title-news   { font-size: 17px; font-weight: 600; color: #1E293B; letter-spacing: -0.02em; }
-        .zone-banner-sub-action { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(250,250,250,0.35); margin-top: 4px; }
-        .zone-banner-sub-news   { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: #94A3B8; margin-top: 4px; }
-        .zone-banner-count-action { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #FCD34D; flex-shrink: 0; }
-        .zone-banner-count-news   { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #94A3B8; flex-shrink: 0; }
+        .zone-banner-title-archived { font-size: 17px; font-weight: 600; color: #A7F3D0; letter-spacing: -0.02em; }
+        .zone-banner-title-action   { font-size: 17px; font-weight: 600; color: #FCD34D; letter-spacing: -0.02em; }
+        .zone-banner-title-news     { font-size: 17px; font-weight: 600; color: #1E293B; letter-spacing: -0.02em; }
+        .zone-banner-sub-archived { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(167,243,208,0.35); margin-top: 4px; }
+        .zone-banner-sub-action   { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(252,211,77,0.35); margin-top: 4px; }
+        .zone-banner-sub-news     { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase; color: #94A3B8; margin-top: 4px; }
+        .zone-banner-count-archived { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #A7F3D0; flex-shrink: 0; }
+        .zone-banner-count-action   { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #FCD34D; flex-shrink: 0; }
+        .zone-banner-count-news     { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #94A3B8; flex-shrink: 0; }
         /* ── BP 任务分解 ── */
         .bp-breakdown { display: flex; flex-direction: column; gap: 16px; }
         .bp-header-row { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }

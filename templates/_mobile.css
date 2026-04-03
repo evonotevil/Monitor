@@ -16,7 +16,7 @@
 
         :root {
             --bg-canvas: #EBEBEB; --bg-main: #F9F9F7; --bg-card: #FFFFFF;
-            --text-primary: #1A1A1A; --text-secondary: #5A5A5A; --text-meta: #999999;
+            --text-primary: #1A1A1A; --text-secondary: #5A5A5A; --text-meta: #717171;
             --line-color: rgba(0,0,0,0.08); --card-border: rgba(0,0,0,0.08);
             --card-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.06);
             --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.08);
@@ -32,13 +32,14 @@
         .app-view { width: 100%; max-width: 430px; min-height: 100vh; background-color: var(--bg-main); box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 8px 40px rgba(0,0,0,0.10); overflow-x: hidden; display: flex; flex-direction: column; }
         .global-header { padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; background-color: var(--header-bg); position: sticky; top: 0; z-index: 20; }
         .header-logo { height: 44px; width: auto; object-fit: contain; mix-blend-mode: screen; margin: -6px 0; }
-        .header-version { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.10em; color: rgba(255,255,255,0.30); text-transform: uppercase; }
+        .header-version { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.10em; color: rgba(255,255,255,0.55); text-transform: uppercase; }
         .main-content { padding: 32px 0 80px; flex: 1; }
         .page-title-block { padding: 0 20px 28px; margin-bottom: 20px; }
+        h1, h2, h3 { margin: 0; }
         .page-week { font-size: 26px; font-weight: 500; letter-spacing: -0.03em; color: var(--text-primary); line-height: 1.1; margin-bottom: 6px; }
         .page-subtitle { font-size: 13px; font-weight: 400; color: var(--text-secondary); margin-bottom: 12px; }
         .stat-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-        .stat-chip { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; background: rgba(0,0,0,0.05); color: var(--text-meta); }
+        .stat-chip { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; background: rgba(0,0,0,0.05); color: var(--text-secondary); }
         .exec-block { margin: 0 20px 24px; background: var(--bg-card); border-radius: 10px; box-shadow: var(--card-shadow); overflow: hidden; }
         .exec-header { background: var(--header-bg); padding: 12px 16px; display: flex; align-items: center; gap: 8px; }
         .exec-header-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(255,255,255,0.55); }
@@ -50,15 +51,15 @@
         .risk-pill.high   { color: #991B1B; background: #FEF2F2; border-color: #FECACA; }
         .risk-pill.medium { color: #92400E; background: #FFFBEB; border-color: #FDE68A; }
         .risk-pill.info   { color: #1E40AF; background: #EFF6FF; border-color: #BFDBFE; }
-        .filter-bar { position: sticky; top: 72px; z-index: 10; background: var(--bg-main); padding: 10px 20px; margin-bottom: 32px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+        .filter-bar { position: sticky; top: 72px; z-index: 10; background: var(--bg-main); padding: 10px 24px; margin-bottom: 32px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent); mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent); }
         .filter-bar::-webkit-scrollbar { display: none; }
-        .filter-btn { flex-shrink: 0; font-family: var(--font-sans); font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--card-border); background: var(--bg-card); color: var(--text-secondary); cursor: pointer; transition: all 0.15s ease; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .filter-btn { flex-shrink: 0; font-family: var(--font-sans); font-size: 12px; font-weight: 500; padding: 8px 14px; border-radius: 20px; border: 1px solid var(--card-border); background: var(--bg-card); color: var(--text-secondary); cursor: pointer; transition: all 0.15s ease; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
         .filter-btn:hover { border-color: rgba(0,0,0,0.16); color: var(--text-primary); }
         .filter-btn.active { background: var(--header-bg); color: #FFFFFF; border-color: transparent; box-shadow: 0 1px 4px rgba(0,0,0,0.14); }
         .section-group { margin-bottom: 40px; }
         .section-group.hidden { display: none; }
         .section-header { display: flex; align-items: baseline; gap: 8px; padding: 0 20px; margin-bottom: 6px; }
-        .section-title { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); }
+        .section-title { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); margin: 0; }
         .section-count { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; color: var(--text-meta); text-transform: uppercase; }
         .section-dots { display: flex; gap: 3px; margin-left: auto; align-items: center; }
         .dot { width: 5px; height: 5px; border-radius: 50%; }
@@ -95,17 +96,23 @@
         .page-footer-text { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-meta); }
         @media (min-width: 600px) { .app-view { border-radius: 12px; margin: 24px auto; min-height: auto; } }
         @media (min-width: 900px) { .app-view { max-width: 520px; } }
-        /* ── 双区块分隔条 ── */
+        /* ── 空状态 ── */
+        .empty-state { padding: 48px 20px; text-align: center; }
+        .empty-state-text { font-size: 13px; color: var(--text-meta); }
+        /* ── 三区块分隔条 ── */
         .zone-divider { margin: 8px 20px 28px; border-radius: 12px; overflow: hidden; }
-        .zone-divider-action { background: #18181B; border: 1px solid #3F3F46; }
-        .zone-divider-news   { background: #18181B; border: 1px solid #3F3F46; }
+        .zone-divider-archived { background: #14352A; border: 1px solid #1E4D3D; }
+        .zone-divider-action   { background: #2D1F0E; border: 1px solid #4A3520; }
+        .zone-divider-news     { background: #18181B; border: 1px solid #3F3F46; }
         .zone-inner { padding: 16px 18px; display: flex; align-items: center; gap: 12px; }
         .zone-icon { font-size: 22px; flex-shrink: 0; line-height: 1; }
         .zone-info { flex: 1; min-width: 0; }
-        .zone-title-action { font-family: var(--font-sans); font-size: 15px; font-weight: 600; color: #FAFAFA; letter-spacing: -0.02em; line-height: 1.2; }
-        .zone-title-news   { font-family: var(--font-sans); font-size: 15px; font-weight: 600; color: #FAFAFA; letter-spacing: -0.02em; line-height: 1.2; }
-        .zone-count-action { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.65); flex-shrink: 0; }
-        .zone-count-news   { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.65); flex-shrink: 0; }
+        .zone-title-archived { font-family: var(--font-sans); font-size: 15px; font-weight: 600; color: #A7F3D0; letter-spacing: -0.02em; line-height: 1.2; }
+        .zone-title-action   { font-family: var(--font-sans); font-size: 15px; font-weight: 600; color: #FCD34D; letter-spacing: -0.02em; line-height: 1.2; }
+        .zone-title-news     { font-family: var(--font-sans); font-size: 15px; font-weight: 600; color: #FAFAFA; letter-spacing: -0.02em; line-height: 1.2; }
+        .zone-count-archived { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: rgba(167,243,208,0.65); flex-shrink: 0; }
+        .zone-count-action   { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: rgba(252,211,77,0.65); flex-shrink: 0; }
+        .zone-count-news     { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.65); flex-shrink: 0; }
         /* ── BP 任务分解 ── */
         .bp-breakdown { display: flex; flex-direction: column; gap: 12px; }
         .bp-header-row { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
@@ -123,7 +130,21 @@
         .log-bp-value { font-size: 11px; font-weight: 500; color: var(--text-secondary); }
         .log-conclusion { margin-top: 8px; font-size: 11px; line-height: 1.7; color: var(--text-secondary); padding: 8px 12px; background: rgba(99,102,241,0.06); border-radius: 6px; border: 1px solid rgba(99,102,241,0.14); border-left: 3px solid #6366F1; }
         .log-btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-        .log-btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 11px; border-radius: 6px; font-size: 11px; font-weight: 500; text-decoration: none; transition: opacity 0.15s; }
+        .log-btn { display: inline-flex; align-items: center; gap: 4px; padding: 8px 14px; border-radius: 6px; font-size: 11px; font-weight: 500; text-decoration: none; transition: opacity 0.15s; }
         .log-btn:hover { opacity: 0.8; }
         .log-btn-doc     { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
         .log-btn-bitable { background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; }
+        /* ── 打印样式 ── */
+        @media print {
+            body { background: #FFF; }
+            .app-view { max-width: 100%; box-shadow: none; }
+            .global-header { position: static; background: #1A1A1A; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .filter-bar { display: none; }
+            .section-group.hidden { display: block !important; }
+            .log-item { break-inside: avoid; box-shadow: none; border: 1px solid #DDD; }
+            .log-item::before { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .log-item:hover { transform: none; }
+            .zone-divider { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-after: avoid; }
+            .log-btn-row { display: none; }
+            .page-footer { margin-top: 24px; }
+        }
