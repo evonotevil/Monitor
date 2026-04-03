@@ -37,6 +37,7 @@ def build_card(
     mobile_url: str = "",
     pc_url: str    = "",
     html_url: str  = "",
+    bitable_url: str = "",
 ) -> dict:
     """
     卡片结构：
@@ -101,19 +102,26 @@ def build_card(
     if effective_mobile:
         actions.append({
             "tag": "button",
-            "text": {"tag": "plain_text", "content": "📱 移动端周报"},
+            "text": {"tag": "plain_text", "content": "📱 查看周报"},
             "type": "primary",
             "url": effective_mobile,
         })
     if pc_url:
         actions.append({
             "tag": "button",
-            "text": {"tag": "plain_text", "content": "🖥️ PC 端周报"},
+            "text": {"tag": "plain_text", "content": "🖥️ PC 版周报"},
             "type": "default",
             "url": pc_url,
         })
     if actions:
         elements.append({"tag": "action", "actions": actions})
+    if bitable_url:
+        elements.append({"tag": "action", "actions": [{
+            "tag": "button",
+            "text": {"tag": "plain_text", "content": "📊 查看多维表格"},
+            "type": "default",
+            "url": bitable_url,
+        }]})
 
     return {
         "config": {"wide_screen_mode": True},
@@ -135,6 +143,10 @@ def main():
     mobile_url  = os.environ.get("REPORT_MOBILE_URL", "") or os.environ.get("MOBILE_URL", "")
     pc_url      = os.environ.get("REPORT_PC_URL", "")    or os.environ.get("PC_URL", "")
     html_url    = os.environ.get("REPORT_HTML_URL", "")
+    # 多维表格概览链接（从 app_token + table_id 拼接）
+    bt_app      = os.environ.get("FEISHU_BITABLE_APP_TOKEN", "")
+    bt_table    = os.environ.get("FEISHU_BITABLE_TABLE_ID", "")
+    bitable_url = f"https://feishu.cn/base/{bt_app}?table={bt_table}" if bt_app and bt_table else ""
 
     if not chat_id:
         print("❌ 未设置 FEISHU_CHAT_ID 环境变量")
@@ -169,6 +181,7 @@ def main():
     card = build_card(
         archived, news, active, ai_summary,
         mobile_url=mobile_url, pc_url=pc_url, html_url=html_url,
+        bitable_url=bitable_url,
     )
     send_card(chat_id, card)
 

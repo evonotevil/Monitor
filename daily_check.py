@@ -34,7 +34,7 @@ DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 
 from utils import (
     _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status,
-    CAT_EMOJI, _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items,
+    _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items,
 )
 from feishu_client import send_card
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
@@ -158,25 +158,6 @@ def get_daily_items() -> list:
 _MAX_PER_GROUP = int(os.environ.get("DAILY_MAX_PER_GROUP", "3"))   # 日报每区域最多展示条数
 _MAX_TOTAL     = int(os.environ.get("DAILY_MAX_ITEMS", "12"))     # 日报全局上限
 
-# 风险维度标签（仅 LLM 评估且维度 ≥2 时展示）
-_RISK_DIM_LABELS = {
-    "risk_revenue": ("营收", "🔴"),
-    "risk_product": ("改动", "🟠"),
-    "risk_urgency": ("紧迫", "⚠️"),
-    "risk_scope":   ("范围", "🌐"),
-}
-
-
-def _build_risk_tags(item: dict) -> str:
-    """为 LLM 评估的高风险维度生成标签串，如"营收🔴·紧迫⚠️"。"""
-    if item.get("risk_source") != "llm":
-        return ""
-    tags = []
-    for dim, (label, emoji) in _RISK_DIM_LABELS.items():
-        if item.get(dim, 0) >= 2:
-            tags.append(f"{label}{emoji}")
-    return "·".join(tags)
-
 
 def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = False) -> dict:
     now_cst   = datetime.now(_TZ_CST)
@@ -247,8 +228,8 @@ def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = Fals
     elements.append({
         "tag": "markdown",
         "content": (
-            f"{count_label}　**{date_label}**\n\n"
-            f"**🗺️ 按地区**　{region_line}"
+            f"{count_label}　{date_label}\n"
+            f"{region_line}"
         ),
     })
 
@@ -286,7 +267,6 @@ def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = Fals
             score    = float(item.get("impact_score", 1.0))
             risk_em  = _impact_emoji(score)
             cat      = item.get("category_l1", "")
-            cat_em   = CAT_EMOJI.get(cat, "")
             status   = normalize_status(item.get("status", ""))
             region   = item.get("region", "")
 
@@ -298,15 +278,12 @@ def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = Fals
             summary_zh = (item.get("summary_zh") or item.get("summary") or "").strip()
             mechanism  = _smart_truncate(summary_zh, 100)
 
-            risk_tags = _build_risk_tags(item)
-            risk_line = f"　**{risk_tags}**" if risk_tags else ""
-
             elements.append({
                 "tag": "markdown",
                 "content": (
-                    f"{risk_em} **[{region}]** {status} · {cat_em} {cat}{risk_line}\n"
+                    f"{risk_em} **{status}** · {region} · {cat}\n"
                     f"{title_md}\n"
-                    f"🔧 **机制变动**：{mechanism}"
+                    f"机制变动：{mechanism}"
                 ),
             })
             total_shown += 1
