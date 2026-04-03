@@ -48,10 +48,14 @@ def build_card(
     """
     elements: list = []
 
-    # ── ① 上周已归档完成（0 条时隐藏整个区块）────────────────────────
+    # ── ① 统计概览行（始终展示三区数据）─────────────────────────────
     n_archived = len(archived)
+    n_news     = len(news)
+    n_active   = len(active)
+    stats_line = f"✅ 归档 {n_archived} 条 · 📰 动态 {n_news} 条 · 🎯 跟进 {n_active} 条"
+
+    # 归档条目的地区标签
     if n_archived > 0:
-        # 收集去重后的地区标签（保持 _GROUP_ORDER 顺序）
         seen_groups: dict = {}
         for item in archived:
             group = _get_region_group(item.get("region", ""))
@@ -60,13 +64,12 @@ def build_card(
         region_tags = "　".join(
             seen_groups[g] for g in _GROUP_ORDER if g in seen_groups
         ) or ""
-
-        content = f"✅ **上周已归档完成 · {n_archived} 条**"
         if region_tags:
-            content += f"\n{region_tags}"
-        elements.append({"tag": "markdown", "content": content})
+            stats_line += f"\n{region_tags}"
 
-    # ── ② AI 摘要（A+B：关键词 + 风险提示）──────────────────────────
+    elements.append({"tag": "markdown", "content": stats_line})
+
+    # ── ② AI 摘要（关键词 + 风险提示）───────────────────────────────
     if ai_summary:
         elements.append({"tag": "hr"})
         quoted = "\n".join(
@@ -74,14 +77,9 @@ def build_card(
         )
         elements.append({"tag": "markdown", "content": quoted})
 
-    # ── ③ 本周跟进任务（按 BP 分组展示）──────────────────────────────
-    elements.append({"tag": "hr"})
-    if not active:
-        elements.append({
-            "tag": "markdown",
-            "content": "🎯 **本周无跟进任务**",
-        })
-    else:
+    # ── ③ 本周跟进任务（按 BP 分组展示，0 条时简洁提示）──────────────
+    if n_active > 0:
+        elements.append({"tag": "hr"})
         bp_groups: dict = {}
         for item in active:
             bp = (item.get("assignee") or "").strip() or "未分配"
@@ -92,7 +90,7 @@ def build_card(
         )
         elements.append({
             "tag": "markdown",
-            "content": f"🎯 **本周跟进任务 · {len(active)} 条**\n{bp_lines}",
+            "content": f"🎯 **本周跟进任务 · {n_active} 条**\n{bp_lines}",
         })
 
     # ── ④ 按钮行 ─────────────────────────────────────────────────────
