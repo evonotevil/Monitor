@@ -105,8 +105,7 @@ def get_daily_items() -> list:
         for d in range(lookback_days + 1)  # 含今天
     ]
 
-    from datetime import timezone as _tz
-    cutoff_utc = (datetime.now(_tz.utc) - timedelta(hours=lookback_hours)).strftime("%Y-%m-%d %H:%M:%S")
+    cutoff_utc = (datetime.now(timezone.utc) - timedelta(hours=lookback_hours)).strftime("%Y-%m-%d %H:%M:%S")
 
     date_range_label = f"{date_list[-1]} ~ {date_list[0]}" if is_monday else f"{date_list[-1]}, {date_list[0]}"
     print(f"📅 日报筛选：date IN [{date_range_label}]，created_at >= {cutoff_utc} (UTC)"
@@ -274,7 +273,6 @@ def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = Fals
             url      = item.get("source_url", "")
             title_md = f"[{title_zh}]({url})" if url else title_zh
 
-            # 机制变动：从 summary_zh 提取摘要，在句号/分号/逗号处智能截断
             summary_zh = (item.get("summary_zh") or item.get("summary") or "").strip()
             mechanism  = _smart_truncate(summary_zh, 100)
 

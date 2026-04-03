@@ -94,7 +94,6 @@ def build_card(
         })
 
     # ── ④ 按钮行 ─────────────────────────────────────────────────────
-    elements.append({"tag": "hr"})
     actions = []
     effective_mobile = mobile_url or html_url
     if effective_mobile:
@@ -119,6 +118,7 @@ def build_card(
             "url": bitable_url,
         })
     if actions:
+        elements.append({"tag": "hr"})
         elements.append({"tag": "action", "actions": actions})
 
     return {
