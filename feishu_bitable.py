@@ -529,6 +529,7 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
 
             # 按日期过滤（仅当指定了 days 时）
             # 归档条目用「归档日期」；若归档日期为空则不过滤（无法判断归档时间）
+            # 跟进/处理中条目不按发布日期截断，避免老任务从周报消失
             # 其余条目用「发布日期」
             if date_cutoff:
                 if "归档" in status_val:
@@ -536,6 +537,8 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
                     # 归档条目没有归档日期时不过滤，保留供周报展示
                     if not ref_date:
                         ref_date = ""
+                elif "处理" in status_val or "跟进" in status_val:
+                    ref_date = ""   # 跟进任务永远保留，不按发布日期截断
                 else:
                     ref_date = mapped["date"]
                 if ref_date and ref_date < date_cutoff:
