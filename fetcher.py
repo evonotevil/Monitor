@@ -286,12 +286,20 @@ REGULATORY_SIGNALS = [
     r"\bIGAC\b", r"\bGRAC\b", r"\bESRB\b", r"\bPEGI\b", r"\bCERO\b", r"\bCESA\b",
     r"\bOnline Safety Act\b", r"\bKIDS Act\b",
     r"消費者庁", r"게임물관리위원회",
+    # 民事诉讼 / 集体诉讼
+    r"\blawsuit\w*\b", r"\bsue[ds]?\b", r"\bsuing\b",
+    r"\bclass.?action\b", r"\bproduct.?liability\b",
+    r"\bcomplaint\b", r"\blitigation\b", r"\bplaintiff\b",
+    r"\binjunction\b", r"\bdamages\b.*\b(?:seek|award|claim)\w*\b",
+    r"\bsettlement\b",
     # 日文
     r"規制", r"法律", r"法案", r"条例", r"施行", r"罰則", r"処分", r"義務",
     r"景品表示法", r"資金決済法", r"特商法",
+    r"訴訟", r"提訴", r"集団訴訟",
     # 韩文
     r"규제", r"법안", r"법률", r"의무", r"제재", r"개정",
     r"게임산업진흥법",
+    r"소송", r"집단소송",
     # 越南语
     r"quy định", r"nghị định", r"thông tư", r"luật",   # 规定/法令/通知/法律
     # 泰语

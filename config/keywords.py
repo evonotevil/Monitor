@@ -99,6 +99,10 @@ KEYWORDS = {
         "KOSA game minor protection legislation",
         "GDPR minor consent age game",
         "UK Children Code game app",
+        "game addiction lawsuit",
+        "game addiction class action",
+        "product liability game addiction minor",
+        "game designed addict children lawsuit",
 
         # === 数据隐私 ===
         "GDPR game enforcement",

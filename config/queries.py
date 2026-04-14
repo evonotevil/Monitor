@@ -62,6 +62,8 @@ DAILY_GOOGLE_NEWS_EN = [
     'game (GDPR OR CCPA OR privacy) enforcement OR fine',
     # 未成年人保护（COPPA / KOSA / 年龄验证）
     'game (children OR minor OR COPPA OR KOSA) protection law',
+    # 游戏成瘾诉讼 / 产品责任（民事诉讼、集体诉讼）
+    'game (lawsuit OR "class action" OR "product liability") (addiction OR minor OR children)',
     # 广告营销（暗黑模式 / 网红披露 / 虚假广告）
     'game advertising (disclosure OR "dark pattern" OR misleading) enforcement',
     # 消费者保护（退款 / 微交易 / 订阅）
