@@ -288,6 +288,14 @@ KEYWORDS = {
         "PIPEDA game Canada privacy",
         "UK GDPR game divergence",
 
+        # === 游戏存续 / 在线服务停运 / 数字所有权 ===
+        'game ("live service" OR "end of service" OR shutdown) consumer protection regulation',
+        'game preservation (law OR regulation OR bill OR act)',
+        '"digital ownership" (game OR gaming) (regulation OR law OR consumer)',
+        '"Stop Killing Games" OR "Protect Our Games Act" game',
+        'game server shutdown (consumer OR regulation OR law OR right)',
+        '"right to play" game (law OR regulation OR bill)',
+
         # === PC 平台合规 (Steam / Epic / D2C / 驱动级反作弊) ===
         # 注: 该段由 PC_PLATFORM_KEYWORDS_EN 导入，fetcher 会对其单独做 UK/EU 路由
         *PC_PLATFORM_KEYWORDS_EN,

@@ -43,6 +43,8 @@ OFFICIAL_SITE_QUERIES = [
     # ── 南美 ────────────────────────────────────────────────────────────
     "jogo regulação site:gov.br/anpd",                       # 巴西 ANPD
     "game regulation site:gob.mx",                            # 墨西哥政府
+    # ── 加州立法 ──────────────────────────────────────────────────────────
+    "game consumer protection site:leginfo.legislature.ca.gov",  # 加州立法机关（AB 1921 等）
     # ── 东南亚补充 ──────────────────────────────────────────────────────
     "game regulation site:privacy.gov.ph",                    # 菲律宾 NPC
     "game regulation site:pdpc.or.th",                        # 泰国 PDPC
@@ -90,6 +92,8 @@ DAILY_GOOGLE_NEWS_EN = [
     'game age (rating OR verification) regulation law',
     # 消费上限 / VIP / 保底机制 / 社交消费压力
     'game (spending cap OR "spending limit" OR "pity system" OR VIP) regulation consumer',
+    # 游戏存续 / 在线服务停运 / 数字所有权
+    'game ("live service" OR preservation OR shutdown OR "end of service") (regulation OR law OR bill OR consumer)',
 ]
 
 # 日报非英文精选（日韩各 2-3 条，重点覆盖本地监管机构动态）
