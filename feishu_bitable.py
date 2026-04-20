@@ -184,13 +184,11 @@ def _build_record(item: dict) -> dict:
         if val is not None:
             fields[field] = val
 
-    # 合成影响评分（Bitable 表需手动添加「影响评分」数字列）
     score = item.get("impact_score")
-    if score is not None and float(score) > 0:
+    if score is not None and score > 0:
         fields["影响评分"] = round(float(score), 1)
 
-    # 信源等级（Bitable 表需手动添加「信源等级」单选列）
-    tier = item.get("source_tier") or get_source_tier(source)
+    tier = get_source_tier(source)
     if tier:
         fields["信源等级"] = tier
 

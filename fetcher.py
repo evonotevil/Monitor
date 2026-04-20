@@ -390,11 +390,11 @@ GAME_SIGNALS = [
     # 韩国发行商
     r"\bNexon\b", r"\bMapleStory\b",
     r"\bKrafton\b", r"\bPUBG\b",
-    r"\bNCsoft\b", r"\bLineage\b",
+    r"\bNCsoft\b", r"\bLineage\b.*\b(?:game|MMORPG|NCsoft|mobile)\b",
     r"\bNetmarble\b",
     r"\bKakao\s*Games?\b",
     r"\bCom2uS\b", r"\bSummoners?\s*War\b",
-    r"\bSmilegate\b", r"\bCrossFire\b", r"\bLost\s*Ark\b",
+    r"\bSmilegate\b", r"\bCross\s*Fire\b.*\b(?:game|Smilegate|mobile|shooter)\b", r"\bLost\s*Ark\b",
     r"\bShift\s*Up\b", r"\bStellar\s*Blade\b",
     # 日本发行商
     r"\bBandai\s*Namco\b",
@@ -413,19 +413,19 @@ GAME_SIGNALS = [
     r"\bMicrosoft\s*Gaming\b", r"\bXbox\s*Game\b",
     r"\bTake.?Two\b", r"\bRockstar\s*Games?\b", r"\b2K\s*Games?\b",
     r"\bUbisoft\b",
-    r"\bValve\b(?!.*\bvalve\b)",
+    r"\bValve\b.*\b(?:Steam|game|Half.Life|software|Gabe)\b",
     r"\bWarner\s*Bros\.?\s*Games?\b",
     r"\bEmbracer\b", r"\bTHQ\s*Nordic\b",
     # 手游专业发行商
     r"\bScopely\b", r"\bMonopoly\s*Go\b",
     r"\bKing\b.*\b(?:game|Candy|Crush)\b",
     r"\bPlayrix\b",
-    r"\bDream\s*Games?\b", r"\bRoyal\s*Match\b",
+    r"\bDream\s*Games\b", r"\bRoyal\s*Match\b",
     r"\bZynga\b",
     r"\bJam\s*City\b",
     # 东南亚 / 其他
-    r"\bGarena\b", r"\bSea\s*Ltd\b", r"\bFree\s*Fire\b",
-    r"\bVNG\b(?!.*\bvng\b)",
+    r"\bGarena\b", r"\bSea\s*Ltd\b", r"\bFree\s*Fire\b.*\b(?:game|Garena|mobile|battle)\b",
+    r"\bVNG\b.*\b(?:game|Garena|ZingPlay|mobile)\b",
     # 平台 / 产品
     r"\bRoblox\b", r"\bFortnite\b", r"\bApple\s*Arcade\b",
 
