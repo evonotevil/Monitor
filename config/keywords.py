@@ -288,6 +288,20 @@ KEYWORDS = {
         "PIPEDA game Canada privacy",
         "UK GDPR game divergence",
 
+        # === Lilith Games / 产品专项 ===
+        '"Lilith Games" regulation OR lawsuit OR fine OR enforcement',
+        '"AFK Arena" OR "Rise of Kingdoms" OR "Dislyte" regulation OR compliance OR lawsuit',
+
+        # === 执法行动 / 诉讼专项 ===
+        'FTC game enforcement OR settlement OR "consent decree" OR "consent order"',
+        '"state attorney general" game enforcement OR lawsuit OR settlement',
+        'game developer (fined OR penalized OR sanctioned OR sued OR investigated)',
+        'game company "consent decree" OR "consent order" OR settlement',
+
+        # === App Store 执法 / 下架 ===
+        'game (removed OR suspended OR banned OR delisted) "App Store" OR "Google Play"',
+        'app store (policy violation OR rejection OR enforcement) game developer',
+
         # === 游戏存续 / 在线服务停运 / 数字所有权 ===
         'game ("live service" OR "end of service" OR shutdown) consumer protection regulation',
         'game preservation (law OR regulation OR bill OR act)',
@@ -325,6 +339,8 @@ KEYWORDS = {
         "ゲーム 課金 冷却期間 消費者保護",
         "放置ゲーム 課金 規制",
         "ゲーム アカウント売買 RMT 規制",
+        # Lilith / 産品専項
+        "リリスゲームズ OR AFK OR ライキン 規制 OR 訴訟 OR 処分",
     ],
     "ko": [
         "게임 규제 법안",
@@ -351,6 +367,8 @@ KEYWORDS = {
         "게임 결제 냉각기간 소비자 보호",
         "방치형 게임 과금 규제",
         "게임 계정 거래 RMT 규제 법률",
+        # Lilith / 제품 전용
+        "릴리스게임즈 OR AFK OR 라이즈오브킹덤즈 규제 OR 소송 OR 처분",
     ],
     "vi": [
         "quy định trò chơi điện tử",

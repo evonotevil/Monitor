@@ -36,6 +36,8 @@ from config import (
     DAILY_GOOGLE_NEWS_VI,
     DAILY_GOOGLE_NEWS_PT,
     DAILY_GOOGLE_NEWS_TH,
+    DAILY_GOOGLE_NEWS_ID,
+    DAILY_GOOGLE_NEWS_AR,
 )
 from models import LegislationItem
 from classifier import classify_article, is_china_mainland
@@ -368,6 +370,74 @@ GAME_SIGNALS = [
     r"เกม",                              # 游戏
     # 阿拉伯语
     r"ألعاب|لعبة",                       # 游戏/一个游戏
+
+    # ── 游戏公司名信号（公司名 + REGULATORY_SIGNAL = 通过过滤）──
+    # Lilith 自家
+    r"\bLilith\s*Games?\b",
+    r"\bAFK\s*(?:Arena|Journey)\b", r"\bRise\s*of\s*Kingdoms?\b",
+    r"\bDislyte\b", r"\bWarpath\b", r"\bFarlight\b",
+    # 中资出海发行商
+    r"\bTencent\b", r"\bNetEase\b", r"\bmiHoYo\b", r"\bHoYoverse\b",
+    r"\bCentury\s*Games?\b", r"\bWhiteout\s*Survival\b",
+    r"\bFunPlus\b", r"\bFun\s*Plus\b", r"\bKings?\s*Group\b",
+    r"\bFUNFLY\b", r"\bLast\s*War\b",
+    r"\b37(?:Games|Interactive)\b",
+    r"\bYotta\s*Games?\b", r"\bTop\s*War\b",
+    r"\bIGG\b", r"\bLords?\s*Mobile\b",
+    r"\bMoonton\b", r"\bMobile\s*Legends?\b",
+    r"\bGame\s*Science\b", r"\bBlack\s*Myth\b",
+    r"\bPapergames\b", r"\bInfinity\s*Nikki\b",
+    # 韩国发行商
+    r"\bNexon\b", r"\bMapleStory\b",
+    r"\bKrafton\b", r"\bPUBG\b",
+    r"\bNCsoft\b", r"\bLineage\b",
+    r"\bNetmarble\b",
+    r"\bKakao\s*Games?\b",
+    r"\bCom2uS\b", r"\bSummoners?\s*War\b",
+    r"\bSmilegate\b", r"\bCrossFire\b", r"\bLost\s*Ark\b",
+    r"\bShift\s*Up\b", r"\bStellar\s*Blade\b",
+    # 日本发行商
+    r"\bBandai\s*Namco\b",
+    r"\bSquare\s*Enix\b",
+    r"\bCapcom\b",
+    r"\bSEGA\b", r"\bAtlus\b",
+    r"\bKonami\b",
+    r"\bCygames\b", r"\bCyber\s*Agent\b",
+    r"\bDeNA\b",
+    r"\bGungHo\b",
+    r"\bCOLOPL\b",
+    # 欧美大厂
+    r"\bSupercell\b", r"\bEpic\s*Games\b", r"\bActivision\b", r"\bBlizzard\b",
+    r"\bElectronic\s*Arts?\b", r"\bEA\s*Games?\b",
+    r"\bNintendo\b", r"\bSony\b.*\b(?:PlayStation|game)\b",
+    r"\bMicrosoft\s*Gaming\b", r"\bXbox\s*Game\b",
+    r"\bTake.?Two\b", r"\bRockstar\s*Games?\b", r"\b2K\s*Games?\b",
+    r"\bUbisoft\b",
+    r"\bValve\b(?!.*\bvalve\b)",
+    r"\bWarner\s*Bros\.?\s*Games?\b",
+    r"\bEmbracer\b", r"\bTHQ\s*Nordic\b",
+    # 手游专业发行商
+    r"\bScopely\b", r"\bMonopoly\s*Go\b",
+    r"\bKing\b.*\b(?:game|Candy|Crush)\b",
+    r"\bPlayrix\b",
+    r"\bDream\s*Games?\b", r"\bRoyal\s*Match\b",
+    r"\bZynga\b",
+    r"\bJam\s*City\b",
+    # 东南亚 / 其他
+    r"\bGarena\b", r"\bSea\s*Ltd\b", r"\bFree\s*Fire\b",
+    r"\bVNG\b(?!.*\bvng\b)",
+    # 平台 / 产品
+    r"\bRoblox\b", r"\bFortnite\b", r"\bApple\s*Arcade\b",
+
+    # ── App Store 执法信号 ──
+    r"\b(?:app\s*store|google\s*play)\b.*\b(?:remov|suspend|delist|reject|ban|violat)\w*\b",
+    r"\b(?:remov|suspend|delist|reject|ban|violat)\w*\b.*\b(?:app\s*store|google\s*play)\b",
+
+    # ── 执法行动补充信号 ──
+    r"\bgame\b.*\b(?:settlement|consent\s*(?:order|decree)|plea)\b",
+    r"\b(?:settlement|consent\s*(?:order|decree)|plea)\b.*\bgame\b",
+    r"\bgame\s*(?:studio|maker|creator)\b",
+    r"\bmobile\s*(?:app|developer)\b.*\b(?:fine|penalt|enforc|sued|lawsuit)\w*\b",
 ]
 
 # 排除词 - 即使匹配了上面的词，如果标题中大量出现这些词，基本可以判断不是法规新闻
@@ -418,8 +488,8 @@ EXCLUSION_PATTERNS = [
     r"\bCOMESA\b",  # 非洲区域贸易组织(非游戏)
     r"\bCleveland\s*Cavaliers\b",
     r"骑士队",
-    r"\blottery\b",  # 彩票
-    r"\bbetting\b",  # 投注
+    r"^(?!.*\b(?:games?|gaming|loot|gacha|mechanic)\b).*\blottery\b",  # 彩票（保留游戏内抽奖机制）
+    r"^(?!.*\b(?:games?|gaming|loot|gacha|in.?app)\b).*\bbetting\b",  # 投注（保留游戏内博彩合规）
     # ── 行业会议 / 商务峰会（不涉及立法）────────────────────────────────
     r"\bPocket Gamer Connects\b",            # Pocket Gamer Connects 系列峰会
     r"\bThinkingData\b",                     # 数据分析服务商活动（非监管）
@@ -768,6 +838,8 @@ def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool
                 [(kw + when, "vi_VN") for kw in DAILY_GOOGLE_NEWS_VI]
                 + [(kw + when, "pt_BR") for kw in DAILY_GOOGLE_NEWS_PT]
                 + [(kw + when, "th_TH") for kw in DAILY_GOOGLE_NEWS_TH]
+                + [(kw + when, "en_ID") for kw in DAILY_GOOGLE_NEWS_ID]
+                + [(kw + when, "ar_SA") for kw in DAILY_GOOGLE_NEWS_AR]
             ),
         ]
     else:

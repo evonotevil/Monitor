@@ -33,6 +33,7 @@ SOURCE_TIER_MAP = {
     "IAPP":                           "legal",
     "Lexology":                       "legal",
     "JD Supra":                       "legal",
+    "JD Supra (Consumer Protection)": "legal",
     "Law360":                         "legal",
     # ── industry ──────────────────────────────────────────────────────
     "GamesIndustry.biz":              "industry",

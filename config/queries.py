@@ -51,6 +51,9 @@ OFFICIAL_SITE_QUERIES = [
     # ── 中东 ────────────────────────────────────────────────────────────
     "game content license site:gcam.gov.sa",               # 沙特 GCAM（游戏内容许可）
     "game regulation site:tra.gov.ae",                     # 阿联酋 TRA
+    # ── 执法/诉讼补充 ──────────────────────────────────────────────────
+    '"Lilith" OR "AFK" OR game site:ftc.gov',              # FTC 涉 Lilith/游戏动态
+    "game enforcement OR settlement site:ag.ny.gov",       # 纽约州 AG 游戏执法
 ]
 
 # ── 日报专用精选 Google News 查询（每日 daily_mode=True 时使用）────────────
@@ -94,6 +97,12 @@ DAILY_GOOGLE_NEWS_EN = [
     'game (spending cap OR "spending limit" OR "pity system" OR VIP) regulation consumer',
     # 游戏存续 / 在线服务停运 / 数字所有权
     'game ("live service" OR preservation OR shutdown OR "end of service") (regulation OR law OR bill OR consumer)',
+    # Lilith Games 及旗下产品专项（执法/诉讼/合规/处罚/下架）
+    '"Lilith Games" OR "AFK Arena" OR "AFK Journey" OR "Rise of Kingdoms" OR "Dislyte" OR "Warpath" OR "Farlight 84" (regulation OR lawsuit OR fine OR enforcement OR ban OR compliance OR removed)',
+    # 中国游戏出海发行商合规动态
+    '"Chinese game" OR "Chinese developer" OR "Chinese publisher" (regulation OR ban OR fine OR enforcement OR compliance OR lawsuit)',
+    # App Store / Google Play 执法（游戏下架/拒审/违规处理）
+    'game (removed OR suspended OR rejected OR delisted OR violation) ("App Store" OR "Google Play")',
 ]
 
 # 日报非英文精选（日韩各 2-3 条，重点覆盖本地监管机构动态）
@@ -105,6 +114,7 @@ DAILY_GOOGLE_NEWS_JA = [
 DAILY_GOOGLE_NEWS_KO = [
     "게임 규제 법안 OR 처분 OR 의무",
     "확률형 아이템 OR 게임산업진흥법 OR 대리인 규제",
+    "게임 소송 OR 과징금 OR 제재 OR 처벌",
 ]
 
 # 日报东南亚/南美精选（补充薄弱地区的日常覆盖）
@@ -116,4 +126,12 @@ DAILY_GOOGLE_NEWS_PT = [
 ]
 DAILY_GOOGLE_NEWS_TH = [
     "เกม กฎหมาย OR ระเบียบ OR PDPA",
+]
+
+# 日报印尼/阿拉伯语精选（补充中东/东南亚薄弱地区）
+DAILY_GOOGLE_NEWS_ID = [
+    "game regulasi OR peraturan OR larangan OR denda",
+]
+DAILY_GOOGLE_NEWS_AR = [
+    "ألعاب تنظيم OR قانون OR ترخيص OR غرامة",
 ]

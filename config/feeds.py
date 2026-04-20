@@ -236,6 +236,17 @@ RSS_FEEDS = [
         "tier": "industry",
     },
     # IAPP RSS (iapp.org/rss/daily-dashboard) — 返回 0 条，已移除
+
+    # ── 诉讼 / 执法补充 (Legal / Official tier) ────────────────────────
+    {
+        "name": "JD Supra (Consumer Protection)",
+        "url": "https://www.jdsupra.com/resources/syndication/docsRSSfeed.aspx?ftype=Consumer+Protection",
+        "lang": "en",
+        "type": "rss",
+        "region": "全球",
+        "tier": "legal",
+    },
+    # NY Attorney General — 无 RSS 源，由 OFFICIAL_SITE_QUERIES 的 site:ag.ny.gov 覆盖
 ]
 
 # ─── Google News 搜索 ────────────────────────────────────────────────

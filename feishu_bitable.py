@@ -36,6 +36,7 @@ import requests
 
 from utils import _get_region_group
 from feishu_client import get_tenant_access_token
+from classifier import get_source_tier
 
 # 将内部分组名映射到多维表格单选选项名（9 大分组，内部名与 Bitable 显示名一致）
 _BITABLE_REGION_LABEL = {
@@ -176,12 +177,22 @@ def _build_record(item: dict) -> dict:
     if date_ms:
         fields["发布日期"] = date_ms
 
-    # LLM 四维风险评估（数值字段，Bitable 表需手动添加对应数字列）
-    if item.get("risk_source") == "llm":
-        fields["营收影响"]   = item.get("risk_revenue", 0)
-        fields["产品改动"]   = item.get("risk_product", 0)
-        fields["时间紧迫性"] = item.get("risk_urgency", 0)
-        fields["影响范围"]   = item.get("risk_scope", 0)
+    # 四维风险评估（LLM 和 regex fallback 均写入）
+    for field, key in [("营收影响", "risk_revenue"), ("产品改动", "risk_product"),
+                       ("时间紧迫性", "risk_urgency"), ("影响范围", "risk_scope")]:
+        val = item.get(key)
+        if val is not None:
+            fields[field] = val
+
+    # 合成影响评分（Bitable 表需手动添加「影响评分」数字列）
+    score = item.get("impact_score")
+    if score is not None and float(score) > 0:
+        fields["影响评分"] = round(float(score), 1)
+
+    # 信源等级（Bitable 表需手动添加「信源等级」单选列）
+    tier = item.get("source_tier") or get_source_tier(source)
+    if tier:
+        fields["信源等级"] = tier
 
     return {"fields": fields}
 
