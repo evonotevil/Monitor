@@ -36,7 +36,6 @@ import requests
 
 from utils import _get_region_group
 from feishu_client import get_tenant_access_token
-from classifier import get_source_tier
 
 # 将内部分组名映射到多维表格单选选项名（9 大分组，内部名与 Bitable 显示名一致）
 _BITABLE_REGION_LABEL = {
@@ -183,14 +182,6 @@ def _build_record(item: dict) -> dict:
         val = item.get(key)
         if val is not None:
             fields[field] = val
-
-    score = item.get("impact_score")
-    if score is not None and score > 0:
-        fields["影响评分"] = round(float(score), 1)
-
-    tier = get_source_tier(source)
-    if tier:
-        fields["信源等级"] = tier
 
     return {"fields": fields}
 
