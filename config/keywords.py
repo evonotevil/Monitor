@@ -20,6 +20,9 @@ DIGITAL_INDUSTRY_SIGNALS = [
     "social media", "user-generated", "ugc",
     "app store", "google play", "steam", "playstation", "xbox", "nintendo",
     "esports", "e-sports",
+    "age verification", "digital identity",
+    "eidas", "eudi",
+    "child safety", "content moderation",
     # ── 日语 ──
     "ゲーム", "アプリ", "オンライン", "インターネット", "デジタル",
     "ソフトウェア", "プラットフォーム", "課金", "ガチャ",

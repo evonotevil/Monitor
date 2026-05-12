@@ -284,6 +284,12 @@ REGULATORY_SIGNALS = [
     r"\bruling\b", r"\bverdict\b", r"\bconsent order\b",
     r"\bpolicy\b", r"\bguideline\w*\b", r"\brule\w*\b",
     r"\bdraft\b", r"\bconsultation\b", r"\bproposal\b",
+    r"\brecommendation\w*\b",
+    r"\bguidance\b",
+    r"\bexecutive order\b",
+    r"\bNPRM\b", r"\bnotice of proposed rulemaking\b",
+    r"\b(?:commission|regulatory|enforcement|court|board)\s+decision\b",
+    r"\bdecision\b.*\b(?:regulat|enforc|compliance|penalt|fine)\w*\b",
     r"\bFTC\b", r"\bCOPPA\b", r"\bGDPR\b", r"\bCCPA\b", r"\bDSA\b", r"\bDMA\b",
     r"\bIGAC\b", r"\bGRAC\b", r"\bESRB\b", r"\bPEGI\b", r"\bCERO\b", r"\bCESA\b",
     r"\bOnline Safety Act\b", r"\bKIDS Act\b",
@@ -298,10 +304,12 @@ REGULATORY_SIGNALS = [
     r"規制", r"法律", r"法案", r"条例", r"施行", r"罰則", r"処分", r"義務",
     r"景品表示法", r"資金決済法", r"特商法",
     r"訴訟", r"提訴", r"集団訴訟",
+    r"通知", r"告示", r"指導", r"答申",
     # 韩文
     r"규제", r"법안", r"법률", r"의무", r"제재", r"개정",
     r"게임산업진흥법",
     r"소송", r"집단소송",
+    r"지침", r"공고", r"고시",
     # 越南语
     r"quy định", r"nghị định", r"thông tư", r"luật",   # 规定/法令/通知/法律
     # 泰语
@@ -449,7 +457,7 @@ EXCLUSION_PATTERNS = [
     r"\bsale\b.*\b(?:off|discount|deal)\b",
     r"\bbest game\w*\b", r"\btop \d+ game\b",
     r"\bhow to play\b", r"\bgame guide\b",
-    r"\bpatch note\b", r"\bupdate.*(?:v\d|version|season|content)\b",
+    r"\bpatch note\b", r"\bupdate.*(?:v\d|version|season)\b", r"\bcontent update\b",
     r"\bGemini\b", r"\bCopilot\b", r"\bChatGPT\b",  # AI 产品新闻
     r"\bSDK\b.*\b(?:release|update|version)\b",  # SDK 更新
     r"\bAPI\b.*\b(?:release|update|version|new)\b",  # API 更新
