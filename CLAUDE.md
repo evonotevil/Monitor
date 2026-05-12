@@ -54,8 +54,8 @@ RSS Feeds (100+) + Google News → fetcher.py → classifier.py → translator.p
 - `feishu_bitable.py` — sync articles to Feishu multi-dimensional table
 
 **Key modules:**
-- `fetcher.py` — RSS parsing + Google News scraping, deduplication stage 0 (per-source cap)
-- `classifier.py` — article classification into 11 categories, noise filtering, 4-dimensional risk scoring (LLM + regex fallback), deduplication stages 1-2
+- `fetcher.py` — RSS parsing + Google News scraping, deduplication stage 0 (per-source cap). Core filter: `is_legislation_relevant()` (see below).
+- `classifier.py` — article classification into 11 categories, noise filtering, 4-dimensional risk scoring (LLM + regex fallback), deduplication stages 1-2. Owns `is_china_mainland()` which is imported by `fetcher.py`.
 - `translator.py` — LLM translation via Silicon Flow (OpenAI SDK), executive summary generation, duplicate merging
 - `models.py` — SQLite ORM with automatic schema migrations
 - `utils.py` — region mapping, bigram similarity
@@ -81,6 +81,27 @@ RSS Feeds (100+) + Google News → fetcher.py → classifier.py → translator.p
 - **Source priority**: Official government > Legal intelligence > Industry media (for dedup winner selection).
 - **Weekly report 3-section structure**: completed tasks (✅已合规/归档), global dynamics (📰行业动态), follow-up tasks (🏃处理/跟进中). Modifying report generation must preserve all three sections.
 
+### `is_legislation_relevant()` filter chain (fetcher.py)
+
+Four sequential gates; any failed gate drops the article:
+
+1. **China mainland exclusion** (`is_china_mainland()` from `classifier.py`): drops articles mentioning 中华人民共和国, 中国大陆, 网信办, 版号, 游戏出海, etc. **This exclusion is a hard business constraint — do NOT remove or relax it. The system intentionally does not track Chinese mainland regulatory content.**
+
+2. **EXCLUSION_PATTERNS**: drops noise — game reviews, patch notes, hardware, casino/sports betting, AI product news (Gemini/Copilot), developer tools, etc. Key subtlety: `r"\bupdate.*(?:v\d|version|season)\b"` and `r"\bcontent update\b"` filter patch notes, but bare `content` was deliberately removed from this pattern to avoid suppressing legitimate "content moderation" regulatory articles.
+
+3. **REGULATORY_SIGNALS** (must match at least one): ~75 regex patterns covering:
+   - EN: regulation/law/enforcement/fine/ban/ruling + recommendation/guidance/executive order/NPRM/notice of proposed rulemaking + compound decision patterns (e.g., "commission decision on X")
+   - Agency acronyms: FTC, COPPA, GDPR, CCPA, DSA, DMA, IGAC, GRAC, ESRB, PEGI, CERO, CESA
+   - Litigation: lawsuit/class action/settlement/consent order
+   - JA: 規制/法律/処分/通知/告示/指導/答申 + 景品表示法/資金決済法
+   - KO: 규제/법안/제재 + 지침/공고/고시 + 게임산업진흥법
+   - VI/TH/ID regulatory terms
+   - Note: bare "decision" alone does NOT match; it requires a co-occurring regulatory context word.
+
+4. **Game/digital industry signal** (must match at least one):
+   - **All sources**: `GAME_SIGNALS` (~90 patterns) — game/gaming/gacha/loot box/mobile game/in-app purchase, ESRB/PEGI ratings, platform names, 50+ company names, etc.
+   - **Official/legal tier sources only (relaxed path)**: `DIGITAL_INDUSTRY_SIGNALS` from `config/keywords.py` — broader digital industry terms (app/online/digital/platform/streaming + age verification/digital identity/eIDAS/EUDI/child safety/content moderation + CJK equivalents). This allows official regulators (FTC, 消費者庁, etc.) to pass without a strict game mention, while blocking traditional-industry content (food safety, telecom retail, etc.).
+
 ## Environment Variables
 
 | Variable | Purpose |
@@ -93,8 +114,8 @@ RSS Feeds (100+) + Google News → fetcher.py → classifier.py → translator.p
 
 ## CI/CD
 
-- `test.yml` — runs pytest on push/PR to main
-- `daily_check.yml` — daily 8am (UTC+8) fetch + Feishu notification
+- `test.yml` — runs pytest on push/PR to main. Covers `tests/test_fetcher.py` (22 cases for `is_legislation_relevant()` including REGULATORY_SIGNALS, DIGITAL_INDUSTRY_SIGNALS, and regression cases), `tests/test_classifier.py`, `tests/test_utils.py`, `tests/test_reporter.py`.
+- `daily_check.yml` — daily 8am (UTC+8) fetch + Feishu notification; commits updated `data/monitor.db` back to repo with `[skip ci]` tag.
 - `publish_report.yml` — manual trigger for weekly report publication
 
 ## Design Context
