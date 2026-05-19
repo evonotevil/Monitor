@@ -464,9 +464,6 @@ EXCLUSION_PATTERNS = [
     r"\bWWDC\d*\b", r"\bGoogle I/O\b",  # 开发者大会（含WWDC25/26等）
     r"@\s*WWDC",                         # @WWDC25 格式
     r"\bdeveloper tool\b", r"\bXcode\b", r"\bSwift\b", r"\bKotlin\b",
-    # 传统消费品/医疗/食品监管：即使来自官方信源且提到网络广告，也不是游戏合规动态
-    r"健康食品|食品表示|食品安全|サプリ|サプリメント|医薬品|化粧品",
-    r"\b(?:health\s*food|food\s*safety|food\s*label(?:ing|ling)|supplements?|cosmetics?|pharmaceuticals?)\b",
     # Apple/Google 开发者博客通用噪音（非立法）
     r"developer activit",                # "developer activities" / "开发者活动"
     r"最新的开发者活动",                   # 中文"查看我们最新的开发者活动"
@@ -516,6 +513,52 @@ EXCLUSION_PATTERNS = [
 ]
 
 
+TRADITIONAL_CONSUMER_GOODS_SIGNALS = [
+    r"健康食品|食品表示|食品安全|サプリ|サプリメント|医薬品|化粧品",
+    r"\bhealth\s*food\b",
+    r"\bfood\s*safety\b",
+    r"\bfood\s*label(?:ing|ling)\b",
+    r"\bsupplement(?:s)?\s+(?:advertis\w*|marketing|label(?:ing|ling)|claim\w*)\b",
+    r"\b(?:advertis\w*|marketing|label(?:ing|ling)|claim\w*)\s+(?:for\s+)?supplements?\b",
+    r"\bcosmetic\s+(?:product|advertis\w*|marketing|label(?:ing|ling)|claim\w*)\b",
+    r"\b(?:advertis\w*|marketing|label(?:ing|ling)|claim\w*)\s+(?:for\s+)?cosmetics?\b",
+    r"\bpharmaceutical\s+(?:product|advertis\w*|marketing|label(?:ing|ling)|claim\w*)\b",
+    r"\b(?:advertis\w*|marketing|label(?:ing|ling)|claim\w*)\s+(?:for\s+)?pharmaceuticals?\b",
+]
+
+GAME_STRONG_SIGNALS = [
+    r"\bgames?\b",
+    r"\bgaming\b",
+    r"\bmobile\s+games?\b",
+    r"\bin-?game\b",
+    r"\bapp\s*store\b",
+    r"\bgoogle\s*play\b",
+    r"\bIAP\b",
+    r"\bmicrotransaction\b",
+    r"\bloot\s*box(?:es)?\b",
+    r"\bgacha\b",
+    r"\bskins?\b",
+    r"\bcosmetic\s+items?\b",
+    r"ゲーム|ガチャ|課金",
+]
+
+
+def _is_traditional_consumer_goods_noise(text_lower: str) -> bool:
+    """排除传统消费品监管噪音，但保留游戏内 cosmetics/skins/IAP 等合规动态。"""
+    has_traditional_signal = any(
+        re.search(pattern, text_lower, re.IGNORECASE)
+        for pattern in TRADITIONAL_CONSUMER_GOODS_SIGNALS
+    )
+    if not has_traditional_signal:
+        return False
+
+    has_game_signal = any(
+        re.search(pattern, text_lower, re.IGNORECASE)
+        for pattern in GAME_STRONG_SIGNALS
+    )
+    return not has_game_signal
+
+
 def is_legislation_relevant(article: dict) -> bool:
     """
     严格过滤：必须同时满足:
@@ -531,6 +574,9 @@ def is_legislation_relevant(article: dict) -> bool:
 
     # 排除中国大陆
     if is_china_mainland(text):
+        return False
+
+    if _is_traditional_consumer_goods_noise(text_lower):
         return False
 
     # 检查排除词（在标题和摘要中）

@@ -146,6 +146,30 @@ class TestDigitalIndustrySignals:
         }
         assert is_legislation_relevant(article) is False
 
+    def test_mobile_game_cosmetic_item_ad_guidance_passes(self):
+        article = {
+            "title": "FTC issues guidance on advertising cosmetic items in mobile games",
+            "summary": "Guidance covers misleading advertising for skins, loot boxes, and in-game cosmetics",
+            "tier": "official",
+        }
+        assert is_legislation_relevant(article) is True
+
+    def test_mobile_game_cosmetic_ads_enforcement_passes(self):
+        article = {
+            "title": "UK ASA rules mobile game cosmetic ads were misleading",
+            "summary": "The enforcement action concerns advertising for in-game cosmetic items and loot boxes",
+            "tier": "",
+        }
+        assert is_legislation_relevant(article) is True
+
+    def test_supplements_as_verb_in_game_guidance_passes(self):
+        article = {
+            "title": "FTC supplements guidance on dark patterns in mobile games",
+            "summary": "Updated enforcement guidance covers in-app purchases and game advertising",
+            "tier": "official",
+        }
+        assert is_legislation_relevant(article) is True
+
     def test_japanese_gacha_ad_guidance_still_passes(self):
         article = {
             "title": "消費者庁 ゲーム ガチャ 景品表示法 指導",
