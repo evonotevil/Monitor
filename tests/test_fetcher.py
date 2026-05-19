@@ -130,6 +130,30 @@ class TestDigitalIndustrySignals:
         }
         assert is_legislation_relevant(article) is False
 
+    def test_japanese_health_food_online_ad_guidance_rejected(self):
+        article = {
+            "title": "健康食品等のインターネット広告に係る虚偽・誇大表示の改善指導",
+            "summary": "消費者庁は健康食品等の商品についてインターネット広告の虚偽・誇大表示に係る改善指導を行いました",
+            "tier": "official",
+        }
+        assert is_legislation_relevant(article) is False
+
+    def test_health_food_supplement_ad_enforcement_rejected(self):
+        article = {
+            "title": "Consumer agency issues guidance on health food supplement advertising",
+            "summary": "The enforcement action targets misleading online ads for supplements and cosmetics",
+            "tier": "official",
+        }
+        assert is_legislation_relevant(article) is False
+
+    def test_japanese_gacha_ad_guidance_still_passes(self):
+        article = {
+            "title": "消費者庁 ゲーム ガチャ 景品表示法 指導",
+            "summary": "ゲーム内ガチャの確率表示と広告表示について改善指導が行われた",
+            "tier": "official",
+        }
+        assert is_legislation_relevant(article) is True
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # 回归测试 — 确保已有行为不变

@@ -464,6 +464,9 @@ EXCLUSION_PATTERNS = [
     r"\bWWDC\d*\b", r"\bGoogle I/O\b",  # 开发者大会（含WWDC25/26等）
     r"@\s*WWDC",                         # @WWDC25 格式
     r"\bdeveloper tool\b", r"\bXcode\b", r"\bSwift\b", r"\bKotlin\b",
+    # 传统消费品/医疗/食品监管：即使来自官方信源且提到网络广告，也不是游戏合规动态
+    r"健康食品|食品表示|食品安全|サプリ|サプリメント|医薬品|化粧品",
+    r"\b(?:health\s*food|food\s*safety|food\s*label(?:ing|ling)|supplements?|cosmetics?|pharmaceuticals?)\b",
     # Apple/Google 开发者博客通用噪音（非立法）
     r"developer activit",                # "developer activities" / "开发者活动"
     r"最新的开发者活动",                   # 中文"查看我们最新的开发者活动"
