@@ -26,7 +26,7 @@ from models import Database
 from fetcher import fetch_and_process
 from translator import translate_items_batch
 from reporter import print_table, save_markdown, save_html
-from utils import _get_region_group, _bigram_sim
+from utils import _get_region_group, _bigram_sim, previous_full_week_range
 from config import PERIOD_DAYS
 
 # ─── 日志配置 ─────────────────────────────────────────────────────────
@@ -258,8 +258,7 @@ def _filter_valid_dates(items):
 
 def _period_label(period: str) -> str:
     if period == "week":
-        # 取昨日所在的 ISO 周号（报告数据截至昨日，无论周几发布都能正确标注）
-        return (datetime.utcnow() - timedelta(days=1)).strftime("%G-W%V")
+        return previous_full_week_range()[2]
     labels = {"day": "日报（昨日）", "month": "月报（近30天）", "all": "全量报告"}
     return labels.get(period, "全量报告")
 
@@ -402,11 +401,18 @@ def cmd_report(args):
     days  = _period_to_days(args.period)
     label = _period_label(args.period)
     fmt   = args.format.lower()
+    week_start = week_end = None
+    if args.period == "week":
+        week_start, week_end, label = previous_full_week_range()
 
     # ── Step 1: 优先从飞书多维表格（SSOT）拉取经人工筛选的记录 ──────────
     from feishu_bitable import fetch_valid_records_from_bitable
     print(f"📋 尝试从飞书多维表格读取数据（{label}）…")
-    items = fetch_valid_records_from_bitable(days=days)
+    items = fetch_valid_records_from_bitable(
+        days=days,
+        date_start=week_start,
+        date_end=week_end,
+    )
 
     # ── Step 2: Bitable 无数据时回退到 SQLite ────────────────────────────
     if not items:
@@ -419,6 +425,8 @@ def cmd_report(args):
                 status=getattr(args, "status", None),
                 keyword=getattr(args, "keyword", None),
                 days=days,
+                date_start=week_start,
+                date_end=week_end,
             )
         finally:
             db.close()

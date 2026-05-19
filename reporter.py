@@ -15,6 +15,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urlparse
 
 # ── 模板目录 & 文件加载 ──────────────────────────────────────────────
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -62,6 +63,16 @@ def _clean_title(title: str) -> str:
     # 去除仍残留的不完整实体（如 &amp 没有分号）
     t = re.sub(r"&\w{2,8}$", "", t).strip()
     return t
+
+
+def _safe_href(url: str) -> str:
+    """只允许可点击的安全 URL scheme，其他值渲染为无链接。"""
+    if not url:
+        return ""
+    parsed = urlparse(str(url).strip())
+    if parsed.scheme.lower() in {"http", "https", "mailto"}:
+        return str(url).strip()
+    return ""
 
 
 def _get_display_title(item: dict) -> str:
@@ -836,7 +847,7 @@ def _render_region_sections_mobile(grouped: dict, zone_type: str) -> str:
             zh      = html_mod.escape(raw_zh if raw_zh else _truncate(raw_sum, 80))
             orig    = html_mod.escape(_clean_title(item.get("title", "")))
             summ    = html_mod.escape(_truncate(raw_sum, 200))
-            url     = html_mod.escape(item.get("source_url", ""))
+            url     = html_mod.escape(_safe_href(item.get("source_url", "")))
             cat_status = f"{cat}{' · ' + status if status else ''}"
             title_tag  = (f'<a href="{url}" target="_blank" rel="noopener">{zh}</a>' if url else zh)
 
@@ -846,9 +857,9 @@ def _render_region_sections_mobile(grouped: dict, zone_type: str) -> str:
                 assignee    = html_mod.escape((item.get("assignee") or "").strip())
                 co_assignee = html_mod.escape((item.get("co_assignee") or "").strip())
                 conclusion  = html_mod.escape((item.get("legal_conclusion") or "").strip())
-                doc_url     = html_mod.escape((item.get("doc_url") or "").strip())
+                doc_url     = html_mod.escape(_safe_href(item.get("doc_url") or ""))
                 doc_text    = html_mod.escape((item.get("doc_text") or "专项合规文档").strip())
-                bitable_url = html_mod.escape((item.get("bitable_url") or "").strip())
+                bitable_url = html_mod.escape(_safe_href(item.get("bitable_url") or ""))
                 if assignee:
                     bp_display = assignee + (f'、{co_assignee}' if co_assignee else '')
                     extra_html += (
@@ -1069,7 +1080,7 @@ def _render_region_sections_pc(grouped: dict, is_action: bool) -> str:
             zh       = html_mod.escape(raw_zh if raw_zh else _truncate(raw_sum, 80))
             orig     = html_mod.escape(_clean_title(item.get("title", "")))
             summ     = html_mod.escape(_truncate(raw_sum, 200))
-            url      = html_mod.escape(item.get("source_url", ""))
+            url      = html_mod.escape(_safe_href(item.get("source_url", "")))
             span_cls = " span-2" if (n % 2 == 1 and idx == n - 1) else ""
             meta_parts = [p for p in [cat, status, date_s] if p]
             meta = " · ".join(meta_parts)
@@ -1204,7 +1215,7 @@ def generate_html(items: List[dict], title: str = "全球游戏行业立法动�
             summary_zh_raw = _get_summary_zh(item)
             summary_zh_full = html_mod.escape(summary_zh_raw)
             summary_zh = html_mod.escape(_truncate(summary_zh_raw, 200))
-            url = item.get("source_url", "")
+            url = _safe_href(item.get("source_url", ""))
             item_date = item.get("date", "")
             region = html_mod.escape(item.get("region", ""))
             source_name = html_mod.escape(source_raw)

@@ -42,7 +42,7 @@ def get_tenant_access_token(app_id: str = "", app_secret: str = "") -> str:
 
 # ── 消息发送 ─────────────────────────────────────────────────────────────
 
-def send_card(chat_id: str, card: dict, max_retries: int = 3) -> None:
+def send_card(chat_id: str, card: dict, max_retries: int = 3) -> bool:
     """通过应用机器人向群聊发送交互卡片，失败指数退避重试。"""
     token = get_tenant_access_token()
     headers = {
@@ -66,10 +66,10 @@ def send_card(chat_id: str, card: dict, max_retries: int = 3) -> None:
             result = resp.json()
             if result.get("code") == 0:
                 print("✅ 飞书通知发送成功")
-                return
+                return True
             else:
                 print(f"⚠️  飞书返回异常: {result}")
-                return  # 业务层错误不重试
+                return False  # 业务层错误不重试
         except Exception as e:
             if attempt < max_retries - 1:
                 wait = 2 ** attempt * 2  # 2s, 4s, 8s
@@ -77,3 +77,5 @@ def send_card(chat_id: str, card: dict, max_retries: int = 3) -> None:
                 time.sleep(wait)
             else:
                 print(f"❌ 发送失败（已重试 {max_retries} 次）: {e}")
+                return False
+    return False

@@ -160,9 +160,15 @@ def main():
     # ── 从 Bitable 读取已审核条目，作为唯一数据源 ────────────────────
     from feishu_bitable import fetch_valid_records_from_bitable
     from reporter import _split_three_ways
+    from utils import previous_full_week_range
 
     try:
-        bitable_items = fetch_valid_records_from_bitable(days=7)
+        week_start, week_end, _ = previous_full_week_range()
+        bitable_items = fetch_valid_records_from_bitable(
+            days=7,
+            date_start=week_start,
+            date_end=week_end,
+        )
         print(f"Bitable 已审核条目: {len(bitable_items)} 条")
     except Exception as e:
         print(f"❌ 获取 Bitable 条目失败: {e}")
@@ -188,7 +194,8 @@ def main():
         mobile_url=mobile_url, pc_url=pc_url, html_url=html_url,
         bitable_url=bitable_url,
     )
-    send_card(chat_id, card)
+    if not send_card(chat_id, card):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

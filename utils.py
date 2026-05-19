@@ -7,7 +7,36 @@
 修改区域配置时只需改此文件，无需逐一同步。
 """
 
+from __future__ import annotations
+
 import re
+from datetime import date, datetime, timedelta, timezone
+
+_TZ_CST = timezone(timedelta(hours=8))
+
+
+def previous_full_week_range(today: date | datetime | None = None) -> tuple[str, str, str]:
+    """
+    返回上一个完整自然周的起止日期和 ISO 周标签。
+
+    周报口径固定为周一至周日。未传 today 时按 UTC+8 当前日期计算，
+    避免 GitHub Actions 的 UTC 日期导致北京时间周边界偏移。
+    """
+    if today is None:
+        current = datetime.now(_TZ_CST).date()
+    elif isinstance(today, datetime):
+        current = today.date()
+    else:
+        current = today
+
+    this_monday = current - timedelta(days=current.weekday())
+    start = this_monday - timedelta(days=7)
+    end = start + timedelta(days=6)
+    return (
+        start.strftime("%Y-%m-%d"),
+        end.strftime("%Y-%m-%d"),
+        start.strftime("%G-W%V"),
+    )
 
 # ── 区域分组映射（region 字段值 → 9 大显示分组）──────────────────────
 #

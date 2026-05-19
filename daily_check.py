@@ -370,7 +370,10 @@ def main():
         print(f"⚠️  综述生成失败（将跳过）: {e}")
 
     card = build_daily_card(push_items, exec_summary=exec_summary, is_monday=is_monday)
-    send_card(chat_id, card)
+    sent = send_card(chat_id, card)
+    if not sent:
+        print("❌ 飞书通知未发送成功，本次不写入机器人推送去重记录")
+        sys.exit(1)
 
     # 推送成功后记录已推送的 URL
     for item in push_items:

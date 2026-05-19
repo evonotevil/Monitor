@@ -153,6 +153,16 @@ class TestDatabaseQuery:
         rows = db.query_items(days=0, limit=3)
         assert len(rows) == 3
 
+    def test_query_by_explicit_date_range(self, db):
+        db.upsert_item(_make_item(date="2026-05-10", title="Old", source_url="https://old.com"))
+        db.upsert_item(_make_item(date="2026-05-11", title="Start", source_url="https://start.com"))
+        db.upsert_item(_make_item(date="2026-05-17", title="End", source_url="https://end.com"))
+        db.upsert_item(_make_item(date="2026-05-18", title="New", source_url="https://new.com"))
+
+        rows = db.query_items(days=90, date_start="2026-05-11", date_end="2026-05-17")
+        titles = {r["title"] for r in rows}
+        assert titles == {"Start", "End"}
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Database - Stats

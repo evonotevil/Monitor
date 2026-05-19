@@ -25,6 +25,8 @@
     python feishu_bitable.py
 """
 
+from __future__ import annotations
+
 import json
 import os
 import sys
@@ -193,13 +195,14 @@ def write_to_bitable(
     app_token: str,
     table_id: str,
     access_token: str,
-) -> int:
+    return_success_urls: bool = False,
+) -> int | set:
     """
     批量写入条目到飞书多维表格。
-    返回成功写入的条数。
+    默认返回成功写入的条数；return_success_urls=True 时返回确认写入成功的 source_url 集合。
     """
     if not items:
-        return 0
+        return set() if return_success_urls else 0
 
     url = _BATCH_URL.format(app_token=app_token, table_id=table_id)
     headers = {
@@ -208,6 +211,7 @@ def write_to_bitable(
     }
 
     written = 0
+    successful_urls: set = set()
     for i in range(0, len(items), _BATCH_SIZE):
         batch   = items[i : i + _BATCH_SIZE]
         records = [_build_record(item) for item in batch]
@@ -228,9 +232,14 @@ def write_to_bitable(
             )
             continue
 
-        written += len(data.get("data", {}).get("records", []))
+        written_count = len(data.get("data", {}).get("records", []))
+        written += written_count
+        for item in batch[:written_count]:
+            item_url = item.get("source_url")
+            if item_url:
+                successful_urls.add(item_url)
 
-    return written
+    return successful_urls if return_success_urls else written
 
 
 # ── 对外接口 ──────────────────────────────────────────────────────────
@@ -280,15 +289,15 @@ def sync_items_to_bitable(items: List[dict]) -> None:
             app_token = resolve_wiki_app_token(wiki_token, token)
             print(f"   解析成功，app_token: {app_token[:8]}...")
 
-        written = write_to_bitable(new_items, app_token, table_id, token)
+        written_urls = write_to_bitable(
+            new_items, app_token, table_id, token, return_success_urls=True
+        )
+        written = len(written_urls)
         print(f"✅ 飞书多维表格写入成功：{written} 条")
 
         # 只有实际写入成功才更新去重记录
         if written > 0:
-            for item in new_items:
-                url = item.get("source_url")
-                if url:
-                    synced_urls.add(url)
+            synced_urls.update(written_urls)
             _save_synced_urls(synced_urls)
 
     except Exception as e:
@@ -423,7 +432,11 @@ def _map_bitable_record(
     }
 
 
-def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
+def fetch_valid_records_from_bitable(
+    days: Optional[int] = None,
+    date_start: Optional[str] = None,
+    date_end: Optional[str] = None,
+) -> List[dict]:
     """
     从飞书多维表格拉取所有经人工初筛的有效记录，供 reporter.py 生成 HTML 报告。
 
@@ -433,6 +446,7 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
     参数：
         days: 可选，仅返回最近 N 天内的记录（按「发布日期」过滤）。
               None 表示返回全部有效记录。
+        date_start/date_end: 可选，按闭区间过滤 YYYY-MM-DD。传入时优先于 days。
 
     返回：
         reporter.py 所需的 dict 列表（与 db.query_items() 格式相同）。
@@ -496,9 +510,11 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
         print(f"✅ 飞书多维表格共 {len(all_records)} 条记录，开始过滤…")
 
         # ── 过滤 + 映射 ─────────────────────────────────────────────────
-        # 计算日期下限（若指定了 days）
+        # 计算日期过滤条件（显式日期区间优先，其次 days 滚动窗口）
         date_cutoff = ""
-        if days:
+        if date_start and date_end:
+            date_cutoff = date_start
+        elif days:
             from datetime import timedelta
             date_cutoff = (
                 datetime.now(tz=timezone.utc) - timedelta(days=days)
@@ -527,21 +543,24 @@ def fetch_valid_records_from_bitable(days: Optional[int] = None) -> List[dict]:
                 skipped_empty += 1
                 continue
 
-            # 按日期过滤（仅当指定了 days 时）
-            # 归档条目用「归档日期」；若归档日期为空则不过滤（无法判断归档时间）
+            # 按日期过滤（仅当指定了 days 或 date_start/date_end 时）
+            # 归档条目用「归档日期」；显式日期区间下，归档日期为空则无法纳入周报
             # 跟进/处理中条目不按发布日期截断，避免老任务从周报消失
             # 其余条目用「发布日期」
             if date_cutoff:
                 if "归档" in status_val:
                     ref_date = mapped["archive_date"]
-                    # 归档条目没有归档日期时不过滤，保留供周报展示
-                    if not ref_date:
-                        ref_date = ""
                 elif "处理" in status_val or "跟进" in status_val:
                     ref_date = ""   # 跟进任务永远保留，不按发布日期截断
                 else:
                     ref_date = mapped["date"]
                 if ref_date and ref_date < date_cutoff:
+                    skipped_date += 1
+                    continue
+                if date_end and ref_date and ref_date > date_end:
+                    skipped_date += 1
+                    continue
+                if date_start and date_end and not ref_date and "处理" not in status_val and "跟进" not in status_val:
                     skipped_date += 1
                     continue
 

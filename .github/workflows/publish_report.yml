@@ -81,15 +81,15 @@ jobs:
           echo "PC_URL=${PAGES_BASE}/latest-pc.html?${CACHE_BUST}" >> $GITHUB_ENV
           echo "HTML_URL=${PAGES_BASE}/latest-mobile.html?${CACHE_BUST}" >> $GITHUB_ENV
           python -c "
-          from datetime import datetime, timedelta
           import urllib.parse, os
-          t = datetime.utcnow()
-          w = t - timedelta(days=7)
-          fn = f'{w.strftime(\"%Y-%m-%d\")} - {t.strftime(\"%Y-%m-%d\")} 周报.pdf'
+          from utils import previous_full_week_range
+          start, end, week_id = previous_full_week_range()
+          fn = f'{start} - {end} 周报.pdf'
           base = 'https://raw.githubusercontent.com/${REPO}/main/reports'
           with open(os.environ['GITHUB_ENV'], 'a') as f:
               f.write(f'PDF_FILENAME={fn}\n')
               f.write(f'PDF_URL={base}/{urllib.parse.quote(fn)}\n')
+              f.write(f'WEEK_ID={week_id}\n')
           "
 
       # ── 6. 提交 HTML / PDF 报告并归档 ──────────────────────────────
@@ -98,7 +98,6 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          WEEK_ID=$(date -u +%Y-W%V)
           ARCHIVE_DIR="reports/archive/${WEEK_ID}"
           mkdir -p "${ARCHIVE_DIR}"
 

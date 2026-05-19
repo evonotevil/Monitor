@@ -11,6 +11,7 @@ from reporter import (
     _resolve_group,
     _impact_tier,
     _clean_title,
+    _safe_href,
     _truncate,
     _get_display_title,
     _get_summary_zh,
@@ -68,6 +69,21 @@ class TestCleanTitle:
 
     def test_none(self):
         assert _clean_title(None) == ""
+
+
+class TestSafeHref:
+
+    def test_allows_https(self):
+        assert _safe_href("https://example.com/a") == "https://example.com/a"
+
+    def test_allows_mailto(self):
+        assert _safe_href("mailto:legal@example.com") == "mailto:legal@example.com"
+
+    def test_rejects_javascript(self):
+        assert _safe_href("javascript:alert(1)") == ""
+
+    def test_rejects_data_url(self):
+        assert _safe_href("data:text/html;base64,xxx") == ""
 
 
 class TestGetDisplayTitle:

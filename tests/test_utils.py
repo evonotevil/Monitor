@@ -3,12 +3,14 @@ utils.py 单元测试
 覆盖：区域分组映射、bigram 相似度、状态标签归一化、去重选择
 """
 import pytest
+from datetime import date
 
 from utils import (
     _REGION_GROUP_MAP,
     _GROUP_ORDER,
     _GROUP_EMOJI,
     _get_region_group,
+    previous_full_week_range,
     normalize_status,
     _bigram_sim,
     _impact_emoji,
@@ -56,6 +58,21 @@ class TestRegionGroupMap:
 
     def test_global_maps_to_other(self):
         assert _REGION_GROUP_MAP["全球"] == "其他"
+
+
+class TestPreviousFullWeekRange:
+
+    def test_tuesday_returns_previous_monday_to_sunday(self):
+        start, end, label = previous_full_week_range(date(2026, 5, 19))
+        assert start == "2026-05-11"
+        assert end == "2026-05-17"
+        assert label == "2026-W20"
+
+    def test_monday_returns_previous_complete_week(self):
+        start, end, label = previous_full_week_range(date(2026, 5, 18))
+        assert start == "2026-05-11"
+        assert end == "2026-05-17"
+        assert label == "2026-W20"
 
 
 class TestGetRegionGroup:

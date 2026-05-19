@@ -160,6 +160,8 @@ class Database:
         keyword: Optional[str] = None,
         days: int = 90,
         limit: int = 500,
+        date_start: Optional[str] = None,
+        date_end: Optional[str] = None,
     ) -> List[dict]:
         conditions = []
         params = []
@@ -176,7 +178,12 @@ class Database:
         if keyword:
             conditions.append("(title LIKE ? OR summary LIKE ? OR title_zh LIKE ? OR summary_zh LIKE ?)")
             params.extend([f"%{keyword}%"] * 4)
-        if days:
+        if date_start and date_end:
+            conditions.append("date >= ?")
+            params.append(date_start)
+            conditions.append("date <= ?")
+            params.append(date_end)
+        elif days:
             conditions.append("date >= date('now', ?)")
             params.append(f"-{days} days")
 
