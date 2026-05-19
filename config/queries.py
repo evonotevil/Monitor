@@ -13,6 +13,9 @@ OFFICIAL_SITE_QUERIES = [
     "game regulation site:ftc.gov",
     "children privacy game site:ftc.gov",
     "game privacy site:oag.ca.gov",                        # 加州 AG
+    "game privacy PIPEDA site:priv.gc.ca",                  # 加拿大 OPC / PIPEDA
+    "game consumer competition site:competition-bureau.canada.ca",  # 加拿大竞争局
+    "online gaming privacy PIPEDA site:justice.gc.ca",      # 加拿大 PIPEDA 法规文本/修订
     # ── 欧洲 / 英国 ────────────────────────────────────────────────────
     "game online safety regulation site:gov.uk",
     "game age verification site:gov.uk",
@@ -34,6 +37,12 @@ OFFICIAL_SITE_QUERIES = [
     "game regulation site:oaic.gov.au",                    # 澳大利亚信息专员办公室
     "game online safety site:acma.gov.au",                 # 澳大利亚通信和媒体局
     "game regulation site:meity.gov.in",                   # 印度电子信息技术部
+    "online gaming regulation site:meity.gov.in",          # 印度在线游戏/中介规则
+    "game DPDP data protection site:meity.gov.in",         # 印度 DPDP / 游戏数据
+    "game regulation site:pcpd.org.hk",                    # 香港隐私专员公署
+    "online game regulation site:ofca.gov.hk",             # 香港通讯事务管理局
+    "遊戲 個資 法規 site:moda.gov.tw",                       # 台湾数位发展部
+    "遊戲 分級 規範 site:gamerating.org.tw",                 # 台湾游戏软件分级查询
     # ── 日本 ────────────────────────────────────────────────────────────
     "ゲーム 規制 site:caa.go.jp",                            # 消費者庁
     "ゲーム OR ガチャ site:soumu.go.jp",                     # 総務省
@@ -43,6 +52,9 @@ OFFICIAL_SITE_QUERIES = [
     # ── 南美 ────────────────────────────────────────────────────────────
     "jogo regulação site:gov.br/anpd",                       # 巴西 ANPD
     "game regulation site:gob.mx",                            # 墨西哥政府
+    "videojuegos datos personales site:argentina.gob.ar/aaip", # 阿根廷 AAIP
+    "videojuegos consumidor site:sernac.cl",                   # 智利 SERNAC
+    "videojuegos proteccion datos site:sic.gov.co",            # 哥伦比亚 SIC
     # ── 加州立法 ──────────────────────────────────────────────────────────
     "game consumer protection site:leginfo.legislature.ca.gov",  # 加州立法机关（AB 1921 等）
     # ── 东南亚补充 ──────────────────────────────────────────────────────
@@ -51,6 +63,11 @@ OFFICIAL_SITE_QUERIES = [
     # ── 中东 ────────────────────────────────────────────────────────────
     "game content license site:gcam.gov.sa",               # 沙特 GCAM（游戏内容许可）
     "game regulation site:tra.gov.ae",                     # 阿联酋 TRA
+    "game regulation site:cra.gov.qa",                     # 卡塔尔 CRA
+    "game regulation site:mcit.gov.qa",                    # 卡塔尔 MCIT
+    "game regulation site:citra.gov.kw",                   # 科威特 CITRA
+    "game regulation site:tra.org.bh",                     # 巴林 TRA
+    "online game privacy site:gov.il",                     # 以色列政府/隐私保护局
     # ── 执法/诉讼补充 ──────────────────────────────────────────────────
     '"Lilith" OR "AFK" OR game site:ftc.gov',              # FTC 涉 Lilith/游戏动态
     "game enforcement OR settlement site:ag.ny.gov",       # 纽约州 AG 游戏执法
@@ -58,7 +75,7 @@ OFFICIAL_SITE_QUERIES = [
 
 # ── 日报专用精选 Google News 查询（每日 daily_mode=True 时使用）────────────
 # 设计原则：每条覆盖一个大类，用 OR 合并同类关键词，避免长尾细化查询。
-# 目标总量 ≤ 20 条，2s 间隔共计 ≤ 40 秒，不触发 Google IP 限速。
+# 控制在小查询集规模，避免触发 Google IP 限速。
 # 周报模式仍使用全量 KEYWORDS 以获得最大覆盖。
 DAILY_GOOGLE_NEWS_EN = [
     # 玩法合规（loot box / gacha / 概率）
@@ -87,8 +104,12 @@ DAILY_GOOGLE_NEWS_EN = [
     'Japan game (regulation OR law OR "age rating" OR gacha OR privacy)',
     # 南美监管动态
     '(Brazil OR Mexico OR Argentina) game (regulation OR law OR LGPD OR privacy)',
+    # 加拿大 / 印度 / 港澳台
+    '(Canada OR India OR "Hong Kong" OR Taiwan) game (privacy OR regulation OR law OR consumer)',
     # 澳大利亚 / 大洋洲
     '(Australia OR "New Zealand") game (online safety OR privacy OR regulation)',
+    # 中东长尾国家
+    '(Qatar OR Kuwait OR Bahrain OR Israel) game (regulation OR law OR privacy OR license)',
     # 经营合规（本地代理 / 许可证）
     'game ("local agent" OR license OR representative) regulation overseas publisher',
     # 年龄分级（PEGI / ESRB / 各国评级）
@@ -134,4 +155,5 @@ DAILY_GOOGLE_NEWS_ID = [
 ]
 DAILY_GOOGLE_NEWS_AR = [
     "ألعاب تنظيم OR قانون OR ترخيص OR غرامة",
+    "قطر OR الكويت OR البحرين ألعاب تنظيم OR قانون OR ترخيص",
 ]

@@ -240,3 +240,46 @@ class TestExistingBehaviorPreserved:
             "tier": "",
         }
         assert is_legislation_relevant(article) is True
+
+
+class TestExpandedRegionCoverage:
+
+    def test_canada_pipeda_game_privacy_passes(self):
+        article = {
+            "title": "Canada OPC issues PIPEDA guidance for game apps",
+            "summary": "The privacy commissioner addresses data protection rules for mobile games",
+            "tier": "official",
+        }
+        assert is_legislation_relevant(article) is True
+
+    def test_india_online_gaming_rules_passes(self):
+        article = {
+            "title": "India online gaming rules require compliance for game platforms",
+            "summary": "MeitY regulation covers gaming intermediaries and consumer protection",
+            "tier": "official",
+        }
+        assert is_legislation_relevant(article) is True
+
+    def test_hong_kong_pcpd_game_privacy_passes(self):
+        article = {
+            "title": "Hong Kong PCPD guidance on online game app privacy",
+            "summary": "Personal data protection requirements apply to gaming applications",
+            "tier": "official",
+        }
+        assert is_legislation_relevant(article) is True
+
+    def test_latam_consumer_game_regulation_passes(self):
+        article = {
+            "title": "Chile SERNAC regulation targets video game consumer protection",
+            "summary": "The consumer agency reviews refund and advertising practices in games",
+            "tier": "official",
+        }
+        assert is_legislation_relevant(article) is True
+
+    def test_middle_east_license_game_regulation_passes(self):
+        article = {
+            "title": "Qatar CRA regulation sets license requirements for online games",
+            "summary": "The rule covers digital platforms and game content compliance",
+            "tier": "official",
+        }
+        assert is_legislation_relevant(article) is True

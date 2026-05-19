@@ -876,7 +876,7 @@ def fetch_all_rss() -> List[dict]:
 def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = False) -> List[dict]:
     """
     聚合所有语言/地区的 Google News 查询。
-    daily_mode=True：使用精选小查询集（约 15 条），控制请求量避免 IP 限速，每查询取前 20 条。
+    daily_mode=True：使用精选小查询集，控制请求量避免 IP 限速，每查询取前 20 条。
     weekly 模式：使用全量 KEYWORDS，以获得最大覆盖。
     """
     all_items = []
@@ -992,6 +992,22 @@ _GDELT_QUERIES = [
         "越南",
     ),
     (
+        "(game OR gaming) (regulation OR law OR privacy OR consumer) sourcecountry:CA",
+        "加拿大",
+    ),
+    (
+        "(game OR gaming) (regulation OR law OR privacy OR consumer) sourcecountry:IN",
+        "印度",
+    ),
+    (
+        "(game OR gaming OR 遊戲) (regulation OR law OR privacy OR 個資 OR 私隱) sourcecountry:HK",
+        "香港",
+    ),
+    (
+        "(game OR gaming OR 遊戲) (regulation OR law OR privacy OR 個資 OR 分級) sourcecountry:TW",
+        "台湾",
+    ),
+    (
         "(game OR gaming) (regulation OR law OR regulasi OR peraturan) sourcecountry:ID",
         "印尼",
     ),
@@ -1021,6 +1037,18 @@ _GDELT_QUERIES = [
         "(game OR gaming OR jogo) (regulation OR law OR regulação OR lei) sourcecountry:BR",
         "巴西",
     ),
+    (
+        "(game OR gaming OR videojuegos) (regulation OR law OR privacy OR consumidor) sourcecountry:AR",
+        "阿根廷",
+    ),
+    (
+        "(game OR gaming OR videojuegos) (regulation OR law OR privacy OR consumidor) sourcecountry:CL",
+        "智利",
+    ),
+    (
+        "(game OR gaming OR videojuegos) (regulation OR law OR privacy OR consumidor) sourcecountry:CO",
+        "哥伦比亚",
+    ),
     # ── 东南亚补充 ──
     (
         "(game OR gaming) (regulation OR law OR privacy) sourcecountry:PH",
@@ -1029,6 +1057,23 @@ _GDELT_QUERIES = [
     (
         "(game OR gaming) (regulation OR law OR privacy) sourcecountry:MY",
         "马来西亚",
+    ),
+    # ── 中东长尾补充 ──
+    (
+        "(game OR gaming OR ألعاب) (regulation OR law OR privacy OR license OR قانون) sourcecountry:QA",
+        "卡塔尔",
+    ),
+    (
+        "(game OR gaming OR ألعاب) (regulation OR law OR privacy OR license OR قانون) sourcecountry:KW",
+        "科威特",
+    ),
+    (
+        "(game OR gaming OR ألعاب) (regulation OR law OR privacy OR license OR قانون) sourcecountry:BH",
+        "巴林",
+    ),
+    (
+        "(game OR gaming) (regulation OR law OR privacy OR consumer) sourcecountry:IL",
+        "以色列",
     ),
 ]
 

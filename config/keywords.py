@@ -157,6 +157,16 @@ KEYWORDS = {
         "Singapore game rating IMDA requirement",
         "India online gaming regulation GST",
         "India online gaming intermediary rules",
+        "India online gaming rules real money game regulation",
+        "India DPDP Act gaming data protection",
+        "Canada PIPEDA game privacy enforcement",
+        "Canada Competition Bureau game consumer protection",
+        "Canada online safety game minor privacy",
+        "Hong Kong PCPD game app personal data",
+        "Hong Kong online game consumer protection regulation",
+        "Taiwan game software rating regulation",
+        "Taiwan personal data protection game app",
+        "Taiwan online game consumer protection law",
         "game publisher local representative requirement overseas",
         "foreign mobile game developer local entity requirement",
         "game operation license overseas developer",
@@ -290,6 +300,32 @@ KEYWORDS = {
         "POPIA game South Africa data protection",
         "PIPEDA game Canada privacy",
         "UK GDPR game divergence",
+
+        # === 加拿大 / 印度 / 港澳台专项 ===
+        "OPC Canada PIPEDA game app privacy",
+        "Canada privacy commissioner game app enforcement",
+        "India online gaming intermediary rules game",
+        "India gaming self-regulatory body regulation",
+        "Hong Kong PCPD online game privacy enforcement",
+        "Hong Kong game app personal data protection",
+        "Taiwan game rating management regulation",
+        "Taiwan game app personal data protection law",
+
+        # === 拉美西语国家专项 ===
+        "Argentina video game consumer protection regulation",
+        "Argentina AAIP game data protection",
+        "Chile SERNAC video game consumer protection",
+        "Chile game app privacy regulation",
+        "Colombia SIC video game consumer protection",
+        "Colombia game personal data protection",
+        "Mexico video game consumer protection privacy",
+
+        # === 中东长尾国家专项 ===
+        "Qatar online game regulation license privacy",
+        "Kuwait online game regulation license privacy",
+        "Bahrain online game regulation license privacy",
+        "Israel online game privacy protection regulation",
+        "GCC game content license regulation",
 
         # === Lilith Games / 产品专项 ===
         '"Lilith Games" regulation OR lawsuit OR fine OR enforcement',
@@ -449,6 +485,13 @@ KEYWORDS = {
         "juegos online regulación España",
         "protección al consumidor videojuegos reembolso",
         "privacidad de datos juegos móviles regulación",
+        "Argentina videojuegos protección de datos personales",
+        "Argentina videojuegos consumidor regulación",
+        "Chile videojuegos SERNAC consumidor regulación",
+        "Chile juegos móviles protección de datos",
+        "Colombia videojuegos SIC protección datos",
+        "Colombia juegos móviles consumidor regulación",
+        "México videojuegos consumidor privacidad regulación",
     ],
     "zh_tw": [
         # 繁体中文 - 台湾/港澳（无硬编码年份）
@@ -460,6 +503,10 @@ KEYWORDS = {
         "手機遊戲 廣告 規範",
         "抽獎合規 遊戲 法規",
         "未成年保護 手遊 法律 香港",
+        "香港 個人資料 遊戲 App 私隱專員",
+        "香港 線上遊戲 消費者保護 法規",
+        "台灣 遊戲軟體分級 管理辦法",
+        "台灣 線上遊戲 消費者保護 法規",
     ],
     "th": [
         # 泰语（无硬编码年份）
@@ -493,5 +540,9 @@ KEYWORDS = {
         "صندوق الحظ لعبة تنظيم",
         "الدفع الإلكتروني ألعاب تنظيم",
         "محتوى الذكاء الاصطناعي ألعاب قانون",
+        "قطر ألعاب إلكترونية تنظيم ترخيص خصوصية",
+        "الكويت ألعاب إلكترونية تنظيم ترخيص خصوصية",
+        "البحرين ألعاب إلكترونية تنظيم ترخيص خصوصية",
+        "إسرائيل ألعاب إلكترونية خصوصية بيانات قانون",
     ],
 }

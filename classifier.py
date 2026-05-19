@@ -57,13 +57,13 @@ COUNTRY_PATTERNS = {
     "挪威": [r"norway|norwegian|挪威"],
     # 北美
     "美国": [r"united states|\bUS\b|\bUSA\b|american|FTC\b|federal trade commission|CCPA|CPRA|COPPA|congress\b|senate\b|california|KIDS act|section 230|tennessee|florida|alabama|missouri|new york|south carolina|mississippi|connecticut|nevada|pennsylvania|harrisburg|attorney general"],
-    "加拿大": [r"canada|canadian|加拿大|PIPEDA"],
+    "加拿大": [r"canada|canadian|加拿大|PIPEDA|OPC\b|privacy commissioner"],
     # 南美
     "巴西": [r"brazil|brazilian|巴西|LGPD"],
-    "墨西哥": [r"mexico|mexican|墨西哥"],
-    "阿根廷": [r"argentina|阿根廷"],
-    "智利": [r"chile|chilean|智利"],
-    "哥伦比亚": [r"colombia|colombian|哥伦比亚"],
+    "墨西哥": [r"mexico|mexican|méxico|墨西哥|PROFECO|INAI"],
+    "阿根廷": [r"argentina|阿根廷|AAIP|datos personales.*argentina"],
+    "智利": [r"chile|chilean|智利|SERNAC|datos personales.*chile"],
+    "哥伦比亚": [r"colombia|colombian|哥伦比亚|SIC\b|datos personales.*colombia"],
     # 东南亚
     "越南": [r"vietnam|vietnamese|越南|việt nam|MIC.*vietnam|nghị định|thông tư"],
     "印度尼西亚": [r"indonesia|indonesian|印尼|印度尼西亚|IGAC|Kominfo|Kemenkominfo"],
@@ -72,12 +72,12 @@ COUNTRY_PATTERNS = {
     "马来西亚": [r"malaysia|malaysian|马来西亚|MCMC"],
     "新加坡": [r"singapore|新加坡|IMDA|MDA.*singapore"],
     # 南亚
-    "印度": [r"\bindia\b|indian|印度|DPDPA|Vaishnaw|MeitY"],
+    "印度": [r"\bindia\b|indian|印度|DPDPA|DPDP|Vaishnaw|MeitY|online gaming rules"],
     "巴基斯坦": [r"pakistan|巴基斯坦"],
     # 港澳台
-    "香港": [r"hong kong|香港|PCPD"],
+    "香港": [r"hong kong|香港|PCPD|OFCA|私隱專員|個人資料私隱"],
     "澳门": [r"macau|macao|澳门"],
-    "台湾": [r"taiwan|台湾|台灣|個資法"],
+    "台湾": [r"taiwan|台湾|台灣|個資法|個人資料保護法|數位發展部|遊戲軟體分級"],
     # 日本
     "日本": [r"japan|japanese|日本|CERO|ガチャ|景品表示法|資金決済法|特商法|消費者庁|スマートフォン"],
     # 韩国
@@ -89,6 +89,10 @@ COUNTRY_PATTERNS = {
     "沙特": [r"saudi|沙特|GAMERS"],
     "阿联酋": [r"UAE|united arab emirates|阿联酋|dubai"],
     "土耳其": [r"turkey|turkish|türkiye|土耳其"],
+    "卡塔尔": [r"qatar|qatari|卡塔尔|卡達|CRA\b|MCIT"],
+    "科威特": [r"kuwait|kuwaiti|科威特|CITRA"],
+    "巴林": [r"bahrain|bahraini|巴林|TRA Bahrain"],
+    "以色列": [r"israel|israeli|以色列|privacy protection authority"],
     "尼日利亚": [r"nigeria|尼日利亚"],
     "南非": [r"south africa|南非"],
 }

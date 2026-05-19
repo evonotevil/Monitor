@@ -47,7 +47,7 @@ MONITORED_REGIONS = {
         "focus": ["Online Safety Act", "Privacy Act", "Age Verification", "Loot Box", "未成年保护"],
     },
     "中东/非洲": {
-        "countries": ["沙特", "阿联酋", "土耳其", "尼日利亚", "南非"],
+        "countries": ["沙特", "阿联酋", "土耳其", "卡塔尔", "科威特", "巴林", "以色列", "尼日利亚", "南非"],
         "focus": ["内容监管", "游戏许可", "数据保护", "本地化要求"],
     },
 }

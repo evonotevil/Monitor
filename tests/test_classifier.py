@@ -81,6 +81,30 @@ class TestDetectRegion:
     def test_indonesia(self):
         assert _detect_region("Indonesia IGAC game rating requirement Kominfo") == "东南亚"
 
+    def test_canada(self):
+        assert _detect_region("Canada OPC PIPEDA game app privacy enforcement") == "北美"
+
+    def test_argentina(self):
+        assert _detect_region("Argentina AAIP game data protection") == "南美"
+
+    def test_chile(self):
+        assert _detect_region("Chile SERNAC video game consumer regulation") == "南美"
+
+    def test_colombia(self):
+        assert _detect_region("Colombia SIC game personal data protection") == "南美"
+
+    def test_qatar(self):
+        assert _detect_region("Qatar CRA online game regulation") == "中东/非洲"
+
+    def test_kuwait(self):
+        assert _detect_region("Kuwait CITRA online game license regulation") == "中东/非洲"
+
+    def test_bahrain(self):
+        assert _detect_region("Bahrain TRA game privacy regulation") == "中东/非洲"
+
+    def test_israel(self):
+        assert _detect_region("Israel Privacy Protection Authority game app privacy") == "中东/非洲"
+
 
 class TestIsChinaMainland:
     """is_china_mainland: 检测中国大陆内容（应排除）"""
