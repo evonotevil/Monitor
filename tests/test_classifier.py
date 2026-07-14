@@ -10,6 +10,7 @@ from classifier import (
     get_source_tier,
     is_china_mainland,
     _detect_region,
+    _detect_geography,
     _detect_category,
     _detect_status,
     _is_hardware_noise,
@@ -32,6 +33,46 @@ class TestDetectRegion:
 
     def test_traditional_chinese_us_state_reporting(self):
         assert _detect_region("南達科他州與Roblox和解千萬美元") == "北美"
+
+    @pytest.mark.parametrize("text,jurisdiction,region", [
+        ("FTC fines a game company for COPPA violations", "美国", "北美"),
+        ("Canada OPC enforces PIPEDA against a game app", "加拿大", "北美"),
+        ("CNIL fines a game publisher under GDPR", "法国", "欧洲"),
+        ("Germany BfDI investigates a mobile game", "德国", "欧洲"),
+        ("Taiwan 個資法 遊戲 合規", "台湾地区", "港澳台"),
+        ("New Zealand online game regulation", "新西兰", "大洋洲"),
+    ])
+    def test_specific_jurisdiction(self, text, jurisdiction, region):
+        detected, scope, source = _detect_geography(text)
+        assert detected == jurisdiction
+        assert scope == "single"
+        assert source == "rule"
+        assert _detect_region(text) in {region, "日本", "韩国"}
+
+    def test_eu_is_supranational_jurisdiction(self):
+        assert _detect_geography("European Commission enforces the DSA") == (
+            "欧盟", "supranational", "rule"
+        )
+
+    def test_global_is_scope_not_jurisdiction(self):
+        assert _detect_geography("Worldwide App Store policy update for games") == (
+            "", "global", "rule"
+        )
+
+    def test_multi_country_without_primary_has_no_jurisdiction(self):
+        assert _detect_geography("International comparison of game laws across multiple countries") == (
+            "", "multi", "rule"
+        )
+
+    def test_equal_country_comparison_has_no_artificial_primary(self):
+        assert _detect_geography("Japan and Korea game regulation comparison") == (
+            "", "multi", "rule"
+        )
+
+    def test_cross_language_reporting_uses_event_jurisdiction(self):
+        assert _detect_geography("미국 FTC가 게임 회사를 제재", fallback="韩国")[:2] == (
+            "美国", "single"
+        )
 
     @pytest.mark.parametrize("text", [
         "米国FTCがゲーム会社への制裁を発表",

@@ -14,6 +14,7 @@ from translator import (
     _REGION_PREFIX_RULES,
     _TERM_CORRECTIONS,
     _VALID_REGIONS,
+    _VALID_JURISDICTIONS,
     _VALID_CATEGORIES_L1,
     _VALID_STATUSES,
 )
@@ -251,6 +252,11 @@ class TestValidSets:
     def test_valid_regions_includes_key_countries(self):
         for country in ["美国", "欧盟", "日本", "韩国", "越南", "香港", "澳大利亚", "巴西", "沙特"]:
             assert country in _VALID_REGIONS, f"'{country}' 不在 _VALID_REGIONS 中"
+
+    def test_jurisdiction_values_exclude_scope_labels(self):
+        assert "欧盟" in _VALID_JURISDICTIONS
+        assert "全球" not in _VALID_JURISDICTIONS
+        assert "其他" not in _VALID_JURISDICTIONS
 
     def test_valid_categories_l1(self):
         expected = {"数据隐私", "玩法合规", "未成年人保护", "广告营销合规",

@@ -4,6 +4,7 @@
 
 import sqlite3
 import os
+import re
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -32,6 +33,9 @@ class LegislationItem:
     risk_urgency: int = 0     # 时间紧迫性 0-3
     risk_scope: int = 0       # 影响范围 0-3
     risk_source: str = "regex"  # 评分来源: "regex" / "llm"
+    jurisdiction: str = ""      # 具体国家/地区或欧盟；全球/多国/未知时留空
+    applicability_scope: str = "unknown"  # single/supranational/multi/global/unknown
+    jurisdiction_source: str = "unknown"  # rule/official_source/llm/locale/backfill/unknown
     id: Optional[int] = None
 
     def to_dict(self):
@@ -65,6 +69,9 @@ class Database:
                 title_zh TEXT DEFAULT '',
                 summary_zh TEXT DEFAULT '',
                 impact_score REAL DEFAULT 1.0,
+                jurisdiction TEXT DEFAULT '',
+                applicability_scope TEXT DEFAULT 'unknown',
+                jurisdiction_source TEXT DEFAULT 'unknown',
                 created_at TEXT DEFAULT (datetime('now')),
                 UNIQUE(title, source_url)
             );
@@ -92,6 +99,9 @@ class Database:
             ("risk_urgency", "INTEGER DEFAULT 0"),
             ("risk_scope",   "INTEGER DEFAULT 0"),
             ("risk_source",  "TEXT DEFAULT 'regex'"),
+            ("jurisdiction", "TEXT DEFAULT ''"),
+            ("applicability_scope", "TEXT DEFAULT 'unknown'"),
+            ("jurisdiction_source", "TEXT DEFAULT 'unknown'"),
         ]:
             try:
                 self.conn.execute(f"SELECT {col} FROM legislation LIMIT 1")
@@ -111,8 +121,9 @@ class Database:
                 INSERT INTO legislation
                     (region, category_l1, category_l2, title, date, status, summary,
                      source_name, source_url, lang, title_zh, summary_zh, impact_score,
-                     risk_revenue, risk_product, risk_urgency, risk_scope, risk_source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     risk_revenue, risk_product, risk_urgency, risk_scope, risk_source,
+                     jurisdiction, applicability_scope, jurisdiction_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(title, source_url) DO UPDATE SET
                     region     = excluded.region,
                     category_l1 = CASE WHEN excluded.category_l1 != '' THEN excluded.category_l1 ELSE legislation.category_l1 END,
@@ -124,7 +135,14 @@ class Database:
                     risk_product = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_product ELSE legislation.risk_product END,
                     risk_urgency = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_urgency ELSE legislation.risk_urgency END,
                     risk_scope   = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_scope   ELSE legislation.risk_scope   END,
-                    risk_source  = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_source  ELSE legislation.risk_source  END
+                    risk_source  = CASE WHEN excluded.risk_source = 'llm' THEN excluded.risk_source  ELSE legislation.risk_source  END,
+                    jurisdiction = CASE
+                        WHEN excluded.applicability_scope IN ('global', 'multi') AND excluded.jurisdiction = '' THEN ''
+                        WHEN excluded.jurisdiction != '' THEN excluded.jurisdiction
+                        ELSE legislation.jurisdiction
+                    END,
+                    applicability_scope = CASE WHEN excluded.applicability_scope != 'unknown' THEN excluded.applicability_scope ELSE legislation.applicability_scope END,
+                    jurisdiction_source = CASE WHEN excluded.jurisdiction_source != 'unknown' THEN excluded.jurisdiction_source ELSE legislation.jurisdiction_source END
             """, (
                 item.region, item.category_l1, item.category_l2,
                 item.title, item.date, item.status, item.summary,
@@ -132,6 +150,8 @@ class Database:
                 item.title_zh, item.summary_zh, item.impact_score,
                 item.risk_revenue, item.risk_product, item.risk_urgency,
                 item.risk_scope, item.risk_source,
+                item.jurisdiction, item.applicability_scope,
+                item.jurisdiction_source,
             ))
             self.conn.commit()
             return self.conn.total_changes > 0
@@ -256,7 +276,9 @@ class Database:
                            status: str = "", impact_score: float = 0.0,
                            risk_revenue: int = 0, risk_product: int = 0,
                            risk_urgency: int = 0, risk_scope: int = 0,
-                           risk_source: str = ""):
+                           risk_source: str = "", jurisdiction: Optional[str] = None,
+                           applicability_scope: str = "",
+                           jurisdiction_source: str = ""):
         """直接按 id 更新翻译字段，可选更新分类/地区/风险评估。"""
         sql = "UPDATE legislation SET title_zh = ?, summary_zh = ?"
         params: list = [title_zh, summary_zh]
@@ -275,10 +297,66 @@ class Database:
         if risk_source:
             sql += ", risk_revenue = ?, risk_product = ?, risk_urgency = ?, risk_scope = ?, risk_source = ?"
             params.extend([risk_revenue, risk_product, risk_urgency, risk_scope, risk_source])
+        if jurisdiction is not None:
+            sql += ", jurisdiction = ?"
+            params.append(jurisdiction)
+        if applicability_scope:
+            sql += ", applicability_scope = ?"
+            params.append(applicability_scope)
+        if jurisdiction_source:
+            sql += ", jurisdiction_source = ?"
+            params.append(jurisdiction_source)
         sql += " WHERE id = ?"
         params.append(item_id)
         self.conn.execute(sql, params)
         self.conn.commit()
+
+    def backfill_geography(self) -> int:
+        """只用与现有一级区域一致的强证据回填历史地理字段。"""
+        from classifier import _detect_geography
+        from utils import _get_region_group, normalize_jurisdiction, region_for_jurisdiction
+
+        rows = self.conn.execute("""
+            SELECT id, region, title, title_zh, summary, source_name
+            FROM legislation
+            WHERE COALESCE(jurisdiction, '') = ''
+              AND COALESCE(applicability_scope, 'unknown') = 'unknown'
+        """).fetchall()
+        updated = 0
+        for row in rows:
+            current_group = _get_region_group(row["region"] or "其他")
+            prefix = re.match(r"^\[([^\]]+)\]", row["title_zh"] or "")
+            prefix_jurisdiction = normalize_jurisdiction(prefix.group(1)) if prefix else ""
+            if prefix_jurisdiction and region_for_jurisdiction(prefix_jurisdiction) != current_group:
+                continue
+
+            text = " ".join(filter(None, [row["title"], row["title_zh"], row["summary"]]))
+            jurisdiction, scope, source = _detect_geography(
+                text,
+                source_name=row["source_name"] or "",
+                allow_locale_fallback=False,
+            )
+            if prefix_jurisdiction:
+                jurisdiction = prefix_jurisdiction
+                scope = "supranational" if jurisdiction == "欧盟" else "single"
+                source = "rule"
+
+            if jurisdiction:
+                if region_for_jurisdiction(jurisdiction) != current_group:
+                    continue
+            elif scope not in {"global", "multi"} or current_group != "其他":
+                continue
+            if source not in {"rule", "official_source"}:
+                continue
+
+            self.conn.execute("""
+                UPDATE legislation
+                SET jurisdiction = ?, applicability_scope = ?, jurisdiction_source = 'backfill'
+                WHERE id = ?
+            """, (jurisdiction, scope, row["id"]))
+            updated += 1
+        self.conn.commit()
+        return updated
 
     def delete_item(self, item_id: int):
         """按 id 删除条目（用于 retranslate 清理 LLM 判定不相关的历史垃圾条目）。"""
@@ -312,11 +390,25 @@ class Database:
                 risk_urgency INTEGER DEFAULT 0,
                 risk_scope INTEGER DEFAULT 0,
                 risk_source TEXT DEFAULT 'regex',
+                jurisdiction TEXT DEFAULT '',
+                applicability_scope TEXT DEFAULT 'unknown',
+                jurisdiction_source TEXT DEFAULT 'unknown',
                 created_at TEXT,
                 archived_at TEXT DEFAULT (datetime('now')),
                 PRIMARY KEY (id)
             );
         """)
+        for col, definition in [
+            ("jurisdiction", "TEXT DEFAULT ''"),
+            ("applicability_scope", "TEXT DEFAULT 'unknown'"),
+            ("jurisdiction_source", "TEXT DEFAULT 'unknown'"),
+        ]:
+            try:
+                self.conn.execute(f"SELECT {col} FROM legislation_archive LIMIT 1")
+            except sqlite3.OperationalError:
+                self.conn.execute(
+                    f"ALTER TABLE legislation_archive ADD COLUMN {col} {definition}"
+                )
         self.conn.commit()
 
         cutoff = (datetime.now() - timedelta(days=keep_days)).strftime("%Y-%m-%d")
@@ -327,13 +419,17 @@ class Database:
                 (id, region, category_l1, category_l2, title, date, status,
                  summary, source_name, source_url, lang, title_zh, summary_zh,
                  impact_score, risk_revenue, risk_product, risk_urgency,
-                 risk_scope, risk_source, created_at)
+                 risk_scope, risk_source, jurisdiction, applicability_scope,
+                 jurisdiction_source, created_at)
             SELECT id, region, category_l1, category_l2, title, date, status,
                    summary, source_name, source_url, lang, title_zh, summary_zh,
                    impact_score,
                    COALESCE(risk_revenue, 0), COALESCE(risk_product, 0),
                    COALESCE(risk_urgency, 0), COALESCE(risk_scope, 0),
                    COALESCE(risk_source, 'regex'),
+                   COALESCE(jurisdiction, ''),
+                   COALESCE(applicability_scope, 'unknown'),
+                   COALESCE(jurisdiction_source, 'unknown'),
                    created_at
             FROM legislation
             WHERE date < ?

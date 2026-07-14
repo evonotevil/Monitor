@@ -17,6 +17,10 @@ from utils import (
     _pick_group_items,
     CAT_EMOJI,
     _TIER_SORT,
+    VALID_JURISDICTIONS,
+    geography_display,
+    normalize_jurisdiction,
+    normalize_geography,
 )
 
 
@@ -49,6 +53,25 @@ class TestRegionGroupMap:
 
     def test_brazil_maps_to_south_america(self):
         assert _REGION_GROUP_MAP["巴西"] == "南美"
+
+    def test_strict_jurisdiction_semantics(self):
+        assert normalize_jurisdiction("台湾") == "台湾地区"
+        assert normalize_jurisdiction("欧盟") == "欧盟"
+        assert normalize_jurisdiction("全球") == ""
+        assert normalize_jurisdiction("多国/地区") == ""
+        assert normalize_jurisdiction("未识别") == ""
+        assert "全球" not in VALID_JURISDICTIONS
+
+    def test_geography_display_uses_scope_when_jurisdiction_is_empty(self):
+        assert geography_display({
+            "region": "其他", "jurisdiction": "", "applicability_scope": "global"
+        }) == "其他｜全球"
+
+    def test_conflicting_geography_values_are_normalized(self):
+        assert normalize_geography("美国", "global") == ("", "global")
+        assert normalize_geography("法国", "supranational") == ("法国", "single")
+        assert normalize_geography("欧盟", "single") == ("欧盟", "supranational")
+        assert normalize_geography("", "single") == ("", "unknown")
 
     def test_saudi_maps_to_middle_east(self):
         assert _REGION_GROUP_MAP["沙特"] == "中东"

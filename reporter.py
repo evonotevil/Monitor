@@ -29,7 +29,7 @@ from config import OUTPUT_DIR, REGION_DISPLAY_ORDER
 from classifier import get_source_tier
 from utils import (
     _REGION_GROUP_MAP, _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status,
-    _bigram_sim, _TIER_SORT, MEDIA_SUFFIX_RE,
+    _bigram_sim, _TIER_SORT, MEDIA_SUFFIX_RE, geography_display,
 )
 
 
@@ -234,6 +234,10 @@ def _infer_group_from_text(title: str, title_zh: str) -> str:
 def _resolve_group(item: dict) -> str:
     """解析条目的最终显示分组（含文本推断兜底）"""
     group = _get_region_group(item.get("region", "其他"))
+    if item.get("jurisdiction"):
+        return group
+    if item.get("applicability_scope") in {"global", "multi"}:
+        return group
     if group == "其他":
         group = _infer_group_from_text(
             item.get("title", ""),
@@ -501,7 +505,7 @@ def print_table(items: List[dict], max_summary_len: int = 50):
         summary_zh = _get_summary_zh(item)
 
         row = (
-            f"{_truncate(item.get('region', ''), 8):<8} | "
+            f"{_truncate(geography_display(item), 16):<16} | "
             f"{_truncate(item.get('category_l1', ''), 12):<12} | "
             f"{_truncate(title, 50):<50} | "
             f"{item.get('date', ''):<12} | "
@@ -553,8 +557,8 @@ def generate_markdown(items: List[dict], title: str = "全球游戏行业立法�
 def _append_region_md(lines: list, region: str, region_items: list):
     lines.append(f"## {region} ({len(region_items)} 条)")
     lines.append("")
-    lines.append("| 类别 | 标题(原文) | 发布时间 | 状态 | 摘要与合规提示 |")
-    lines.append("|------|------------|----------|------|------------|")
+    lines.append("| 管辖范围 | 类别 | 标题(原文) | 发布时间 | 状态 | 摘要与合规提示 |")
+    lines.append("|----------|------|------------|----------|------|------------|")
 
     for item in sorted(region_items, key=lambda x: x.get("date", ""), reverse=True):
         title_orig = (item.get("title", "") or "").replace("|", "\\|")
@@ -567,6 +571,7 @@ def _append_region_md(lines: list, region: str, region_items: list):
             title_cell = _truncate(title_orig, 50)
 
         lines.append(
+            f"| {geography_display(item)} "
             f"| {item.get('category_l1', '')} "
             f"| {title_cell} "
             f"| {item.get('date', '')} "
@@ -712,7 +717,7 @@ def _render_bp_breakdown_html(action_items: list) -> str:
         items_html = ""
         for item in items:
             title  = html_mod.escape(((item.get("title_zh") or item.get("title") or "").strip())[:45])
-            region = html_mod.escape((item.get("region") or "").strip())
+            region = html_mod.escape(geography_display(item))
             status = (item.get("bitable_status") or "").strip()
             dot_c  = _BP_STATUS_DOT.get(status, "#94A3B8")
             meta   = f'<span class="bp-item-meta">{region}</span>' if region else ""
@@ -859,6 +864,7 @@ def _render_region_sections_mobile(grouped: dict, zone_type: str) -> str:
             summ    = html_mod.escape(_truncate(raw_sum, 200))
             url     = html_mod.escape(_safe_href(item.get("source_url", "")))
             cat_status = f"{cat}{' · ' + status if status else ''}"
+            geography = html_mod.escape(geography_display(item))
             title_tag  = (f'<a href="{url}" target="_blank" rel="noopener">{zh}</a>' if url else zh)
 
             extra_html = ""
@@ -911,6 +917,7 @@ def _render_region_sections_mobile(grouped: dict, zone_type: str) -> str:
                 f'<article class="log-item" data-accent="{accent}">'
                 f'<div class="log-inner">'
                 f'<div class="log-tags"><span class="log-category">{cat_status}</span>'
+                f'<span class="log-category">{geography}</span>'
                 f'<span class="log-date">{date_s}</span></div>'
                 f'<div class="log-title">{title_tag}</div>'
                 f'<span class="log-title-orig">{orig}</span>'
@@ -1092,7 +1099,8 @@ def _render_region_sections_pc(grouped: dict, is_action: bool) -> str:
             summ     = html_mod.escape(_truncate(raw_sum, 200))
             url      = html_mod.escape(_safe_href(item.get("source_url", "")))
             span_cls = " span-2" if (n % 2 == 1 and idx == n - 1) else ""
-            meta_parts = [p for p in [cat, status, date_s] if p]
+            geography = html_mod.escape(geography_display(item))
+            meta_parts = [p for p in [geography, cat, status, date_s] if p]
             meta = " · ".join(meta_parts)
             title_tag = (f'<a href="{url}" target="_blank" rel="noopener">{zh}</a>' if url else zh)
 
@@ -1227,7 +1235,7 @@ def generate_html(items: List[dict], title: str = "全球游戏行业立法动�
             summary_zh = html_mod.escape(_truncate(summary_zh_raw, 200))
             url = _safe_href(item.get("source_url", ""))
             item_date = item.get("date", "")
-            region = html_mod.escape(item.get("region", ""))
+            region = html_mod.escape(geography_display(item))
             source_name = html_mod.escape(source_raw)
 
             # 中文主标题：优先 title_zh，回退到 summary_zh 前 80 字

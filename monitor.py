@@ -31,7 +31,10 @@ from reporter import (
     print_table, save_markdown, save_html,
     _calculate_event_fingerprint, _fp_same_event,
 )
-from utils import _get_region_group, _bigram_sim, previous_full_week_range, _TIER_SORT
+from utils import (
+    _get_region_group, _bigram_sim, previous_full_week_range, _TIER_SORT,
+    normalize_geography, normalize_jurisdiction, region_for_jurisdiction,
+)
 from config import PERIOD_DAYS
 
 # ─── 日志配置 ─────────────────────────────────────────────────────────
@@ -358,6 +361,12 @@ def cmd_run(args):
     label = _period_label(args.period)
     logger.info(f"开始执行抓取 [{label}]...")
     db = Database()
+    try:
+        backfilled = getattr(db, "backfill_geography", lambda: 0)()
+        if backfilled:
+            logger.info(f"[地理回填] 高置信度更新 {backfilled} 条历史记录")
+    except Exception as exc:
+        logger.warning(f"[地理回填] 跳过，不影响本次抓取: {exc}")
 
     daily_mode = (args.period == "day")
     try:
@@ -395,11 +404,26 @@ def cmd_run(args):
 
                     # ── 应用 LLM 分类结果（覆盖正则，空值保留正则原值）──
                     llm_region   = translated.get("_llm_region", "")
+                    llm_jurisdiction = normalize_jurisdiction(
+                        translated.get("_llm_jurisdiction", "") or llm_region
+                    )
+                    llm_scope = translated.get("_llm_applicability_scope", "unknown")
+                    llm_jurisdiction, llm_scope = normalize_geography(
+                        llm_jurisdiction, llm_scope
+                    )
                     llm_category = translated.get("_llm_category_l1", "")
                     llm_status   = translated.get("_llm_status", "")
 
-                    if llm_region:
-                        item.region = llm_region
+                    if llm_jurisdiction:
+                        item.jurisdiction = llm_jurisdiction
+                        item.region = region_for_jurisdiction(llm_jurisdiction)
+                        item.jurisdiction_source = "llm"
+                    elif llm_scope in {"global", "multi"}:
+                        item.jurisdiction = ""
+                        item.region = "其他"
+                        item.jurisdiction_source = "llm"
+                    if llm_scope != "unknown":
+                        item.applicability_scope = llm_scope
                     if llm_category:
                         item.category_l1 = llm_category
                     if llm_status and llm_status != item.status:
@@ -647,9 +671,23 @@ def cmd_retranslate(args):
             if translated.get("title_zh"):
                 # 提取 LLM 分类结果
                 llm_region   = translated.get("_llm_region", "")
+                jurisdiction = normalize_jurisdiction(
+                    translated.get("_llm_jurisdiction", "") or llm_region
+                )
+                applicability_scope = translated.get(
+                    "_llm_applicability_scope", "unknown"
+                )
+                jurisdiction, applicability_scope = normalize_geography(
+                    jurisdiction, applicability_scope
+                )
                 llm_category = translated.get("_llm_category_l1", "")
                 llm_status   = translated.get("_llm_status", "")
-                region = _get_region_group(llm_region) if llm_region else _get_region_group(item_dict.get("region", ""))
+                if jurisdiction:
+                    region = region_for_jurisdiction(jurisdiction)
+                elif applicability_scope in {"global", "multi"}:
+                    region = "其他"
+                else:
+                    region = _get_region_group(item_dict.get("region", ""))
 
                 # 提取 LLM 风险评估
                 r_rev = translated.get("_llm_risk_revenue", 0)
@@ -678,6 +716,11 @@ def cmd_retranslate(args):
                     risk_revenue=r_rev, risk_product=r_pro,
                     risk_urgency=r_urg, risk_scope=r_sco,
                     risk_source=risk_source,
+                    jurisdiction=jurisdiction,
+                    applicability_scope=applicability_scope,
+                    jurisdiction_source="llm" if (
+                        jurisdiction or applicability_scope != "unknown"
+                    ) else "",
                 )
                 updated += 1
                 logger.info(f"  ✓ [{region}] {translated['title_zh'][:40]}")

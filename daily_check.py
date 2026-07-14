@@ -35,7 +35,9 @@ DB_PATH = Path(__file__).parent / "data" / "monitor.db"
 from utils import (
     _GROUP_ORDER, _GROUP_EMOJI, _get_region_group, normalize_status,
     _TIER_SORT, _impact_emoji, _bigram_sim, _pick_group_items,
+    geography_display,
 )
+from models import Database
 from feishu_client import send_card
 from classifier import get_source_tier, _is_hardware_noise, _is_google_apple_non_core
 
@@ -103,6 +105,10 @@ def get_daily_items() -> list:
         print(f"⚠️  数据库不存在: {DB_PATH}")
         return []
 
+    # daily_check 可独立运行，先确保旧数据库已经补齐新增列。
+    migration_db = Database(str(DB_PATH))
+    migration_db.close()
+
     now_cst = datetime.now(_TZ_CST)
 
     # 周一覆盖周六+周日+周一（74h），其余工作日只覆盖昨天（26h）
@@ -129,7 +135,10 @@ def get_daily_items() -> list:
                COALESCE(risk_product, 0)   AS risk_product,
                COALESCE(risk_urgency, 0)   AS risk_urgency,
                COALESCE(risk_scope, 0)     AS risk_scope,
-               COALESCE(risk_source, 'regex') AS risk_source
+               COALESCE(risk_source, 'regex') AS risk_source,
+               COALESCE(jurisdiction, '') AS jurisdiction,
+               COALESCE(applicability_scope, 'unknown') AS applicability_scope,
+               COALESCE(jurisdiction_source, 'unknown') AS jurisdiction_source
         FROM legislation
         WHERE date IN ({placeholders})
           AND created_at >= ?
@@ -271,7 +280,7 @@ def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = Fals
             risk_em  = _impact_emoji(score)
             cat      = item.get("category_l1", "")
             status   = normalize_status(item.get("status", ""))
-            region   = item.get("region", "")
+            geography = geography_display(item)
 
             title_zh = (item.get("title_zh") or "").strip()
             url      = item.get("source_url", "")
@@ -283,7 +292,7 @@ def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = Fals
             elements.append({
                 "tag": "markdown",
                 "content": (
-                    f"{risk_em} **{status}** · {region} · {cat}\n"
+                    f"{risk_em} **{status}** · {geography} · {cat}\n"
                     f"{title_md}\n"
                     f"机制变动：{mechanism}"
                 ),

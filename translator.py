@@ -16,7 +16,10 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from utils import _REGION_GROUP_MAP, _GROUP_ORDER
+from utils import (
+    APPLICABILITY_SCOPES, VALID_JURISDICTIONS, _REGION_GROUP_MAP, _GROUP_ORDER,
+    normalize_applicability_scope, normalize_geography, normalize_jurisdiction,
+)
 
 # ── 提示词加载 ─────────────────────────────────────────────────────────
 
@@ -149,14 +152,16 @@ def _build_region_prompt_section() -> str:
     """从 _REGION_GROUP_MAP 自动生成 Prompt 中的国家列表，按显示分组排列。"""
     from collections import defaultdict
     groups: dict = defaultdict(list)
+    seen: set = set()
     for country, group in _REGION_GROUP_MAP.items():
-        if country not in _REGION_PROMPT_SKIP and country not in {"全球", "其他"}:
-            groups[group].append(country)
+        jurisdiction = normalize_jurisdiction(country)
+        if jurisdiction and jurisdiction not in seen:
+            groups[group].append(jurisdiction)
+            seen.add(jurisdiction)
     lines = []
     for g in _GROUP_ORDER:
         if groups[g]:
             lines.append(" ".join(groups[g]))
-    lines.append("全球 其他")
     return "\n".join(lines)
 
 
@@ -174,6 +179,8 @@ _PROMPT_DAILY_SUMMARY = _load_prompt("daily_summary.txt")
 
 # 从 utils._REGION_GROUP_MAP 自动派生，与 _get_region_group() 始终保持一致
 _VALID_REGIONS: set = set(_REGION_GROUP_MAP.keys())
+_VALID_JURISDICTIONS: set = set(VALID_JURISDICTIONS)
+_VALID_APPLICABILITY_SCOPES: set = set(APPLICABILITY_SCOPES)
 
 _VALID_CATEGORIES_L1 = {
     "数据隐私", "玩法合规", "未成年人保护", "广告营销合规",
@@ -311,7 +318,17 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
                 return {"is_relevant": False}
 
             # ── 步骤 4b：提取分类字段（校验合法性，非法值留空由正则兜底）─
-            llm_region = (data.get("region") or "").strip()
+            legacy_region = (data.get("region") or "").strip()
+            llm_jurisdiction = normalize_jurisdiction(
+                data.get("jurisdiction") or legacy_region
+            )
+            llm_scope = (data.get("applicability_scope") or "").strip().lower()
+            if llm_scope not in _VALID_APPLICABILITY_SCOPES:
+                llm_scope = normalize_applicability_scope("", llm_jurisdiction)
+            llm_jurisdiction, llm_scope = normalize_geography(
+                llm_jurisdiction, llm_scope
+            )
+            llm_region = legacy_region if legacy_region in _VALID_REGIONS else ""
             llm_category_l1 = (data.get("category_l1") or "").strip()
             llm_status = (data.get("status") or "").strip()
 
@@ -400,6 +417,8 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
                     "title_zh":      title_zh,
                     "summary_zh":    summary_zh,
                     "region":        llm_region,
+                    "jurisdiction":  llm_jurisdiction,
+                    "applicability_scope": llm_scope,
                     "category_l1":   llm_category_l1,
                     "status":        llm_status,
                     "risk_revenue":  _clamp_risk(data.get("risk_revenue")),
@@ -573,6 +592,8 @@ def _ai_process_batch(items_data: list) -> list:
         hint_parts = []
         if d.get("region_hint"):
             hint_parts.append(f"地区={d['region_hint']}")
+        if d.get("jurisdiction_hint"):
+            hint_parts.append(f"管辖区={d['jurisdiction_hint']}")
         if d.get("category_hint"):
             hint_parts.append(f"分类={d['category_hint']}")
         if d.get("status_hint"):
@@ -655,7 +676,8 @@ def _ai_process_batch(items_data: list) -> list:
 _REGION_PREFIX_RULES = [
     ("美国",    r'\b(US|USA|United States|America[n]?|FTC|Congress|Senate|White House)\b|米国|アメリカ|미국|hoa kỳ|nước mỹ|amerika serikat|estados unidos|\bEUA\b|vereinigte staaten|états-unis|สหรัฐอเมริกา|الولايات المتحدة'),
     ("英国",    r'\b(UK|United Kingdom|Britain|British|ASA|Ofcom|ICO)\b'),
-    ("欧盟",    r'\b(EU|European Union|Europe[an]?|GDPR|DSA|DMA|CNIL)\b|欧州連合|유럽연합|liên minh châu âu|uni eropa|união europeia|unión europea|europäische union|union européenne|สหภาพยุโรป|الاتحاد الأوروبي'),
+    ("法国",    r'\b(France|French|CNIL)\b'),
+    ("欧盟",    r'\b(EU|European Union|Europe[an]?|GDPR|DSA|DMA)\b|欧州連合|유럽연합|liên minh châu âu|uni eropa|união europeia|unión europea|europäische union|union européenne|สหภาพยุโรป|الاتحاد الأوروبي'),
     ("韩国",    r'\b(Korea[n]?|South Korea|GRAC|KCA)\b'),
     ("日本",    r'\b(Japan[ese]?)\b'),
     ("澳大利亚", r'\b(Austral[ia]+[n]?|eSafety)\b'),
@@ -690,6 +712,7 @@ def translate_items_batch(items_dicts: list, batch_size: int = 3) -> list:
                 "title":         (d.get("title")       or "").strip(),
                 "summary":       (d.get("summary")     or "").strip(),
                 "region_hint":   (d.get("region")      or "").strip(),
+                "jurisdiction_hint": (d.get("jurisdiction") or "").strip(),
                 "category_hint": (d.get("category_l1") or "").strip(),
                 "status_hint":   (d.get("status")      or "").strip(),
                 "lang":          (d.get("lang")        or "en"),
@@ -752,6 +775,15 @@ def translate_items_batch(items_dicts: list, batch_size: int = 3) -> list:
 
             # 校验分类字段合法性
             llm_region   = (raw.get("region")      or "").strip()
+            llm_jurisdiction = normalize_jurisdiction(
+                raw.get("jurisdiction") or llm_region
+            )
+            llm_scope = (raw.get("applicability_scope") or "").strip().lower()
+            if llm_scope not in _VALID_APPLICABILITY_SCOPES:
+                llm_scope = normalize_applicability_scope("", llm_jurisdiction)
+            llm_jurisdiction, llm_scope = normalize_geography(
+                llm_jurisdiction, llm_scope
+            )
             llm_category = (raw.get("category_l1") or "").strip()
             llm_status   = (raw.get("status")      or "").strip()
             if llm_region   not in _VALID_REGIONS:        llm_region   = ""
@@ -762,6 +794,8 @@ def translate_items_batch(items_dicts: list, batch_size: int = 3) -> list:
             item_dict["summary_zh"]       = summary_zh
             item_dict["_llm_is_relevant"] = True
             item_dict["_llm_region"]      = llm_region
+            item_dict["_llm_jurisdiction"] = llm_jurisdiction
+            item_dict["_llm_applicability_scope"] = llm_scope
             item_dict["_llm_category_l1"] = llm_category
             item_dict["_llm_status"]      = llm_status
             item_dict["_llm_risk_revenue"] = _clamp_risk(raw.get("risk_revenue"))
@@ -1128,6 +1162,10 @@ def translate_item_fields(item_dict: dict) -> dict:
             item_dict["summary_zh"]       = result.get("summary_zh", "")
             item_dict["_llm_is_relevant"] = True
             item_dict["_llm_region"]      = result.get("region", "")
+            item_dict["_llm_jurisdiction"] = result.get("jurisdiction", "")
+            item_dict["_llm_applicability_scope"] = result.get(
+                "applicability_scope", "unknown"
+            )
             item_dict["_llm_category_l1"] = result.get("category_l1", "")
             item_dict["_llm_status"]      = result.get("status", "")
             item_dict["_llm_risk_revenue"] = _clamp_risk(result.get("risk_revenue", 0))

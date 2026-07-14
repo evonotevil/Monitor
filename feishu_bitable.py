@@ -36,7 +36,10 @@ from typing import List, Optional
 
 import requests
 
-from utils import _get_region_group
+from utils import (
+    APPLICABILITY_SCOPE_LABELS, _get_region_group,
+    normalize_applicability_scope, normalize_geography, normalize_jurisdiction,
+)
 from feishu_client import get_tenant_access_token
 
 # 将内部分组名映射到多维表格单选选项名（9 大分组，内部名与 Bitable 显示名一致）
@@ -61,6 +64,10 @@ _WIKI_NODE_URL = "https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node"
 _BATCH_URL = (
     "https://open.feishu.cn/open-apis/bitable/v1/apps"
     "/{app_token}/tables/{table_id}/records/batch_create"
+)
+_FIELDS_URL = (
+    "https://open.feishu.cn/open-apis/bitable/v1/apps"
+    "/{app_token}/tables/{table_id}/fields"
 )
 _BATCH_SIZE = 500  # 飞书 Bitable API 单次最多 500 条
 
@@ -143,7 +150,7 @@ def _date_to_ms(date_str: str) -> Optional[int]:
         return None
 
 
-def _build_record(item: dict) -> dict:
+def _build_record(item: dict, available_fields: Optional[set] = None) -> dict:
     """将一条 LegislationItem dict 转为飞书多维表格 record 格式。"""
     title   = (item.get("title_zh") or item.get("title") or "").strip()
     summary = (item.get("summary_zh") or item.get("summary") or "").strip()
@@ -151,6 +158,11 @@ def _build_record(item: dict) -> dict:
     region  = (item.get("region") or "").strip()
     cat     = (item.get("category_l1") or "").strip()
     source  = (item.get("source_name") or "").strip()
+    jurisdiction = normalize_jurisdiction(item.get("jurisdiction", ""))
+    scope = normalize_applicability_scope(
+        item.get("applicability_scope", ""), jurisdiction
+    )
+    jurisdiction, scope = normalize_geography(jurisdiction, scope)
 
     fields: dict = {
         "动态标题":   title,
@@ -161,6 +173,10 @@ def _build_record(item: dict) -> dict:
     if region:
         group = _get_region_group(region)
         fields["国家/地区"] = _BITABLE_REGION_LABEL.get(group, "其他")
+    if jurisdiction and (available_fields is None or "具体国家/地区" in available_fields):
+        fields["具体国家/地区"] = jurisdiction
+    if available_fields is None or "适用范围" in available_fields:
+        fields["适用范围"] = APPLICABILITY_SCOPE_LABELS[scope]
 
     # 合规类别为多选字段，API 需传列表
     if cat:
@@ -196,6 +212,7 @@ def write_to_bitable(
     table_id: str,
     access_token: str,
     return_success_urls: bool = False,
+    available_fields: Optional[set] = None,
 ) -> int | set:
     """
     批量写入条目到飞书多维表格。
@@ -214,7 +231,7 @@ def write_to_bitable(
     successful_urls: set = set()
     for i in range(0, len(items), _BATCH_SIZE):
         batch   = items[i : i + _BATCH_SIZE]
-        records = [_build_record(item) for item in batch]
+        records = [_build_record(item, available_fields=available_fields) for item in batch]
 
         resp = requests.post(
             url,
@@ -240,6 +257,28 @@ def write_to_bitable(
                 successful_urls.add(item_url)
 
     return successful_urls if return_success_urls else written
+
+
+def get_bitable_field_names(
+    app_token: str, table_id: str, access_token: str
+) -> Optional[set]:
+    """读取真实字段结构；失败时返回 None，由调用方使用旧字段安全写入。"""
+    url = _FIELDS_URL.format(app_token=app_token, table_id=table_id)
+    headers = {"Authorization": f"Bearer {access_token}"}
+    try:
+        resp = requests.get(url, headers=headers, params={"page_size": 500}, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("code") != 0:
+            return None
+        return {
+            str(field.get("field_name") or "")
+            for field in data.get("data", {}).get("items", [])
+            if field.get("field_name")
+        }
+    except Exception as exc:
+        print(f"⚠️  无法读取多维表格字段结构，将按旧字段写入: {exc}")
+        return None
 
 
 # ── 对外接口 ──────────────────────────────────────────────────────────
@@ -289,8 +328,17 @@ def sync_items_to_bitable(items: List[dict]) -> None:
             app_token = resolve_wiki_app_token(wiki_token, token)
             print(f"   解析成功，app_token: {app_token[:8]}...")
 
+        available_fields = get_bitable_field_names(app_token, table_id, token)
+        if available_fields is None:
+            # 字段探测失败时不冒险写入新增字段，保证旧表兼容。
+            available_fields = set()
+        else:
+            missing = {"具体国家/地区", "适用范围"} - available_fields
+            if missing:
+                print(f"⚠️  多维表格尚未配置字段 {sorted(missing)}，本次仅写入已有字段")
         written_urls = write_to_bitable(
-            new_items, app_token, table_id, token, return_success_urls=True
+            new_items, app_token, table_id, token, return_success_urls=True,
+            available_fields=available_fields,
         )
         written = len(written_urls)
         print(f"✅ 飞书多维表格写入成功：{written} 条")
@@ -338,7 +386,9 @@ def _map_bitable_record(
     - 原始链接  ：超链接对象 {"text": ..., "link": "https://..."} → 取 link
     - 发布日期  ：毫秒时间戳 → YYYY-MM-DD
     - 归档日期  ：毫秒时间戳 → YYYY-MM-DD（由飞书自动化在拖入归档时写入）
-    - 国家/地区 ：单选字符串，已是分组标签（北美/欧洲/日韩/港澳台/东南亚/中东/南美/大洋洲/其他）
+    - 国家/地区 ：一级区域分组
+    - 具体国家/地区：具体法律管辖区，可为空
+    - 适用范围  ：单一管辖区/超国家管辖区/多国/地区/全球/未确定
     - 💡 核心结论：若存在则优先作为 summary_zh；否则使用「摘要」字段
     - 专项合规文档：超链接字段，仅归档条目展示
     """
@@ -372,6 +422,15 @@ def _map_bitable_record(
 
     # ── 国家/地区：直接传 Bitable 显示标签，_get_region_group() 已可识别所有分组名 ──
     region = str(fields.get("国家/地区") or "其他")
+    jurisdiction = normalize_jurisdiction(str(fields.get("具体国家/地区") or ""))
+    scope_label = str(fields.get("适用范围") or "").strip()
+    scope_by_label = {label: key for key, label in APPLICABILITY_SCOPE_LABELS.items()}
+    applicability_scope = scope_by_label.get(
+        scope_label, normalize_applicability_scope("", jurisdiction)
+    )
+    jurisdiction, applicability_scope = normalize_geography(
+        jurisdiction, applicability_scope
+    )
 
     # ── 工作流状态（供 reporter 三分区）────────────────────────────────
     bitable_status = str(fields.get("处理状态") or "").strip()
@@ -414,6 +473,8 @@ def _map_bitable_record(
         "summary_zh":       summary_zh,
         "summary":          "",
         "region":           region,
+        "jurisdiction":     jurisdiction,
+        "applicability_scope": applicability_scope,
         "status":           "",             # 法规生命周期状态（Bitable 未单独维护，留空）
         "bitable_status":   bitable_status, # 工作流状态：用于三分区
         "assignee":         assignee,       # 跟进 BP

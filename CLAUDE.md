@@ -49,9 +49,9 @@ fetcher.py: exact-title dedup → relevance filter → source-date enrichment �
         ↓
 classifier.py: jurisdiction/category/status/risk fallback
         ↓
-translator.py: LLM relevance + translation + jurisdiction/category/status + 4D risk
+translator.py: LLM relevance + translation + jurisdiction/scope/category/status + 4D risk
         ↓
-monitor.py: post-LLM region normalization + cross-language event dedup
+monitor.py: post-LLM hierarchical geography normalization + cross-language event dedup
         ↓
 models.py (SQLite) → daily_check.py → Feishu Bitable + daily card
                    → reporter.py / feishu_notify.py → weekly HTML/PDF + weekly card
@@ -65,12 +65,12 @@ models.py (SQLite) → daily_check.py → Feishu Bitable + daily card
 
 **Key modules:**
 - `fetcher.py` — RSS/Google News/GDELT fetching, exact-title dedup, multilingual relevance filtering, source-date enrichment, and language-funnel logging. Core filter: `is_legislation_relevant()` (see below).
-- `classifier.py` — regex jurisdiction/category/status classification, mainland-China exclusion, noise helpers, and 4-dimensional fallback risk scoring. Owns `is_china_mainland()`, imported by `fetcher.py`.
+- `classifier.py` — regex jurisdiction/applicability/category/status classification, mainland-China exclusion, noise helpers, and 4-dimensional fallback risk scoring. Owns `is_china_mainland()`, imported by `fetcher.py`.
 - `translator.py` — LLM relevance, translation, jurisdiction/category/status correction, 4-dimensional risk scoring, summaries, and duplicate verification/merge
 - `monitor.py` — CLI orchestration plus source cap, title similarity dedup, 30-day event clustering, and conservative post-LLM event-fingerprint dedup
-- `models.py` — SQLite ORM with automatic schema migrations
+- `models.py` — SQLite ORM with automatic schema migrations and conservative geography backfill
 - `daily_check.py` — daily date/created-at window, Bitable sync, display dedup, normal/empty/failure Feishu cards
-- `utils.py` — display-region mapping, source tier ordering, bigram similarity
+- `utils.py` — Level-1 region, concrete jurisdiction and applicability-scope normalization; source tier ordering; bigram similarity
 
 **Config system** (`config/`):
 - `settings.py` — output paths, DB path, timeouts, concurrency
@@ -91,6 +91,8 @@ models.py (SQLite) → daily_check.py → Feishu Bitable + daily card
 - **Risk scoring**: 4 dimensions (revenue impact, product changes, time urgency, scope) each 0-3, weighted into composite 1.0-10.0 score. Regex fallback when LLM unavailable.
 - **Daily multilingual queries**: 12 locales × 4 lanes (regulation/compliance, enforcement/litigation, platform policy, priority companies/products). Keep query terms and safe filter terms together in `DAILY_LANGUAGE_PROFILES`.
 - **Jurisdiction is not language**: classify the event's actual jurisdiction from country/state/regulator/law evidence. Google News locale is fallback-only. Never drop an article merely because its language and jurisdiction differ.
+- **Hierarchical geography semantics**: `region` remains one of the nine display groups; nullable `jurisdiction` is a country/territory or the EU; `applicability_scope` is `single`, `supranational`, `multi`, `global`, or `unknown`. Global/multi/unknown are never jurisdiction values. Reports group by `region` and display the concrete jurisdiction when available.
+- **Geography migration**: SQLite adds the three geography columns automatically. Historical rows are backfilled only from strong evidence consistent with their existing Level-1 region; title-prefix conflicts remain unresolved. Bitable keeps `国家/地区` and optionally accepts `具体国家/地区` plus `适用范围` after live field discovery.
 - **Date semantics**: daily `max_days=1` includes today and yesterday as calendar dates. Re-run recency filtering after fetching the source page date; recycled Apple/Android RSS dates must not reach the LLM or DB as current news.
 - **Deduplication**: source cap + same-region title similarity + 30-day stage clustering. After LLM correction, event fingerprints may nominate low-similarity cross-language pairs, but only LLM confirmation may merge them. Without LLM confirmation, retain both.
 - **Source priority**: Official government > Legal intelligence > Industry media (for dedup winner selection).

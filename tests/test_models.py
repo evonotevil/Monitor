@@ -62,6 +62,8 @@ class TestLegislationItem:
         assert item.title_zh == ""
         assert item.impact_score == 1.0
         assert item.id is None
+        assert item.jurisdiction == ""
+        assert item.applicability_scope == "unknown"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -103,6 +105,47 @@ class TestDatabaseUpsert:
                  for i in range(5)]
         count = db.bulk_upsert(items)
         assert count == 5
+
+    def test_geography_fields_round_trip(self, db):
+        db.upsert_item(_make_item(
+            jurisdiction="美国", applicability_scope="single",
+            jurisdiction_source="rule",
+        ))
+        row = db.query_items(days=0)[0]
+        assert row["jurisdiction"] == "美国"
+        assert row["applicability_scope"] == "single"
+        assert row["jurisdiction_source"] == "rule"
+
+    def test_global_reclassification_clears_old_jurisdiction(self, db):
+        db.upsert_item(_make_item(
+            jurisdiction="美国", applicability_scope="single",
+            jurisdiction_source="rule",
+        ))
+        db.upsert_item(_make_item(
+            jurisdiction="", applicability_scope="global",
+            jurisdiction_source="llm",
+        ))
+        row = db.query_items(days=0)[0]
+        assert row["jurisdiction"] == ""
+        assert row["applicability_scope"] == "global"
+
+    def test_high_confidence_backfill_rejects_prefix_region_conflict(self, db):
+        db.upsert_item(_make_item(
+            region="欧洲", title="Vague gaming update",
+            title_zh="[美国] 游戏监管动态",
+        ))
+        assert db.backfill_geography() == 0
+        assert db.query_items(days=0)[0]["jurisdiction"] == ""
+
+    def test_high_confidence_backfill_accepts_consistent_regulator(self, db):
+        db.upsert_item(_make_item(
+            region="欧洲", title="CNIL fines game publisher under GDPR",
+            title_zh="法国数据保护执法",
+        ))
+        assert db.backfill_geography() == 1
+        row = db.query_items(days=0)[0]
+        assert row["jurisdiction"] == "法国"
+        assert row["jurisdiction_source"] == "backfill"
 
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -4,7 +4,7 @@ feishu_bitable.py 单元测试
 """
 
 import feishu_bitable
-from feishu_bitable import write_to_bitable
+from feishu_bitable import _build_record, _map_bitable_record, write_to_bitable
 
 
 class _FakeResponse:
@@ -48,3 +48,38 @@ def test_write_to_bitable_returns_only_successful_urls(monkeypatch):
     )
 
     assert written_urls == {"https://example.com/a", "https://example.com/b"}
+
+
+def test_build_record_writes_hierarchical_geography_when_fields_exist():
+    record = _build_record(
+        {
+            "title_zh": "测试",
+            "region": "欧洲",
+            "jurisdiction": "欧盟",
+            "applicability_scope": "supranational",
+        },
+        available_fields={"具体国家/地区", "适用范围"},
+    )
+    assert record["fields"]["国家/地区"] == "欧洲"
+    assert record["fields"]["具体国家/地区"] == "欧盟"
+    assert record["fields"]["适用范围"] == "超国家管辖区"
+
+
+def test_build_record_omits_optional_fields_for_legacy_table():
+    fields = _build_record(
+        {"region": "北美", "jurisdiction": "美国", "applicability_scope": "single"},
+        available_fields=set(),
+    )["fields"]
+    assert fields["国家/地区"] == "北美"
+    assert "具体国家/地区" not in fields
+    assert "适用范围" not in fields
+
+
+def test_map_bitable_record_reads_hierarchical_geography():
+    item = _map_bitable_record({
+        "国家/地区": "港澳台",
+        "具体国家/地区": "台湾地区",
+        "适用范围": "单一管辖区",
+    })
+    assert item["jurisdiction"] == "台湾地区"
+    assert item["applicability_scope"] == "single"

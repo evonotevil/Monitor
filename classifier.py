@@ -20,7 +20,10 @@ from config import (
     SOURCE_TIER_MAP, SOURCE_TIER_PATTERNS,
 )
 from models import LegislationItem
-from utils import _get_region_group
+from utils import (
+    VALID_JURISDICTIONS, _get_region_group, normalize_applicability_scope, normalize_jurisdiction,
+    region_for_jurisdiction,
+)
 
 # ── 噪音来源加载（由 monitor.py noise-sync 命令生成）───────────────────
 # 若文件不存在则静默忽略，不影响正常分类流程。
@@ -111,11 +114,17 @@ COUNTRY_PATTERNS = {
     "南非": [r"south africa|南非"],
 }
 
+# 全量管辖区至少支持标准中文名称；重点市场继续使用上方多语种/机构/法规强规则。
+for _jurisdiction in VALID_JURISDICTIONS:
+    COUNTRY_PATTERNS.setdefault(_jurisdiction, [re.escape(_jurisdiction)])
+
 # 国家 → 区域 映射表
 COUNTRY_TO_REGION = {}
 for region_name, region_info in MONITORED_REGIONS.items():
     for country in region_info["countries"]:
         COUNTRY_TO_REGION[country] = region_name
+for _jurisdiction in VALID_JURISDICTIONS:
+    COUNTRY_TO_REGION.setdefault(_jurisdiction, region_for_jurisdiction(_jurisdiction))
 
 # 中国大陆关键词（用于排除）
 CHINA_MAINLAND_PATTERNS = [
@@ -658,7 +667,18 @@ def classify_article(article: dict) -> LegislationItem:
     """对一篇文章进行区域、分类、状态、影响评分判定"""
     text = f"{article.get('title', '')} {article.get('summary', '')}".strip()
 
-    region = _get_region_group(_detect_region(text, article.get("region", "")))
+    jurisdiction, applicability_scope, jurisdiction_source = _detect_geography(
+        text,
+        fallback=article.get("region", ""),
+        source_name=article.get("source", ""),
+    )
+    region = (
+        region_for_jurisdiction(jurisdiction)
+        if jurisdiction
+        else _get_region_group(article.get("region", "其他"))
+    )
+    if applicability_scope in {"global", "multi", "unknown"} and not jurisdiction:
+        region = "其他"
     l1, l2 = _detect_category(text)
     status = _detect_status(text)
     source_name = article.get("source", "")
@@ -676,33 +696,119 @@ def classify_article(article: dict) -> LegislationItem:
         source_url=article.get("url", ""),
         lang=article.get("lang", "en"),
         impact_score=impact,
+        jurisdiction=jurisdiction,
+        applicability_scope=applicability_scope,
+        jurisdiction_source=jurisdiction_source,
     )
 
 
 def _detect_region(text: str, fallback: str = "") -> str:
-    """检测文章所属区域（返回大区名称如 '欧洲', '北美'）"""
+    """兼容旧调用：检测事件地区，但仍返回历史区域名称。"""
+    jurisdiction, _, _ = _detect_geography(text, fallback=fallback)
+    if jurisdiction:
+        return COUNTRY_TO_REGION.get(
+            next((old for old in COUNTRY_TO_REGION if normalize_jurisdiction(old) == jurisdiction), jurisdiction),
+            region_for_jurisdiction(jurisdiction),
+        )
+    if fallback and fallback in MONITORED_REGIONS:
+        return fallback
+    return "其他"
+
+
+_GLOBAL_SCOPE_PATTERN = re.compile(
+    r"\b(global(?:ly)?|worldwide|all countries|across the world)\b|全球|全世界|全地域",
+    re.IGNORECASE,
+)
+_MULTI_SCOPE_PATTERN = re.compile(
+    r"\b(multiple countries|several countries|cross-border|international comparison)\b"
+    r"|多国|多个国家|跨境比较|各国比较",
+    re.IGNORECASE,
+)
+
+_JURISDICTION_AUTHORITY_PATTERNS = {
+    "美国": r"\bFTC\b|federal trade commission|\bDOJ\b|\bCPPA\b|attorney general",
+    "加拿大": r"privacy commissioner of canada|\bOPC\b",
+    "欧盟": r"european commission|european parliament|court of justice of the european union|\bCJEU\b",
+    "法国": r"\bCNIL\b",
+    "德国": r"\bBfDI\b",
+    "意大利": r"\bAGCM\b|garante per la protezione dei dati personali",
+    "西班牙": r"\bAEPD\b",
+    "英国": r"\bOfcom\b|information commissioner(?:'s office)?|\bICO\b",
+    "巴西": r"\bANPD\b|\bSenacon\b",
+    "印度尼西亚": r"\bKomdigi\b|\bKominfo\b|\bIGAC\b",
+    "日本": r"消費者庁|\bCERO\b",
+    "韩国": r"게임물관리위원회|문화체육관광부|\bGRAC\b",
+    "澳大利亚": r"\bACCC\b|\bOAIC\b|eSafety commissioner",
+}
+
+
+def _detect_geography(
+    text: str,
+    fallback: str = "",
+    source_name: str = "",
+    allow_locale_fallback: bool = True,
+) -> tuple[str, str, str]:
+    """识别主要管辖区、适用范围和证据来源。"""
     text_combined = text.lower()
 
     country_scores = {}
+    authority_countries = set()
     for country, patterns in COUNTRY_PATTERNS.items():
         score = 0
         for p in patterns:
             score += len(re.findall(p, text_combined, re.IGNORECASE))
         if score > 0:
-            country_scores[country] = score
+            normalized_country = normalize_jurisdiction(country)
+            authority_pattern = _JURISDICTION_AUTHORITY_PATTERNS.get(normalized_country)
+            if authority_pattern and re.search(authority_pattern, text, re.IGNORECASE):
+                score += 5
+                authority_countries.add(normalized_country)
+            country_scores[normalized_country] = (
+                country_scores.get(normalized_country, 0) + score
+            )
 
     if country_scores:
         best_country = max(country_scores, key=country_scores.get)
-        region = COUNTRY_TO_REGION.get(best_country)
-        if region:
-            return region
+        jurisdiction = best_country
+        material_countries = set(country_scores)
+        if best_country != "欧盟" and best_country in authority_countries:
+            # 国家监管机关适用 GDPR 等欧盟法律，仍是该成员国的一次执法。
+            material_countries.discard("欧盟")
+        is_multi = len(material_countries) > 1 or bool(_MULTI_SCOPE_PATTERN.search(text))
+        if len(material_countries) > 1 and best_country not in authority_countries:
+            ranked = sorted(
+                (country_scores[country] for country in material_countries),
+                reverse=True,
+            )
+            if len(ranked) > 1 and ranked[0] == ranked[1]:
+                return "", "multi", "rule"
+        scope = "multi" if is_multi else "single"
+        if jurisdiction == "欧盟" and scope == "single":
+            scope = "supranational"
+        return jurisdiction, scope, "rule"
 
-    if re.search(r"\beu\b|欧盟|european|europe", text_combined, re.IGNORECASE):
-        return "欧洲"
+    # 官方来源名只作为标题/摘要无明确证据时的次级提示。
+    if source_name:
+        for country, patterns in COUNTRY_PATTERNS.items():
+            if any(re.search(p, source_name, re.IGNORECASE) for p in patterns):
+                jurisdiction = normalize_jurisdiction(country)
+                scope = "supranational" if jurisdiction == "欧盟" else "single"
+                return jurisdiction, scope, "official_source"
 
-    if fallback and fallback in MONITORED_REGIONS:
-        return fallback
-    return "其他"
+    if _GLOBAL_SCOPE_PATTERN.search(text):
+        return "", "global", "rule"
+    if _MULTI_SCOPE_PATTERN.search(text):
+        return "", "multi", "rule"
+
+    if allow_locale_fallback:
+        jurisdiction = normalize_jurisdiction(fallback)
+        if jurisdiction:
+            return (
+                jurisdiction,
+                normalize_applicability_scope("", jurisdiction),
+                "locale",
+            )
+    return "", "unknown", "unknown"
 
 
 def is_china_mainland(text: str) -> bool:

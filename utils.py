@@ -138,6 +138,101 @@ _GROUP_EMOJI = {
     "南美": "🇧🇷", "大洋洲": "🇦🇺", "其他": "🌐",
 }
 
+# ── 二级管辖区与适用范围 ─────────────────────────────────────────────
+
+APPLICABILITY_SCOPES = {"single", "supranational", "multi", "global", "unknown"}
+APPLICABILITY_SCOPE_LABELS = {
+    "single": "单一管辖区",
+    "supranational": "超国家管辖区",
+    "multi": "多国/地区",
+    "global": "全球",
+    "unknown": "未确定",
+}
+
+# region 分组名和历史泛称不能作为具体管辖区。欧盟是具有独立法律秩序的例外。
+_NON_JURISDICTION_KEYS = {
+    "北美", "欧洲", "东南亚", "亚太", "亚太区", "港澳", "港澳台",
+    "日韩", "南美", "南亚", "非洲", "大洋洲", "中东", "中东/非洲",
+    "独联体", "全球", "其他",
+}
+_JURISDICTION_ALIASES = {
+    "台湾": "台湾地区",
+    "香港": "香港特别行政区",
+    "澳门": "澳门特别行政区",
+    "沙特": "沙特阿拉伯",
+    "马其顿": "北马其顿",
+    "斯威士兰": "埃斯瓦蒂尼",
+}
+
+# 让标准展示名也能直接映射回一级区域，同时保留旧短名称兼容性。
+_REGION_GROUP_MAP.update({
+    "台湾地区": "港澳台",
+    "香港特别行政区": "港澳台",
+    "澳门特别行政区": "港澳台",
+    "北马其顿": "欧洲",
+    "埃斯瓦蒂尼": "其他",
+})
+
+VALID_JURISDICTIONS = {
+    _JURISDICTION_ALIASES.get(name, name)
+    for name in _REGION_GROUP_MAP
+    if name not in _NON_JURISDICTION_KEYS
+}
+
+
+def normalize_jurisdiction(value: str) -> str:
+    """返回标准管辖区名称；区域、全球和未知值返回空字符串。"""
+    value = (value or "").strip()
+    value = _JURISDICTION_ALIASES.get(value, value)
+    return value if value in VALID_JURISDICTIONS else ""
+
+
+def region_for_jurisdiction(jurisdiction: str) -> str:
+    """由具体管辖区唯一派生一级区域。"""
+    normalized = normalize_jurisdiction(jurisdiction)
+    return _REGION_GROUP_MAP.get(normalized, "其他") if normalized else "其他"
+
+
+def normalize_applicability_scope(value: str, jurisdiction: str = "") -> str:
+    """校验适用范围；缺失时仅根据合法管辖区提供保守默认值。"""
+    value = (value or "").strip().lower()
+    if value in APPLICABILITY_SCOPES:
+        return value
+    normalized = normalize_jurisdiction(jurisdiction)
+    if normalized == "欧盟":
+        return "supranational"
+    if normalized:
+        return "single"
+    return "unknown"
+
+
+def normalize_geography(jurisdiction: str, scope: str) -> tuple[str, str]:
+    """联合校验管辖区和适用范围，消除相互矛盾的组合。"""
+    normalized = normalize_jurisdiction(jurisdiction)
+    scope = (scope or "").strip().lower()
+    if scope == "global":
+        return "", "global"
+    if scope == "multi":
+        return normalized, "multi"
+    if not normalized:
+        return "", "unknown"
+    if normalized == "欧盟":
+        return normalized, "supranational"
+    return normalized, "single"
+
+
+def geography_display(item: dict) -> str:
+    """生成报告/卡片使用的“一级区域｜具体范围”标签。"""
+    region = _get_region_group(item.get("region", "其他"))
+    jurisdiction, scope = normalize_geography(
+        item.get("jurisdiction", ""), item.get("applicability_scope", "")
+    )
+    if jurisdiction:
+        return f"{region}｜{jurisdiction}"
+    if scope in {"global", "multi"}:
+        return f"{region}｜{APPLICABILITY_SCOPE_LABELS[scope]}"
+    return region
+
 
 # ── 状态标签历史值 → 当前展示名映射 ─────────────────────────────────────
 # DB 中老记录可能仍保存旧标签值，渲染时统一通过此表转换，无需重跑 retranslate。
