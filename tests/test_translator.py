@@ -3,6 +3,7 @@ translator.py 单元测试（纯本地逻辑，不调用 LLM/Google Translate）
 覆盖：专有名词纠错、bigram 相似度、文本构建、区域前缀规则
 """
 import pytest
+import translator
 
 from translator import (
     _apply_term_corrections,
@@ -182,6 +183,16 @@ class TestRegionPrefixRules:
     def test_us_ftc(self):
         assert self._match_region("FTC announces new game regulation") == "美国"
 
+    @pytest.mark.parametrize("title", [
+        "米国がゲーム会社を調査",
+        "미국이 게임 회사를 조사",
+        "Estados Unidos multa empresa de videojuegos",
+        "Les États-Unis enquêtent sur un jeu",
+        "الولايات المتحدة تحقق مع شركة ألعاب",
+    ])
+    def test_multilingual_us(self, title):
+        assert self._match_region(title) == "美国"
+
     def test_uk_asa(self):
         assert self._match_region("UK ASA bans misleading game ad") == "英国"
 
@@ -203,6 +214,29 @@ class TestRegionPrefixRules:
 
     def test_no_match(self):
         assert self._match_region("random cooking recipe") == ""
+
+
+def test_llm_negative_keeps_all_supported_non_english_languages(monkeypatch):
+    languages = ["ja", "ko", "vi", "th", "id", "pt", "es", "de", "fr", "ar", "zh-TW"]
+    items = [{"title": f"item-{lang}", "lang": lang} for lang in languages]
+
+    monkeypatch.setattr(translator, "_HAS_AI", True)
+    monkeypatch.setattr(translator, "_check_ai_reachable", lambda: True)
+    monkeypatch.setattr(
+        translator,
+        "_ai_process_batch",
+        lambda batch: [{"is_relevant": False} for _ in batch],
+    )
+    monkeypatch.setattr(
+        translator,
+        "translate_item_fields",
+        lambda item: {**item, "used_safe_fallback": True},
+    )
+    monkeypatch.setattr(translator.time, "sleep", lambda _seconds: None)
+
+    results = translator.translate_items_batch(items, batch_size=len(items))
+
+    assert all(result["used_safe_fallback"] is True for result in results)
 
 
 # ═══════════════════════════════════════════════════════════════════════

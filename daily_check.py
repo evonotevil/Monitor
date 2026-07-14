@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 每日合规动态检查 - 检查过去 24 小时内新增的立法监管动态
-有新增条目则通过飞书应用机器人推送；无新增则静默退出。
+工作日有新增则推送日报，无新增也会推送绿色运行状态卡片；周末仅写入多维表格。
 
 必需环境变量:
     FEISHU_APP_ID                飞书自建应用 App ID
@@ -80,6 +80,17 @@ def _smart_truncate(text: str, max_len: int = 100) -> str:
 
 # ── 数据库查询 ────────────────────────────────────────────────────────
 
+def _daily_window(now_cst: datetime) -> tuple[list[str], int]:
+    """返回日报发布日期列表与 created_at 回看小时数。"""
+    is_monday = now_cst.weekday() == 0
+    lookback_days = 2 if is_monday else 1
+    lookback_hours = 74 if is_monday else 26
+    date_list = [
+        (now_cst - timedelta(days=d)).strftime("%Y-%m-%d")
+        for d in range(lookback_days + 1)
+    ]
+    return date_list, lookback_hours
+
 def get_daily_items() -> list:
     """
     查询昨日（北京时间）发布、且在过去 26 小时内新写入 DB 的条目。
@@ -93,17 +104,10 @@ def get_daily_items() -> list:
         return []
 
     now_cst = datetime.now(_TZ_CST)
-    today_str = now_cst.strftime("%Y-%m-%d")
 
     # 周一覆盖周六+周日+周一（74h），其余工作日只覆盖昨天（26h）
     is_monday = now_cst.weekday() == 0
-    lookback_days = 3 if is_monday else 1
-    lookback_hours = 74 if is_monday else 26
-
-    date_list = [
-        (now_cst - timedelta(days=d)).strftime("%Y-%m-%d")
-        for d in range(lookback_days + 1)  # 含今天
-    ]
+    date_list, lookback_hours = _daily_window(now_cst)
 
     cutoff_utc = (datetime.now(timezone.utc) - timedelta(hours=lookback_hours)).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -301,12 +305,47 @@ def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = Fals
     }
 
 
+def _send_fetch_failure_card(chat_id: str, outcome: str) -> bool:
+    """抓取失败时发送明确的红色告警，避免伪装成“无新增”。"""
+    now_cst = datetime.now(_TZ_CST)
+    card = {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "template": "red",
+            "title": {
+                "tag": "plain_text",
+                "content": f"全球游戏合规监控异常 ({now_cst:%Y-%m-%d})",
+            },
+        },
+        "elements": [
+            {
+                "tag": "markdown",
+                "content": (
+                    "**今日抓取任务失败，不能据此判断为‘无新增’。**\n"
+                    f"工作流状态：`{outcome or 'unknown'}`\n"
+                    "本次已跳过多维表格同步和正常日报，请检查 GitHub Actions 日志。"
+                ),
+            },
+        ],
+    }
+    return send_card(chat_id, card)
+
+
 # ── 入口 ─────────────────────────────────────────────────────────────
 
 def main():
     chat_id = os.environ.get("FEISHU_CHAT_ID", "")
     if not chat_id:
         print("❌ 未设置 FEISHU_CHAT_ID 环境变量")
+        sys.exit(1)
+
+    fetch_outcome = os.environ.get("FETCH_STEP_OUTCOME", "success").strip().lower()
+    if fetch_outcome != "success":
+        sent = _send_fetch_failure_card(chat_id, fetch_outcome)
+        print(
+            "❌ 抓取步骤失败，已发送异常卡片"
+            if sent else "❌ 抓取步骤失败，且异常卡片发送失败"
+        )
         sys.exit(1)
 
     now_cst = datetime.now(_TZ_CST)
@@ -352,7 +391,9 @@ def main():
                 {"tag": "markdown", "content": f"✅ {no_update_text}"},
             ],
         }
-        send_card(chat_id, empty_card)
+        if not send_card(chat_id, empty_card):
+            print("❌ 无新增状态卡片发送失败")
+            sys.exit(1)
         return
 
     print(f"📡 发现 {len(push_items)} 条新增动态，发送飞书通知...")

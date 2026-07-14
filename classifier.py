@@ -43,11 +43,17 @@ _reload_noise_sources()
 
 COUNTRY_PATTERNS = {
     # 欧洲
-    "欧盟": [r"european union|\bEU\b|GDPR|DSA\b|DMA\b|digital services act|digital markets act|european commission|european parliament|brussels|AI act|欧盟"],
-    "英国": [r"united kingdom|\bUK\b|british|ofcom|online safety act|UK GDPR|英国|britain"],
+    "欧盟": [
+        r"european union|\bEU\b|GDPR|DSA\b|DMA\b|digital services act|digital markets act|european commission|european parliament|brussels|AI act|欧盟|欧州連合|유럽연합",
+        r"liên minh châu âu|uni eropa|união europeia|unión europea|europäische union|union européenne|สหภาพยุโรป|الاتحاد الأوروبي",
+    ],
+    "英国": [r"united kingdom|\bUK\b|british|ofcom|online safety act|UK GDPR|英国|イギリス|영국|britain|reino unido|royaume-uni|vereinigtes königreich"],
     "德国": [r"germany|german|德国|deutschland|BfDI"],
     "法国": [r"france|french|法国|CNIL"],
-    "荷兰": [r"netherlands|dutch|荷兰|kansspelautoriteit"],
+    "荷兰": [
+        r"netherlands|dutch|荷兰|荷蘭|kansspelautoriteit|オランダ|네덜란드",
+        r"belanda|niederlande|pays-bas|países bajos|paesi bassi",
+    ],
     "奥地利": [r"austria|austrian|奥地利"],
     "比利时": [r"belgium|belgian|比利时"],
     "意大利": [r"italy|italian|意大利|AGCM"],
@@ -55,18 +61,26 @@ COUNTRY_PATTERNS = {
     "波兰": [r"poland|polish|波兰"],
     "瑞典": [r"sweden|swedish|瑞典"],
     "挪威": [r"norway|norwegian|挪威"],
+    "俄罗斯": [r"russia|russian|俄罗斯|俄羅斯|Roskomnadzor|RKN"],
     # 北美
-    "美国": [r"united states|\bUS\b|\bUSA\b|american|FTC\b|federal trade commission|CCPA|CPRA|COPPA|congress\b|senate\b|california|KIDS act|section 230|tennessee|florida|alabama|missouri|new york|south carolina|mississippi|connecticut|nevada|pennsylvania|harrisburg|attorney general"],
-    "加拿大": [r"canada|canadian|加拿大|PIPEDA|OPC\b|privacy commissioner"],
+    "美国": [
+        r"united states|\bUS\b|\bUSA\b|american|FTC\b|federal trade commission|CCPA|CPRA|COPPA|congress\b|senate\b|california|KIDS act|section 230|tennessee|florida|alabama|missouri|new york|south carolina|south dakota|north dakota|mississippi|connecticut|nevada|pennsylvania|harrisburg|attorney general",
+        r"南达科他州|南達科他州|北达科他州|北達科他州",
+        r"米国|アメリカ|미국|hoa kỳ|nước mỹ|amerika serikat|estados unidos|\bEUA\b|\bEE\.?\s*UU\.?\b|vereinigte staaten|états-unis|สหรัฐอเมริกา|الولايات المتحدة|أمريكا",
+    ],
+    "加拿大": [r"canada|canadian|加拿大|PIPEDA|OPC\b|privacy commissioner of canada"],
     # 南美
-    "巴西": [r"brazil|brazilian|巴西|LGPD"],
+    "巴西": [r"brazil|brazilian|brasil|brasileir|巴西|LGPD|ANPD|Senacon"],
     "墨西哥": [r"mexico|mexican|méxico|墨西哥|PROFECO|INAI"],
     "阿根廷": [r"argentina|阿根廷|AAIP|datos personales.*argentina"],
     "智利": [r"chile|chilean|智利|SERNAC|datos personales.*chile"],
     "哥伦比亚": [r"colombia|colombian|哥伦比亚|SIC\b|datos personales.*colombia"],
     # 东南亚
     "越南": [r"vietnam|vietnamese|越南|việt nam|MIC.*vietnam|nghị định|thông tư"],
-    "印度尼西亚": [r"indonesia|indonesian|印尼|印度尼西亚|IGAC|Kominfo|Kemenkominfo"],
+    "印度尼西亚": [
+        r"indonesia|indonesian|印尼|印度尼西亚|IGAC|Kominfo|Kemenkominfo|Komdigi",
+        r"PP\s*TUNAS|PP\s*(?:Nomor\s*)?17\s*(?:Tahun\s*)?2025",
+    ],
     "泰国": [r"thailand|thai\b|泰国|PDPA.*thailand|thai.*PDPA"],
     "菲律宾": [r"philippines|filipino|菲律宾|NTC.*philippine"],
     "马来西亚": [r"malaysia|malaysian|马来西亚|MCMC"],
@@ -79,9 +93,9 @@ COUNTRY_PATTERNS = {
     "澳门": [r"macau|macao|澳门"],
     "台湾": [r"taiwan|台湾|台灣|個資法|個人資料保護法|數位發展部|遊戲軟體分級"],
     # 日本
-    "日本": [r"japan|japanese|日本|CERO|ガチャ|景品表示法|資金決済法|特商法|消費者庁|スマートフォン"],
+    "日本": [r"japan|japanese|日本|CERO|景品表示法|資金決済法|特商法|消費者庁"],
     # 韩国
-    "韩国": [r"korea|korean|韩国|한국|GRAC|게임|게임산업진흥|확률형|문화체육관광부"],
+    "韩国": [r"korea|korean|韩国|한국|GRAC|게임산업진흥|문화체육관광부|게임물관리위원회"],
     # 大洋洲
     "澳大利亚": [r"australia|australian|澳大利亚|澳洲|ACCC|eSafety|OAIC"],
     "新西兰": [r"new zealand|新西兰"],
@@ -108,6 +122,22 @@ CHINA_MAINLAND_PATTERNS = [
     r"(?<!\bhong\s)(?<!\bmacau\s)(?<!\btaiwan\s)china(?!.*hong kong)(?!.*macau)(?!.*taiwan)",
     r"中国(?!.*香港)(?!.*澳门)(?!.*台湾)",
     r"中华人民共和国|版号|网信办|新闻出版署|PIPL|防沉迷|游戏出海",
+]
+
+# 公司国籍不等于事件法域。海外监管机构针对中国游戏公司的执法应保留。
+OVERSEAS_REGULATORY_CONTEXT = [
+    r"\bFTC\b|\bDOJ\b|\bCPPA\b|\bCOPPA\b|\bCCPA\b",
+    r"\bEU\b|European Commission|\bGDPR\b|\bDSA\b|\bDMA\b",
+    r"Japan|Korea|Vietnam|Indonesia|Taiwan|Hong Kong|Singapore|Thailand|Philippines|Malaysia",
+    r"Brazil|Mexico|Argentina|Chile|Colombia|Australia|New Zealand|India",
+    r"Saudi|UAE|United Arab Emirates|Qatar|Kuwait|Bahrain|Israel|Turkey",
+    r"美国|加拿大|欧盟|英国|日本|韩国|越南|印尼|台湾|香港|新加坡|泰国|菲律宾|马来西亚",
+    r"巴西|墨西哥|阿根廷|智利|哥伦比亚|澳大利亚|新西兰|印度|沙特|阿联酋|卡塔尔|科威特|巴林|以色列|土耳其",
+]
+OVERSEAS_ENFORCEMENT_ACTIONS = [
+    r"investigat\w*|enforc\w*|fine[ds]?|penalt\w*|sanction\w*",
+    r"lawsuit|sue[ds]?|settlement|injunction|ban(?:ned)?|removed|delisted",
+    r"调查|执法|处罚|罚款|诉讼|和解|禁令|下架|裁罰|處分",
 ]
 
 
@@ -677,6 +707,16 @@ def _detect_region(text: str, fallback: str = "") -> str:
 
 def is_china_mainland(text: str) -> bool:
     """检测是否为中国大陆相关内容"""
+    has_overseas_context = any(
+        re.search(pattern, text, re.IGNORECASE)
+        for pattern in OVERSEAS_REGULATORY_CONTEXT
+    )
+    has_overseas_action = any(
+        re.search(pattern, text, re.IGNORECASE)
+        for pattern in OVERSEAS_ENFORCEMENT_ACTIONS
+    )
+    if has_overseas_context and has_overseas_action:
+        return False
     for p in CHINA_MAINLAND_PATTERNS:
         if re.search(p, text, re.IGNORECASE):
             return True

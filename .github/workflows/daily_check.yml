@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write   # 允许 CI 提交更新后的 DB 回仓库
 
+concurrency:
+  group: monitor-daily-main
+  cancel-in-progress: false
+
 jobs:
   daily-check:
     runs-on: ubuntu-latest
@@ -38,8 +42,9 @@ jobs:
         run: pip install -r requirements.txt
 
       # ── 3. 抓取最新数据（写入 DB，已有条目 IGNORE）─────────────────
-      # continue-on-error: 抓取/翻译失败不阻断后续日报推送（DB 中已有数据仍可检查）
+      # continue-on-error 仅用于让下一步发送红色故障卡；日报步骤会重新将 job 标记失败。
       - name: Fetch latest data
+        id: fetch
         continue-on-error: true
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
@@ -47,7 +52,9 @@ jobs:
 
       # ── 4. 检查昨日新增，有则推送飞书 + 写入多维表格 ──────────────
       - name: Check and notify daily updates
+        if: steps.fetch.outcome == 'success' || steps.fetch.outcome == 'failure'
         env:
+          FETCH_STEP_OUTCOME: ${{ steps.fetch.outcome }}
           FEISHU_CHAT_ID: ${{ secrets.FEISHU_CHAT_ID }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
@@ -64,6 +71,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -f data/monitor.db
           git add -f data/bitable_synced_urls.json 2>/dev/null || true
+          git add -f data/daily_pushed_urls.json 2>/dev/null || true
           git diff --staged --quiet || \
             git commit -m "🔄 每日数据更新 $(date -u +%Y-%m-%d) [skip ci]"
           git stash --include-untracked || true

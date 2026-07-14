@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from urllib.parse import quote_plus
 import concurrent.futures
+from collections import Counter
 
 from utils import MEDIA_SUFFIX_RE
 
@@ -25,6 +26,7 @@ from config import (
     DIGITAL_INDUSTRY_SIGNALS,
     OFFICIAL_SITE_QUERIES,
     INDUSTRY_QUERY_NOISE_SUFFIX,
+    DAILY_LANGUAGE_PROFILES,
     GOOGLE_NEWS_SEARCH_TEMPLATE,
     GOOGLE_NEWS_REGIONS,
     FETCH_TIMEOUT,
@@ -37,7 +39,11 @@ from config import (
     DAILY_GOOGLE_NEWS_PT,
     DAILY_GOOGLE_NEWS_TH,
     DAILY_GOOGLE_NEWS_ID,
+    DAILY_GOOGLE_NEWS_ZH_TW,
     DAILY_GOOGLE_NEWS_AR,
+    DAILY_GOOGLE_NEWS_DE,
+    DAILY_GOOGLE_NEWS_FR,
+    DAILY_GOOGLE_NEWS_ES,
 )
 from models import LegislationItem
 from classifier import classify_article, is_china_mainland
@@ -107,20 +113,11 @@ def clean_html(html_text: str) -> str:
     return text[:500]
 
 
-# 标题乱码清洗 — 在 RSS/Google News 解析后、翻译前调用
-# 处理以下问题:
-#   1. Unicode 替换字符（U+FFFD）和控制字符
-#   2. 高密度非 ASCII 连续段（mojibake 特征）
-#   3. 媒体机构名称后缀（utils.MEDIA_SUFFIX_RE，reporter._clean_title 在渲染时也用）
-# 连续≥4个非 ASCII 非中日韩字符 → 疑似乱码段
-_GARBLED_SEGMENT = re.compile(r"[^\x00-\x7F\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7a3]{4,}")
-
-
 def _sanitize_title(title: str) -> str:
     """
     清洗 RSS/Google News 原始标题：
     - 剔除 Unicode 替换字符和控制字符
-    - 剔除疑似 mojibake 乱码段（连续 ≥4 个非 ASCII/非中日韩字符）
+    - 保留合法 Unicode 文字（泰文、阿拉伯文、重音拉丁文等均为有效标题）
     - 剔除媒体机构名称后缀（ - GamesIndustry.biz 等）
     - 折叠多余空白
     """
@@ -129,14 +126,9 @@ def _sanitize_title(title: str) -> str:
     # 1. 替换字符 & 控制字符
     t = title.replace("\ufffd", "").replace("\ufffe", "").replace("\ufffc", "")
     t = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", t)
-    # 2. 乱码段检测：若单个连续非 ASCII 段 ≥8 字符，整个标题可能 mojibake → 返回截断安全版
-    garbled = _GARBLED_SEGMENT.findall(t)
-    if garbled and max(len(g) for g in garbled) >= 8:
-        # 保留 ASCII 和中日韩部分，其余删除
-        t = re.sub(r"[^\x20-\x7E\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7a3\s]", "", t)
-    # 3. 媒体机构后缀
+    # 2. 媒体机构后缀
     t = MEDIA_SUFFIX_RE.sub("", t)
-    # 4. 整理空白
+    # 3. 整理空白
     t = re.sub(r"\s+", " ", t).strip()
     return t
 
@@ -178,8 +170,11 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
             link = item.findtext("link", "")
             pub_date = item.findtext("pubDate", "")
             description = item.findtext("description", "")
+            clean_title = _sanitize_title(clean_html(title))
+            if not clean_title:
+                continue
             items.append({
-                "title": _sanitize_title(clean_html(title)),
+                "title": clean_title,
                 "url": link,
                 "date": parse_rss_date(pub_date),
                 "summary": clean_html(description),
@@ -208,6 +203,36 @@ def fetch_rss_feed(feed_config: dict) -> List[dict]:
 
     except ET.ParseError as e:
         logger.warning(f"RSS 解析失败 {url}: {e}")
+        # 一些政府 RSS 含未转义字符或截断标签。使用现有 BeautifulSoup
+        # 做宽松回退，避免单个格式瑕疵让整个官方信源归零。
+        soup = BeautifulSoup(resp.content, "html.parser")
+        for node in soup.find_all(["item", "entry"]):
+            title_el = node.find("title")
+            link_el = node.find("link")
+            date_el = (
+                node.find("pubdate") or node.find("updated")
+                or node.find("published") or node.find("date")
+            )
+            summary_el = (
+                node.find("description") or node.find("summary")
+                or node.find("content")
+            )
+            title = title_el.get_text(" ", strip=True) if title_el else ""
+            if not title:
+                continue
+            link = ""
+            if link_el:
+                link = link_el.get("href", "") or link_el.get_text(strip=True)
+            items.append({
+                "title": _sanitize_title(clean_html(title)),
+                "url": link,
+                "date": parse_rss_date(date_el.get_text(" ", strip=True) if date_el else ""),
+                "summary": clean_html(summary_el.get_text(" ", strip=True) if summary_el else ""),
+                "source": feed_config["name"],
+                "region": feed_config.get("region", ""),
+                "lang": feed_config.get("lang", "en"),
+                "tier": feed_config.get("tier", ""),
+            })
 
     # 部分 RSS 源不含 <link>，根据标题生成 URL（feeds.py 中声明 url_from_title）
     if feed_config.get("url_from_title"):
@@ -259,7 +284,8 @@ def fetch_google_news(query: str, region_key: str = "en_US", max_results: int = 
                 "date": parse_rss_date(pub_date),
                 "summary": clean_html(description),
                 "source": source_name,
-                "region": "",  # 由 classifier 检测
+                # 本地语言入口提供地区提示；标题含明确国家时 classifier 仍会覆盖。
+                "region": region.get("region", ""),
                 "lang": region["hl"].split("-")[0],
             })
             if max_results and len(items) >= max_results:
@@ -273,8 +299,24 @@ def fetch_google_news(query: str, region_key: str = "en_US", max_results: int = 
 
 # ─── 严格相关性过滤 ──────────────────────────────────────────────────
 
+def _profile_filter_patterns(field: str) -> List[str]:
+    """从日报语言画像生成基础过滤正则，确保查询与过滤同步。"""
+    patterns = []
+    seen = set()
+    for profile in DAILY_LANGUAGE_PROFILES.values():
+        for term in profile[field]:
+            normalized = term.strip().lower()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            escaped = re.escape(term)
+            patterns.append(
+                rf"(?<!\w){escaped}(?!\w)" if term.isascii() else escaped
+            )
+    return patterns
+
 # 必须包含至少一个「法规/监管行动」信号词
-REGULATORY_SIGNALS = [
+REGULATORY_SIGNALS = _profile_filter_patterns("regulatory_terms") + [
     # 英文
     r"\bregulat\w*\b", r"\blegislat\w*\b", r"\b(?:new |proposed )?law\b", r"\bbill\b",
     r"\bact\b", r"\bordinance\b", r"\bstatute\b", r"\bdirective\b",
@@ -294,6 +336,7 @@ REGULATORY_SIGNALS = [
     r"\bIGAC\b", r"\bGRAC\b", r"\bESRB\b", r"\bPEGI\b", r"\bCERO\b", r"\bCESA\b",
     r"\bOnline Safety Act\b", r"\bKIDS Act\b",
     r"消費者庁", r"게임물관리위원회",
+    r"\bPP\s*TUNAS\b", r"PP\s*(?:Nomor\s*)?17\s*(?:Tahun\s*)?2025",
     # 民事诉讼 / 集体诉讼
     r"\blawsuit\w*\b", r"\bsue[ds]?\b", r"\bsuing\b",
     r"\bclass.?action\b", r"\bproduct.?liability\b",
@@ -305,23 +348,54 @@ REGULATORY_SIGNALS = [
     r"景品表示法", r"資金決済法", r"特商法",
     r"訴訟", r"提訴", r"集団訴訟",
     r"通知", r"告示", r"指導", r"答申",
+    r"行政処分", r"課徴金", r"罰金", r"調査", r"和解", r"禁止", r"配信停止",
     # 韩文
     r"규제", r"법안", r"법률", r"의무", r"제재", r"개정",
     r"게임산업진흥법",
     r"소송", r"집단소송",
     r"지침", r"공고", r"고시",
+    r"조사", r"행정처분", r"과징금", r"벌금", r"처벌", r"합의", r"금지", r"정책", r"퇴출",
     # 越南语
-    r"quy định", r"nghị định", r"thông tư", r"luật",   # 规定/法令/通知/法律
+    r"quy định", r"nghị định", r"thông tư", r"luật",
+    r"tuân thủ", r"điều tra", r"xử phạt", r"phạt tiền", r"cưỡng chế",
+    r"khởi kiện", r"dàn xếp", r"cấm", r"chính sách", r"gỡ bỏ", r"đình chỉ",
     # 泰语
-    r"กฎหมาย", r"ระเบียบ", r"ประกาศ",                   # 法律/法规/公告
+    r"กฎหมาย", r"ระเบียบ", r"ประกาศ", r"การกำกับดูแล", r"การปฏิบัติตาม",
+    r"สอบสวน", r"บังคับใช้", r"ปรับ", r"ลงโทษ", r"ฟ้องร้อง", r"คดีแบบกลุ่ม",
+    r"ยอมความ", r"ห้าม", r"นโยบาย", r"ถอดออก", r"ระงับ",
     # 印尼语
-    r"\bperaturan\b", r"\bundang-undang\b", r"\bregulasi\b",  # 法规/法律/监管
+    r"\bperaturan\b", r"\bundang-undang\b", r"\bregulasi\b",
+    r"\bsanksi\b", r"\bdenda\b", r"\bkewajiban\b", r"\bkeputusan\b",
+    r"\bkepatuhan\b", r"\bpenyelidikan\b", r"\bpenegakan\b", r"\bgugatan\b",
+    r"\bpenyelesaian\b", r"\blarangan\b", r"\bkebijakan\b", r"\bdihapus\b", r"\bditangguhkan\b",
+    # 葡萄牙语（巴西）
+    r"\bregula(?:ção|cao)\b", r"\bregulamenta(?:ção|cao)\b", r"\blei\b", r"\bmultas?\b",
+    r"\bsanções?\b", r"\bfiscaliza(?:ção|cao)\b", r"\bresolução\b", r"\bconformidade\b",
+    r"\binvestiga(?:ção|cao)\b", r"\bação coletiva\b", r"\bacordo (?:judicial|regulatório)\b",
+    r"\bproibição\b", r"\bpolítica\b", r"\bremovido\b", r"\bsuspenso\b",
+    # 繁体中文（港澳台）
+    r"法規", r"修法", r"裁罰", r"處分", r"規範", r"行政命令", r"合規",
+    r"調查", r"執法", r"罰款", r"訴訟", r"集體訴訟", r"和解", r"禁止",
+    r"下架", r"停權", r"違規", r"政策",
     # 阿拉伯语
-    r"تنظيم", r"قانون", r"لوائح",                        # 监管/法律/法规
+    r"تنظيم", r"قانون", r"لوائح", r"امتثال", r"تحقيق", r"إنفاذ", r"غرامة",
+    r"عقوبة", r"دعوى", r"تسوية", r"حظر", r"سياسة", r"إزالة", r"تعليق",
+    # 德语
+    r"\bregulierung\b", r"\bgesetz\b", r"\bcompliance\b", r"\bermittlung\b",
+    r"\bdurchsetzung\b", r"\bgeldbuße\b", r"\bstrafe\b", r"\bklage\b",
+    r"\bsammelklage\b", r"\bvergleich\b", r"\bverbot\b", r"\brichtlinie\b",
+    # 法语
+    r"\bréglementation\b", r"\bloi\b", r"\bconformité\b", r"\benquête\b",
+    r"\bamende\b", r"\bsanction\b", r"\bprocès\b", r"\brecours collectif\b",
+    r"\binterdiction\b", r"\bpolitique\b", r"\bretiré\b", r"\bsuspendu\b",
+    # 西班牙语
+    r"\bregulación\b", r"\bley\b", r"\bcumplimiento\b", r"\binvestigación\b",
+    r"\bejecución\b", r"\bmulta\b", r"\bsanción\b", r"\bdemanda\b",
+    r"\bacción colectiva\b", r"\bprohibición\b", r"\bpolítica\b", r"\bretirado\b", r"\bsuspendido\b",
 ]
 
 # 必须包含至少一个「游戏/互动娱乐」信号词
-GAME_SIGNALS = [
+GAME_SIGNALS = _profile_filter_patterns("filter_game_terms") + [
     r"\bvideo\s*game\w*\b", r"\bmobile\s*game\w*\b", r"\bonline\s*game\w*\b",
     r"\bgaming\b",
     r"\bloot\s*box\w*\b", r"\bgacha\b", r"\bmicrotransaction\w*\b",
@@ -373,11 +447,25 @@ GAME_SIGNALS = [
     # 越南语
     r"trò chơi",                        # 游戏
     # 印尼语
-    r"\bpermainan\b",                   # 游戏
+    r"\bpermainan\b", r"\bgim\b",
+    r"\bgame\b.*\b(?:regulasi|peraturan|sanksi|denda|gugatan|larangan)\b",
+    r"\b(?:regulasi|peraturan|sanksi|denda|gugatan|larangan)\b.*\bgame\b",
+    r"\bPP\s*TUNAS\b", r"PP\s*(?:Nomor\s*)?17\s*(?:Tahun\s*)?2025",
+    r"pelindungan anak.*sistem elektronik|sistem elektronik.*pelindungan anak",
+    # 葡萄牙语（巴西）
+    r"\bjogos?\b", r"\bvideogames?\b", r"\bitem\s+virtual\b",
     # 泰语
     r"เกม",                              # 游戏
+    # 繁体中文
+    r"線上遊戲", r"手機遊戲", r"電子遊戲", r"虛擬寶物",
+    r"遊戲.*(?:平台|發行|玩家|帳號|虛擬|分級|課金|數位)",
+    r"(?:平台|發行商|玩家|帳號|虛擬物品|分級).*遊戲",
     # 阿拉伯语
     r"ألعاب|لعبة",                       # 游戏/一个游戏
+    # 德语 / 法语 / 西班牙语
+    r"\bspiele?\b", r"\bvideospiele?\b", r"\bonline-spiel\b",
+    r"\bjeux?\b", r"\bjeu vidéo\b", r"\bjeux en ligne\b",
+    r"\bjuegos?\b", r"\bvideojuegos?\b", r"\bjuegos en línea\b",
 
     # ── 游戏公司名信号（公司名 + REGULATORY_SIGNAL = 通过过滤）──
     # Lilith 自家
@@ -394,7 +482,10 @@ GAME_SIGNALS = [
     r"\bIGG\b", r"\bLords?\s*Mobile\b",
     r"\bMoonton\b", r"\bMobile\s*Legends?\b",
     r"\bGame\s*Science\b", r"\bBlack\s*Myth\b",
-    r"\bPapergames\b", r"\bInfinity\s*Nikki\b",
+    r"\bPapergames\b", r"\bInfold\s*Games?\b",
+    r"\bInfinity\s*Nikki\b", r"\bLove\s*and\s*Deepspace\b",
+    r"\bKuro\s*Games?\b", r"\bWuthering\s*Waves\b", r"\bPunishing:\s*Gray\s*Raven\b",
+    r"\bHypergryph\b", r"\bGRYPHLINE\b", r"\bArknights\b",
     # 韩国发行商
     r"\bNexon\b", r"\bMapleStory\b",
     r"\bKrafton\b", r"\bPUBG\b",
@@ -416,6 +507,7 @@ GAME_SIGNALS = [
     r"\bCOLOPL\b",
     # 欧美大厂
     r"\bSupercell\b", r"\bEpic\s*Games\b", r"\bActivision\b", r"\bBlizzard\b",
+    r"\bRiot\s*Games?\b", r"\bLeague\s*of\s*Legends\b", r"\bVALORANT\b",
     r"\bElectronic\s*Arts?\b", r"\bEA\s*Games?\b",
     r"\bNintendo\b", r"\bSony\b.*\b(?:PlayStation|game)\b",
     r"\bMicrosoft\s*Gaming\b", r"\bXbox\s*Game\b",
@@ -486,6 +578,16 @@ EXCLUSION_PATTERNS = [
     r"\bfishing\b.*\b(?:season|rule)\b",  # 钓鱼 (fishing game 误匹配)
     r"\bNBA\b.*\bfine\b", r"\bNFL\b.*\bfine\b",  # 体育罚款
     r"\bprediction\s*market\b",  # 预测市场
+    r"\bforex\b", r"คาสิโน", r"พนัน", r"บาคาร่า", r"สล็อต", r"หวย", r"joker\d*", r"\bufa\b",
+    r"\bdtac\b", r"โปร โทร ฟรี", r"รับคะแนนฟรี",
+    r"เกม\s*ยิง\s*ปลา|ยิงปลา|ได้\s*เงิน\s*จริง|ชนะรางวัลใหญ่",
+    r"\bcuracao\b|\bcuraçao\b", r"\balberta\b.*\bonline gaming\b",
+    r"\bwild game birds?\b|\bgame bird eggs?\b",
+    r"\bWNBA\b|\bfootball\b|\bsoccer\b|\bWest Ham\b",
+    r"\bgaming laptop review\b",
+    r"เดินเกม|เปิดเกมคดี|เปลี่ยนเกม",  # 泰语中的政治/商业“博弈”隐喻
+    r"\bjogo político\b", r"\bjuego político\b",
+    r"操作して.*調査.*(?:ホラー)?ゲーム",  # 游戏剧情中的“调查”，不是监管调查
     r"\bIAG\b", r"\bInside Asian Gaming\b",  # 博彩行业会议
     r"\btribal\s*gam", r"\btribal\s*bet",  # 部落博彩
     r"\bskill\s*game.*(?:ban|legal|tax)\b",  # "技巧游戏"(实为赌博机)
@@ -508,6 +610,9 @@ EXCLUSION_PATTERNS = [
     r"\bkeynote\b.*\b(?:game|gaming|apple|google|wwdc)\b",
     r"\binvestor\s*day\b",                   # 投资者日（无监管内容）
     r"\bearnings\s*call\b", r"\bQ[1-4]\s*result\b",  # 财报电话会
+    # PP TUNAS 纯宣讲/培训活动；平台义务、执法、处罚和实施进展仍保留
+    r"\b(?:sosialisasi|pelatihan|seminar|festival|literasi|edukasi)\b.*\bPP\s*TUNAS\b",
+    r"\bPP\s*TUNAS\b.*\b(?:sosialisasi|pelatihan|seminar|festival|literasi|edukasi)\b",
     # "game industry X summit/expo" 组合（允许1个中间词，如"industry"）
     r"\b(?:game|gaming)\s+industry\s+(?:summit|expo)\b",
 ]
@@ -623,8 +728,8 @@ def is_legislation_relevant(article: dict) -> bool:
 
 def is_recent(article: dict, max_days: int = MAX_ARTICLE_AGE_DAYS) -> bool:
     try:
-        article_date = datetime.strptime(article["date"], "%Y-%m-%d")
-        cutoff = datetime.now() - timedelta(days=max_days)
+        article_date = datetime.strptime(article["date"], "%Y-%m-%d").date()
+        cutoff = datetime.now().date() - timedelta(days=max_days)
         return article_date >= cutoff
     except (ValueError, KeyError):
         return True
@@ -895,8 +1000,12 @@ def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool
                 [(kw + when, "vi_VN") for kw in DAILY_GOOGLE_NEWS_VI]
                 + [(kw + when, "pt_BR") for kw in DAILY_GOOGLE_NEWS_PT]
                 + [(kw + when, "th_TH") for kw in DAILY_GOOGLE_NEWS_TH]
-                + [(kw + when, "en_ID") for kw in DAILY_GOOGLE_NEWS_ID]
+                + [(kw + when, "id_ID") for kw in DAILY_GOOGLE_NEWS_ID]
+                + [(kw + when, "zh_TW") for kw in DAILY_GOOGLE_NEWS_ZH_TW]
                 + [(kw + when, "ar_SA") for kw in DAILY_GOOGLE_NEWS_AR]
+                + [(kw + when, "de_DE") for kw in DAILY_GOOGLE_NEWS_DE]
+                + [(kw + when, "fr_FR") for kw in DAILY_GOOGLE_NEWS_FR]
+                + [(kw + when, "es_MX") for kw in DAILY_GOOGLE_NEWS_ES]
             ),
         ]
     else:
@@ -920,7 +1029,7 @@ def fetch_google_news_all(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool
             # 6. 越南语 + 印尼语
             (
                 [(kw + when, "vi_VN") for kw in KEYWORDS.get("vi", [])]
-                + [(kw + when, "en_ID") for kw in KEYWORDS.get("id", [])]
+                + [(kw + when, "id_ID") for kw in KEYWORDS.get("id", [])]
             ),
             # 7. 繁中 + 泰语
             (
@@ -973,107 +1082,25 @@ _GDELT_LANG_MAP = {
     "Portuguese": "pt", "Spanish": "es",
 }
 
-# 查询列表：(query, 日志标签)
-# theme:LEGISLATION / theme:REGULATION 是 GDELT 预打的立法/监管主题标签，精准度最高
-# sourcecountry: 定向官方来源，补充 Google News 搜不到的本地政府公告
+# GDELT 仅作为每日兜底。查询保持少而宽，避免按国家逐条请求触发免费接口限速。
 _GDELT_QUERIES = [
     (
-        'theme:LEGISLATION (game OR gaming OR "loot box" OR gacha'
-        ' OR "in-app purchase" OR "age verification")',
-        "全球-立法主题",
+        '(theme:LEGISLATION OR theme:REGULATION)'
+        ' (game OR gaming OR "video game" OR "online game" OR "loot box" OR gacha)'
+        ' (law OR regulation OR privacy OR children OR consumer OR license)',
+        "全球-立法监管",
     ),
     (
-        'theme:REGULATION (game OR gaming)'
-        ' (minor OR children OR privacy OR "data protection" OR "age verification")',
-        "全球-监管主题",
+        '(game OR gaming OR "video game")'
+        ' (enforcement OR investigation OR fine OR penalty OR lawsuit'
+        ' OR "class action" OR settlement OR injunction OR ban)',
+        "全球-执法诉讼",
     ),
     (
-        "(game OR gaming) (regulation OR law OR decree OR circular) sourcecountry:VN",
-        "越南",
-    ),
-    (
-        "(game OR gaming) (regulation OR law OR privacy OR consumer) sourcecountry:CA",
-        "加拿大",
-    ),
-    (
-        "(game OR gaming) (regulation OR law OR privacy OR consumer) sourcecountry:IN",
-        "印度",
-    ),
-    (
-        "(game OR gaming OR 遊戲) (regulation OR law OR privacy OR 個資 OR 私隱) sourcecountry:HK",
-        "香港",
-    ),
-    (
-        "(game OR gaming OR 遊戲) (regulation OR law OR privacy OR 個資 OR 分級) sourcecountry:TW",
-        "台湾",
-    ),
-    (
-        "(game OR gaming) (regulation OR law OR regulasi OR peraturan) sourcecountry:ID",
-        "印尼",
-    ),
-    (
-        "(game OR gaming) (regulation OR law) sourcecountry:TH",
-        "泰国",
-    ),
-    (
-        "(game OR gaming OR ألعاب) (regulation OR law OR تنظيم OR قانون) sourcecountry:SA",
-        "沙特",
-    ),
-    (
-        "(game OR gaming OR ألعاب) (regulation OR law OR تنظيم OR قانون) sourcecountry:AE",
-        "阿联酋",
-    ),
-    # ── 日韩补充 ──
-    (
-        "(game OR gaming OR ゲーム OR ガチャ) (regulation OR law OR 規制 OR 法律 OR 処分) sourcecountry:JP",
-        "日本",
-    ),
-    (
-        "(game OR gaming OR 게임) (regulation OR law OR 규제 OR 법안) sourcecountry:KR",
-        "韩国",
-    ),
-    # ── 南美补充 ──
-    (
-        "(game OR gaming OR jogo) (regulation OR law OR regulação OR lei) sourcecountry:BR",
-        "巴西",
-    ),
-    (
-        "(game OR gaming OR videojuegos) (regulation OR law OR privacy OR consumidor) sourcecountry:AR",
-        "阿根廷",
-    ),
-    (
-        "(game OR gaming OR videojuegos) (regulation OR law OR privacy OR consumidor) sourcecountry:CL",
-        "智利",
-    ),
-    (
-        "(game OR gaming OR videojuegos) (regulation OR law OR privacy OR consumidor) sourcecountry:CO",
-        "哥伦比亚",
-    ),
-    # ── 东南亚补充 ──
-    (
-        "(game OR gaming) (regulation OR law OR privacy) sourcecountry:PH",
-        "菲律宾",
-    ),
-    (
-        "(game OR gaming) (regulation OR law OR privacy) sourcecountry:MY",
-        "马来西亚",
-    ),
-    # ── 中东长尾补充 ──
-    (
-        "(game OR gaming OR ألعاب) (regulation OR law OR privacy OR license OR قانون) sourcecountry:QA",
-        "卡塔尔",
-    ),
-    (
-        "(game OR gaming OR ألعاب) (regulation OR law OR privacy OR license OR قانون) sourcecountry:KW",
-        "科威特",
-    ),
-    (
-        "(game OR gaming OR ألعاب) (regulation OR law OR privacy OR license OR قانون) sourcecountry:BH",
-        "巴林",
-    ),
-    (
-        "(game OR gaming) (regulation OR law OR privacy OR consumer) sourcecountry:IL",
-        "以色列",
+        '(ゲーム OR 게임 OR "trò chơi" OR permainan OR jogo OR videojuegos OR 遊戲 OR เกม OR ألعاب)'
+        ' (規制 OR 규제 OR nghị định OR regulasi OR regulação OR regulación'
+        ' OR 法規 OR กฎหมาย OR تنظيم OR fine OR lawsuit)',
+        "弱覆盖市场-本地语",
     ),
 ]
 
@@ -1093,12 +1120,18 @@ def fetch_gdelt_all(daily_mode: bool = False) -> List[dict]:
     """
     timespan = "1d" if daily_mode else "7d"
     all_items: List[dict] = []
+    started = time.monotonic()
+    requests_made = 0
+    successful_queries = 0
+    rate_limits = 0
+    stopped_for_rate_limit = False
 
-    for query, label in _GDELT_QUERIES:
-        # GDELT 免费 API 限速约 5 次/分钟，12s 间隔保持在安全范围内
-        time.sleep(12)
+    for query_index, (query, label) in enumerate(_GDELT_QUERIES):
+        if query_index:
+            time.sleep(12)
         for attempt in range(2):   # 429 时最多重试一次
             try:
+                requests_made += 1
                 resp = requests.get(
                     _GDELT_API,
                     params={
@@ -1112,9 +1145,27 @@ def fetch_gdelt_all(daily_mode: bool = False) -> List[dict]:
                     timeout=20,
                 )
                 if resp.status_code == 429:
-                    logger.warning(f"[GDELT] {label} 触发限速，等待 30 秒后重试…")
-                    time.sleep(30)
-                    continue
+                    rate_limits += 1
+                    if daily_mode:
+                        logger.warning(
+                            f"[GDELT] {label} 触发限速，日报模式立即停止补充抓取"
+                        )
+                        stopped_for_rate_limit = True
+                        break
+                    if attempt == 0:
+                        retry_after = resp.headers.get("Retry-After", "5")
+                        try:
+                            wait_seconds = min(15.0, max(1.0, float(retry_after)))
+                        except (TypeError, ValueError):
+                            wait_seconds = 5.0
+                        logger.warning(
+                            f"[GDELT] {label} 触发限速，等待 {wait_seconds:g} 秒后重试…"
+                        )
+                        time.sleep(wait_seconds)
+                        continue
+                    logger.warning("[GDELT] 持续限速，本轮停止 GDELT 补充抓取")
+                    stopped_for_rate_limit = True
+                    break
                 resp.raise_for_status()
                 articles = resp.json().get("articles") or []
                 count = 0
@@ -1132,55 +1183,40 @@ def fetch_gdelt_all(daily_mode: bool = False) -> List[dict]:
                         "lang":    _GDELT_LANG_MAP.get(a.get("language", ""), "en"),
                     })
                     count += 1
+                successful_queries += 1
                 logger.info(f"[GDELT] {label}: 获取 {count} 条")
                 break
             except Exception as e:
                 logger.warning(f"[GDELT] {label} 请求失败: {e}")
                 break
+        if stopped_for_rate_limit:
+            break
+
+    logger.info(
+        "[GDELT统计] 请求=%d 成功查询=%d 429=%d 贡献=%d 耗时=%.1fs",
+        requests_made,
+        successful_queries,
+        rate_limits,
+        len(all_items),
+        time.monotonic() - started,
+    )
 
     return all_items
 
 
-# ─── 语言-地区一致性过滤 ──────────────────────────────────────────────
-#
-# 各语言文章"合理覆盖"的地区集合。
-# 逻辑：北美/欧洲的监管动态原始信源是英文，
-# 若韩文/日文等非英语文章被分类到这些地区，通常是外媒转载，
-# 英文原始源已被收录，无需重复入库。
-# "全球"/"其他" 一律保留（多地区综述）。
-#
-_LANG_ACCEPTABLE_REGIONS = {
-    # key = lang 前缀, value = 该语言"一次信源"应覆盖的合理区域集合
-    "ko": {"韩国",                          "全球", "其他"},
-    "ja": {"日本",                          "全球", "其他"},
-    "vi": {"越南", "东南亚", "亚太",        "全球", "其他"},
-    "id": {"印度尼西亚", "东南亚", "亚太",  "全球", "其他"},
-    "th": {"泰国", "东南亚", "亚太",       "全球", "其他"},
-    "zh": {"台湾", "香港", "澳门", "港澳台","全球", "其他"},
-    "de": {"德国", "奥地利", "欧盟", "欧洲","全球", "其他"},
-    "fr": {"法国", "比利时", "欧盟", "欧洲","全球", "其他"},
-    "nl": {"荷兰", "比利时", "欧盟", "欧洲","全球", "其他"},
-    "pt": {"巴西", "南美",                  "全球", "其他"},
-    "es": {"墨西哥", "西班牙", "阿根廷", "智利", "哥伦比亚", "南美", "全球", "其他"},
-    "ar": {"沙特", "阿联酋", "土耳其", "中东/非洲", "全球", "其他"},
-}
-
-
 def _is_foreign_commentary(lang: str, region: str) -> bool:
-    """
-    判断是否为"外语文章转载非本地区监管新闻"。
+    """兼容旧调用：文章语言不再作为删除事件的依据。"""
+    return False
 
-    例：韩文(ko)文章被分类为北美 → 视为韩媒转载美国新闻，过滤。
-    例：韩文文章分类为韩国 → 本地一次信源，保留。
-    英文(en)文章全球通用，始终保留。
-    """
-    if not lang or lang == "en":
-        return False
-    lang_prefix = lang.split("-")[0].lower()
-    acceptable = _LANG_ACCEPTABLE_REGIONS.get(lang_prefix)
-    if acceptable is None:
-        return False   # 未配置的语言：保守策略，不过滤
-    return region not in acceptable
+
+def _count_by_language(items: List[dict]) -> Counter:
+    return Counter((item.get("lang") or "unknown").split("-")[0] for item in items)
+
+
+def _log_language_funnel(stage: str, items: List[dict]) -> None:
+    counts = _count_by_language(items)
+    detail = " ".join(f"{lang}={counts[lang]}" for lang in sorted(counts))
+    logger.info(f"[语种漏斗] {stage}: total={len(items)} {detail}".rstrip())
 
 
 def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = False) -> List[LegislationItem]:
@@ -1189,8 +1225,7 @@ def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = F
     1. 抓取 RSS + Google News
     2. 严格过滤 (法规 + 游戏 + 排除中国大陆 + 排除噪音)
     3. 分类为 LegislationItem
-    4. 语言-地区一致性过滤（外语转载非本地新闻）
-    5. 翻译标题和摘要
+    4. 按事件实际司法辖区分类（语言仅作为输入信息，不用于删除）
 
     daily_mode=True: Google News 强制 when:1d，每查询限 10 条，适合日报场景。
     """
@@ -1209,6 +1244,7 @@ def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = F
 
     all_raw = rss_items + news_items + gdelt_items
     logger.info(f"合计原始数据: {len(all_raw)} 条")
+    _log_language_funnel("raw", all_raw)
 
     # 2. 去重 (按 title 归一化)
     seen_titles = set()
@@ -1219,30 +1255,27 @@ def fetch_and_process(max_days: int = MAX_ARTICLE_AGE_DAYS, daily_mode: bool = F
             seen_titles.add(title_key)
             unique_items.append(item)
     logger.info(f"去重后: {len(unique_items)} 条")
+    _log_language_funnel("title_unique", unique_items)
 
     # 3. 严格过滤: 法规+游戏+排除中国大陆+排除噪音+时间范围
     relevant = [a for a in unique_items if is_legislation_relevant(a) and is_recent(a, max_days)]
     logger.info(f"严格过滤后: {len(relevant)} 条立法相关文章")
+    _log_language_funnel("rule_relevant", relevant)
 
     # 4. 日期精准化（对来源日期不可信的文章抓取真实发布时间）
     relevant = enrich_article_dates(relevant)
+    before_date_recheck = len(relevant)
+    relevant = [article for article in relevant if is_recent(article, max_days)]
+    removed_after_enrichment = before_date_recheck - len(relevant)
+    if removed_after_enrichment:
+        logger.info(
+            f"[日期校正] 二次时间过滤移除旧文 {removed_after_enrichment} 条"
+        )
+    _log_language_funnel("date_rechecked", relevant)
 
-    # 5. 分类 + 语言-地区一致性过滤
-    legislation_items = []
-    lang_filtered = 0
-    for article in relevant:
-        classified = classify_article(article)
-        lang = article.get("lang", "en")
-        if _is_foreign_commentary(lang, classified.region):
-            logger.debug(
-                f"[语言过滤] [{lang}] 文章报道非本地区 [{classified.region}]，跳过: "
-                f"{article.get('title', '')[:60]}"
-            )
-            lang_filtered += 1
-            continue
-        legislation_items.append(classified)
-
-    if lang_filtered:
-        logger.info(f"[语言过滤] 过滤外语转载 {lang_filtered} 条（非本地区监管新闻）")
+    # 5. 分类。外语媒体可以报道任何司法辖区，跨语言重复留给翻译后去重。
+    legislation_items = [classify_article(article) for article in relevant]
+    classified_dicts = [item.to_dict() for item in legislation_items]
+    _log_language_funnel("classified", classified_dicts)
     logger.info(f"分类完成: {len(legislation_items)} 条立法动态")
     return legislation_items

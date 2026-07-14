@@ -653,9 +653,9 @@ def _ai_process_batch(items_data: list) -> list:
 
 # 地区前缀兜底规则（批量后处理时使用，与 _ai_process 内保持一致）
 _REGION_PREFIX_RULES = [
-    ("美国",    r'\b(US|USA|United States|America[n]?|FTC|Congress|Senate|White House)\b'),
+    ("美国",    r'\b(US|USA|United States|America[n]?|FTC|Congress|Senate|White House)\b|米国|アメリカ|미국|hoa kỳ|nước mỹ|amerika serikat|estados unidos|\bEUA\b|vereinigte staaten|états-unis|สหรัฐอเมริกา|الولايات المتحدة'),
     ("英国",    r'\b(UK|United Kingdom|Britain|British|ASA|Ofcom|ICO)\b'),
-    ("欧盟",    r'\b(EU|European Union|Europe[an]?|GDPR|DSA|DMA|CNIL)\b'),
+    ("欧盟",    r'\b(EU|European Union|Europe[an]?|GDPR|DSA|DMA|CNIL)\b|欧州連合|유럽연합|liên minh châu âu|uni eropa|união europeia|unión europea|europäische union|union européenne|สหภาพยุโรป|الاتحاد الأوروبي'),
     ("韩国",    r'\b(Korea[n]?|South Korea|GRAC|KCA)\b'),
     ("日本",    r'\b(Japan[ese]?)\b'),
     ("澳大利亚", r'\b(Austral[ia]+[n]?|eSafety)\b'),
@@ -708,10 +708,9 @@ def translate_items_batch(items_dicts: list, batch_size: int = 3) -> list:
 
             # LLM 判定不相关
             if raw.get("is_relevant") is False:
-                # 非英语条目（ja/ko/vi/th/id）：已通过正则过滤，不信任 LLM 的不相关判断
-                # 降级为 Google Translate 保留条目，防止误删日韩越监管动态
+                # 非英语条目已通过本地语种规则过滤；单次 LLM 负判不应造成小语种漏报。
                 item_lang = item_dict.get("lang", "en").split("-")[0]
-                if item_lang in {"ja", "ko", "vi", "th", "id"}:
+                if item_lang in {"ja", "ko", "vi", "th", "id", "pt", "es", "de", "fr", "ar", "zh"}:
                     logger.info(
                         f"[LLM过滤] 非英语({item_lang})条目降级 Google Translate 保留: "
                         f"{item_dict.get('title','')[:40]}"

@@ -160,15 +160,7 @@ RSS_FEEDS = [
         "region": "东南亚",
         "tier": "official",
     },
-    {
-        # ブラジル ANPD — LGPD 執法、データ保護規制
-        "name": "Brazil ANPD",
-        "url": "https://www.gov.br/anpd/RSS",
-        "lang": "pt",
-        "type": "rss",
-        "region": "南美",
-        "tier": "official",
-    },
+    # Brazil ANPD RSS 长期返回损坏 XML；由葡语日报 ANPD 查询及官方 site: 查询覆盖。
     {
         # オーストラリア ACCC — 消費者保護執法、競争法
         "name": "ACCC (Australia)",
@@ -180,24 +172,8 @@ RSS_FEEDS = [
     },
 
     # ── 欧洲立法 & 隐私执法补充 (Official / Legal tier) ────────────────
-    {
-        # EUR-Lex — 欧盟议会与理事会立法公报（DSA/DMA/AI Act 等法案原文，极稳定）
-        "name": "EUR-Lex Legislation",
-        "url": "https://eur-lex.europa.eu/EN/display-feed.rss?rssId=162",
-        "lang": "en",
-        "type": "rss",
-        "region": "欧洲",
-        "tier": "official",
-    },
-    {
-        # GDPRHub — GDPR 执法案例数据库（noyb 维护，替代已失效的 ICO/GDPR.eu RSS）
-        "name": "GDPRHub",
-        "url": "https://gdprhub.eu/index.php?title=Special:NewPages&feed=atom&hideredirs=1&limit=20&render=1",
-        "lang": "en",
-        "type": "rss",   # fetcher 兼容 Atom 格式
-        "region": "欧洲",
-        "tier": "legal",
-    },
+    # EUR-Lex 与 GDPRHub feed 长期返回 HTML/损坏 XML；分别由 EU Digital
+    # Strategy + EDPB，以及 noyb + JD Supra Privacy 覆盖。
     {
         # noyb.eu — Max Schrems 隐私执法组织（重大 GDPR 案件第一手报道）
         "name": "noyb",
@@ -238,14 +214,8 @@ RSS_FEEDS = [
     # IAPP RSS (iapp.org/rss/daily-dashboard) — 返回 0 条，已移除
 
     # ── 诉讼 / 执法补充 (Legal / Official tier) ────────────────────────
-    {
-        "name": "JD Supra (Consumer Protection)",
-        "url": "https://www.jdsupra.com/resources/syndication/docsRSSfeed.aspx?ftype=Consumer+Protection",
-        "lang": "en",
-        "type": "rss",
-        "region": "全球",
-        "tier": "legal",
-    },
+    # JD Supra Consumer Protection feed 长期截断；保留可用的 Privacy feed，
+    # 消费者诉讼由英文执法诉讼通道补充。
     # NY Attorney General — 无 RSS 源，由 OFFICIAL_SITE_QUERIES 的 site:ag.ny.gov 覆盖
 ]
 
@@ -264,19 +234,20 @@ GOOGLE_NEWS_REGIONS = {
     "en_PH": {"hl": "en",    "gl": "PH", "ceid": "PH:en"},
     "en_MY": {"hl": "en",    "gl": "MY", "ceid": "MY:en"},
     "en_ID": {"hl": "en",    "gl": "ID", "ceid": "ID:en"},
+    "id_ID": {"hl": "id",    "gl": "ID", "ceid": "ID:id", "region": "东南亚"},
     # ── 亚洲 ──────────────────────────────────────────────────────
-    "ja_JP": {"hl": "ja",    "gl": "JP", "ceid": "JP:ja"},
-    "ko_KR": {"hl": "ko",    "gl": "KR", "ceid": "KR:ko"},
-    "vi_VN": {"hl": "vi",    "gl": "VN", "ceid": "VN:vi"},
-    "zh_TW": {"hl": "zh-TW", "gl": "TW", "ceid": "TW:zh-Hant"},
-    "th_TH": {"hl": "th",    "gl": "TH", "ceid": "TH:th"},
+    "ja_JP": {"hl": "ja",    "gl": "JP", "ceid": "JP:ja", "region": "日本"},
+    "ko_KR": {"hl": "ko",    "gl": "KR", "ceid": "KR:ko", "region": "韩国"},
+    "vi_VN": {"hl": "vi",    "gl": "VN", "ceid": "VN:vi", "region": "东南亚"},
+    "zh_TW": {"hl": "zh-TW", "gl": "TW", "ceid": "TW:zh-Hant", "region": "港澳台"},
+    "th_TH": {"hl": "th",    "gl": "TH", "ceid": "TH:th", "region": "东南亚"},
     # ── 欧洲 ──────────────────────────────────────────────────────
-    "de_DE": {"hl": "de",    "gl": "DE", "ceid": "DE:de"},
-    "fr_FR": {"hl": "fr",    "gl": "FR", "ceid": "FR:fr"},
+    "de_DE": {"hl": "de",    "gl": "DE", "ceid": "DE:de", "region": "欧洲"},
+    "fr_FR": {"hl": "fr",    "gl": "FR", "ceid": "FR:fr", "region": "欧洲"},
     "nl_NL": {"hl": "nl",    "gl": "NL", "ceid": "NL:nl"},
     # ── 南美 ──────────────────────────────────────────────────────
-    "pt_BR": {"hl": "pt-BR", "gl": "BR", "ceid": "BR:pt-419"},
-    "es_MX": {"hl": "es",    "gl": "MX", "ceid": "MX:es"},
+    "pt_BR": {"hl": "pt-BR", "gl": "BR", "ceid": "BR:pt-419", "region": "南美"},
+    "es_MX": {"hl": "es",    "gl": "MX", "ceid": "MX:es", "region": "北美"},
     # ── 中东 ──────────────────────────────────────────────────────
-    "ar_SA": {"hl": "ar",    "gl": "SA", "ceid": "SA:ar"},
+    "ar_SA": {"hl": "ar",    "gl": "SA", "ceid": "SA:ar", "region": "中东/非洲"},
 }

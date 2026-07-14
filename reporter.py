@@ -88,9 +88,12 @@ def _get_summary_zh(item: dict) -> str:
 # ─── 事件指纹（跨来源/跨区域快速候选匹配）─────────────────────────────
 
 _FP_ENTITIES = re.compile(
-    r"\b(google|alphabet|apple|microsoft|meta|facebook|amazon|epic|valve|steam"
-    r"|sony|nintendo|bytedance|tencent|netflix|spotify"
-    r"|ftc|doj|dma|cma|accc|pcc|ofcom|cnil|bfdi|agcm)\b",
+    r"(?<![A-Za-z0-9])(google|alphabet|apple|microsoft|meta|facebook|amazon|epic|valve|steam"
+    r"|sony|playstation|xbox|nintendo|roblox|bytedance|tencent|netease"
+    r"|lilith|hoyoverse|mihoyo|kuro|papergames|infold|hypergryph|gryphline"
+    r"|riot|activision|blizzard|ncsoft|kakao|nexon|krafton|netmarble"
+    r"|netflix|spotify|ftc|doj|dma|cma|accc|pcc|ofcom|cnil|bfdi|agcm"
+    r"|grac|anpd|senacon|komdigi|oaic|edpb)(?![A-Za-z0-9])",
     re.IGNORECASE,
 )
 _FP_TOPICS = [
@@ -105,6 +108,12 @@ _FP_TOPICS = [
     (re.compile(r"adverti[sz]|广告", re.I), "ads"),
     (re.compile(r"age.?verif|rating|分级|年龄验证", re.I), "rating"),
     (re.compile(r"refund|退款", re.I), "refund"),
+    (re.compile(r"lawsuit|litigat|class.?action|sued?|诉讼|起诉|集体诉讼", re.I), "lawsuit"),
+    (re.compile(r"settlement|consent.?order|和解", re.I), "settlement"),
+    (re.compile(r"copyright|著作权|版权", re.I), "copyright"),
+    (re.compile(r"shutdown|end.?of.?service|preserv|停售|停服|游戏保存", re.I), "preservation"),
+    (re.compile(r"remov|delist|suspend|下架|停权", re.I), "platform-removal"),
+    (re.compile(r"consumer|消费者|消費者", re.I), "consumer"),
 ]
 
 
@@ -117,6 +126,7 @@ def _calculate_event_fingerprint(item: dict) -> frozenset:
     text = " ".join(filter(None, [
         item.get("title", ""),
         item.get("title_zh", ""),
+        item.get("summary", ""),
         item.get("summary_zh", ""),
     ]))
     parts: set = set()

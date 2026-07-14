@@ -30,7 +30,8 @@ OFFICIAL_SITE_QUERIES = [
     "game regulation site:moleg.go.kr",                    # 韩国法制处
     "game consumer site:kftc.go.kr",                       # 韩国公正交易委员会
     "game regulation site:mic.gov.vn",                     # 越南信息通信部
-    "game regulation site:kominfo.go.id",                  # 印尼 Kominfo
+    "game regulation site:komdigi.go.id",                  # 印尼 Komdigi（现用域名）
+    '"PP TUNAS" site:komdigi.go.id',                       # 印尼儿童数字保护 PP 17/2025
     "game regulation site:pdpc.gov.sg",                    # 新加坡个人数据保护委员会
     "game regulation site:imda.gov.sg",                    # 新加坡 IMDA（媒体内容分级）
     "game regulation site:accc.gov.au",                    # 澳大利亚竞争与消费者委员会
@@ -51,6 +52,8 @@ OFFICIAL_SITE_QUERIES = [
     "게임 site:kcc.go.kr",                                    # 放送通信委员会
     # ── 南美 ────────────────────────────────────────────────────────────
     "jogo regulação site:gov.br/anpd",                       # 巴西 ANPD
+    "jogo consumidor plataforma digital site:gov.br/mj",     # 巴西 Senacon / 司法部
+    "game mercado digital site:gov.br/cade",                 # 巴西 CADE 竞争执法
     "game regulation site:gob.mx",                            # 墨西哥政府
     "videojuegos datos personales site:argentina.gob.ar/aaip", # 阿根廷 AAIP
     "videojuegos consumidor site:sernac.cl",                   # 智利 SERNAC
@@ -73,87 +76,156 @@ OFFICIAL_SITE_QUERIES = [
     "game enforcement OR settlement site:ag.ny.gov",       # 纽约州 AG 游戏执法
 ]
 
-# ── 日报专用精选 Google News 查询（每日 daily_mode=True 时使用）────────────
-# 设计原则：每条覆盖一个大类，用 OR 合并同类关键词，避免长尾细化查询。
-# 控制在小查询集规模，避免触发 Google IP 限速。
-# 周报模式仍使用全量 KEYWORDS 以获得最大覆盖。
-DAILY_GOOGLE_NEWS_EN = [
-    # 玩法合规（loot box / gacha / 概率）
-    '"loot box" OR gacha regulation OR law OR ban OR fine',
-    # 数据隐私（GDPR / CCPA / 跨境）
-    'game (GDPR OR CCPA OR privacy) enforcement OR fine',
-    # 未成年人保护（COPPA / KOSA / 年龄验证）
-    'game (children OR minor OR COPPA OR KOSA) protection law',
-    # 游戏成瘾诉讼 / 产品责任（民事诉讼、集体诉讼）
-    'game (lawsuit OR "class action" OR "product liability") (addiction OR minor OR children)',
-    # 广告营销（暗黑模式 / 网红披露 / 虚假广告）
-    'game advertising (disclosure OR "dark pattern" OR misleading) enforcement',
-    # 消费者保护（退款 / 微交易 / 订阅）
-    'game (refund OR "in-app purchase" OR microtransaction) consumer regulation',
-    # 平台政策（App Store / DMA / 第三方支付）
-    'game ("App Store" OR "Google Play" OR DMA OR "third party payment") regulation',
-    # EU 数字法规（DSA / DMA / AI Act）
-    'EU (DSA OR DMA OR "AI Act") game compliance',
-    # AI 内容合规（深度合成 / 生成内容标识）
-    'AI (deepfake OR "generated content" OR synthetic) game regulation',
-    # 金融合规（制裁 / AML / 虚拟资产）
-    'game (OFAC OR sanctions OR AML OR "virtual asset") compliance',
-    # 亚洲（韩国 / 东南亚）监管动态
-    '(Korea OR Vietnam OR Indonesia OR Thailand OR Philippines) game regulation OR law',
-    # 日本监管动态（英文媒体对日本的报道）
-    'Japan game (regulation OR law OR "age rating" OR gacha OR privacy)',
-    # 南美监管动态
-    '(Brazil OR Mexico OR Argentina) game (regulation OR law OR LGPD OR privacy)',
-    # 加拿大 / 印度 / 港澳台
-    '(Canada OR India OR "Hong Kong" OR Taiwan) game (privacy OR regulation OR law OR consumer)',
-    # 澳大利亚 / 大洋洲
-    '(Australia OR "New Zealand") game (online safety OR privacy OR regulation)',
-    # 中东长尾国家
-    '(Qatar OR Kuwait OR Bahrain OR Israel) game (regulation OR law OR privacy OR license)',
-    # 经营合规（本地代理 / 许可证）
-    'game ("local agent" OR license OR representative) regulation overseas publisher',
-    # 年龄分级（PEGI / ESRB / 各国评级）
-    'game age (rating OR verification) regulation law',
-    # 消费上限 / VIP / 保底机制 / 社交消费压力
-    'game (spending cap OR "spending limit" OR "pity system" OR VIP) regulation consumer',
-    # 游戏存续 / 在线服务停运 / 数字所有权
-    'game ("live service" OR preservation OR shutdown OR "end of service") (regulation OR law OR bill OR consumer)',
-    # Lilith Games 及旗下产品专项（执法/诉讼/合规/处罚/下架）
-    '"Lilith Games" OR "AFK Arena" OR "AFK Journey" OR "Rise of Kingdoms" OR "Dislyte" OR "Warpath" OR "Farlight 84" (regulation OR lawsuit OR fine OR enforcement OR ban OR compliance OR removed)',
-    # 中国游戏出海发行商合规动态
-    '"Chinese game" OR "Chinese developer" OR "Chinese publisher" (regulation OR ban OR fine OR enforcement OR compliance OR lawsuit)',
-    # App Store / Google Play 执法（游戏下架/拒审/违规处理）
-    'game (removed OR suspended OR rejected OR delisted OR violation) ("App Store" OR "Google Play")',
-]
+# ── 日报专用 Google News 四通道查询（daily_mode=True）────────────────
+# 每种语言都覆盖：监管合规、执法诉讼、平台政策、重点公司/产品。
+# 总量固定为每 locale 4 条，避免多语种扩展后放大 Google News 限速风险。
+PRIORITY_GAME_ENTITIES = (
+    '"Lilith Games" OR "AFK Arena" OR "AFK Journey" OR "Rise of Kingdoms"'
+    ' OR HoYoverse OR miHoYo OR Genshin OR "Honkai Star Rail"'
+    ' OR "Kuro Games" OR "Wuthering Waves" OR Papergames OR Infold'
+    ' OR "Infinity Nikki" OR "Love and Deepspace" OR Hypergryph OR GRYPHLINE'
+    ' OR Arknights OR Tencent OR NetEase OR "Riot Games" OR VALORANT'
+    ' OR Activision OR Blizzard'
+)
 
-# 日报非英文精选（日韩各 2-3 条，重点覆盖本地监管机构动态）
-DAILY_GOOGLE_NEWS_JA = [
-    "ゲーム 規制 法律 OR 法案 OR 処分",
-    "消費者庁 OR ガチャ OR 景品表示法 ゲーム 規制",
-    "ステルスマーケティング OR AI規制 ゲーム 法律",
-]
-DAILY_GOOGLE_NEWS_KO = [
-    "게임 규제 법안 OR 처분 OR 의무",
-    "확률형 아이템 OR 게임산업진흥법 OR 대리인 규제",
-    "게임 소송 OR 과징금 OR 제재 OR 처벌",
-]
 
-# 日报东南亚/南美精选（补充薄弱地区的日常覆盖）
-DAILY_GOOGLE_NEWS_VI = [
-    "trò chơi điện tử quy định OR nghị định OR luật",
-]
-DAILY_GOOGLE_NEWS_PT = [
-    "jogo regulação OR lei OR LGPD OR proteção",
-]
-DAILY_GOOGLE_NEWS_TH = [
-    "เกม กฎหมาย OR ระเบียบ OR PDPA",
-]
+DAILY_LANGUAGE_PROFILES = {}
 
-# 日报印尼/阿拉伯语精选（补充中东/东南亚薄弱地区）
-DAILY_GOOGLE_NEWS_ID = [
-    "game regulasi OR peraturan OR larangan OR denda",
-]
-DAILY_GOOGLE_NEWS_AR = [
-    "ألعاب تنظيم OR قانون OR ترخيص OR غرامة",
-    "قطر OR الكويت OR البحرين ألعاب تنظيم OR قانون OR ترخيص",
-]
+
+def _four_lane_queries(
+    language: str,
+    regulation: str,
+    enforcement: str,
+    platform: str,
+    company_actions: str,
+    *,
+    game_terms: tuple[str, ...],
+    regulatory_terms: tuple[str, ...],
+    filter_game_terms: tuple[str, ...] | None = None,
+):
+    queries = [
+        regulation,
+        enforcement,
+        platform,
+        f"({PRIORITY_GAME_ENTITIES}) ({company_actions})",
+    ]
+    DAILY_LANGUAGE_PROFILES[language] = {
+        "queries": tuple(queries),
+        "game_terms": game_terms,
+        "filter_game_terms": filter_game_terms or game_terms,
+        "regulatory_terms": regulatory_terms,
+    }
+    return queries
+
+
+DAILY_GOOGLE_NEWS_EN = _four_lane_queries(
+    "en",
+    '(game OR gaming OR "video game" OR "online game") (regulation OR law OR bill OR compliance OR privacy OR children OR "age verification" OR "loot box" OR gacha OR consumer OR advertising OR license)',
+    '(game OR gaming OR "video game") (enforcement OR investigation OR fine OR penalty OR lawsuit OR "class action" OR settlement OR injunction OR ban)',
+    '(game OR gaming) ("App Store" OR "Google Play" OR Steam OR PlayStation OR Xbox OR "Nintendo eShop") (policy OR payment OR removed OR delisted OR rejected OR regulation)',
+    'regulation OR compliance OR investigation OR enforcement OR fine OR lawsuit OR settlement OR ban OR removed',
+    game_terms=("game", "gaming", "video game", "online game"),
+    filter_game_terms=("gaming", "video game", "online game"),
+    regulatory_terms=("regulation", "law", "bill", "compliance", "enforcement", "investigation", "fine", "penalty", "lawsuit", "class action", "settlement", "injunction", "ban", "policy", "removed"),
+)
+DAILY_GOOGLE_NEWS_JA = _four_lane_queries(
+    "ja",
+    '(ゲーム OR オンラインゲーム OR ビデオゲーム) (規制 OR 法律 OR 法案 OR コンプライアンス OR 個人情報 OR 未成年 OR 年齢確認 OR ガチャ OR 景品表示法 OR 資金決済法)',
+    '(ゲーム OR オンラインゲーム) (行政処分 OR 課徴金 OR 罰金 OR 調査 OR 訴訟 OR 集団訴訟 OR 和解 OR 禁止)',
+    '(ゲーム OR オンラインゲーム) (App Store OR Google Play OR Steam OR PlayStation OR Xbox OR ニンテンドーeショップ) (ポリシー OR 決済 OR 削除 OR 配信停止 OR 規制)',
+    '規制 OR 法令 OR コンプライアンス OR 調査 OR 行政処分 OR 課徴金 OR 訴訟 OR 和解 OR 配信停止',
+    game_terms=("ゲーム", "オンラインゲーム", "ビデオゲーム"),
+    regulatory_terms=("規制", "法律", "法案", "コンプライアンス", "行政処分", "課徴金", "罰金", "調査", "訴訟", "集団訴訟", "和解", "禁止", "配信停止"),
+)
+DAILY_GOOGLE_NEWS_KO = _four_lane_queries(
+    "ko",
+    '(게임 OR 온라인게임 OR 비디오게임) (규제 OR 법률 OR 법안 OR 준수 OR 개인정보 OR 미성년자 OR 연령확인 OR 확률형 아이템 OR 게임산업진흥법)',
+    '(게임 OR 온라인게임) (조사 OR 행정처분 OR 과징금 OR 벌금 OR 제재 OR 소송 OR 집단소송 OR 합의 OR 금지)',
+    '(게임 OR 온라인게임) (App Store OR Google Play OR Steam OR PlayStation OR Xbox OR 닌텐도 e숍) (정책 OR 결제 OR 삭제 OR 퇴출 OR 규제)',
+    '규제 OR 법률 OR 준수 OR 조사 OR 행정처분 OR 과징금 OR 소송 OR 합의 OR 퇴출',
+    game_terms=("게임", "온라인게임", "비디오게임"),
+    regulatory_terms=("규제", "법률", "법안", "준수", "조사", "행정처분", "과징금", "벌금", "제재", "소송", "집단소송", "합의", "금지", "퇴출"),
+)
+DAILY_GOOGLE_NEWS_VI = _four_lane_queries(
+    "vi",
+    '(trò chơi OR trò chơi điện tử OR trò chơi trực tuyến) (quy định OR luật OR nghị định OR tuân thủ OR dữ liệu cá nhân OR trẻ em OR xác thực tuổi OR vật phẩm ảo OR "Nghị định 147/2024/NĐ-CP" OR "Nghị định 174/2026/NĐ-CP")',
+    '(trò chơi OR trò chơi điện tử) (điều tra OR xử phạt OR phạt tiền OR cưỡng chế OR kiện OR khởi kiện tập thể OR dàn xếp OR cấm)',
+    '(trò chơi OR trò chơi điện tử) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (chính sách OR thanh toán OR gỡ bỏ OR đình chỉ OR quy định)',
+    'quy định OR tuân thủ OR điều tra OR xử phạt OR phạt tiền OR kiện OR dàn xếp OR cấm OR gỡ bỏ',
+    game_terms=("trò chơi", "trò chơi điện tử", "trò chơi trực tuyến"),
+    regulatory_terms=("quy định", "luật", "nghị định", "tuân thủ", "điều tra", "xử phạt", "phạt tiền", "cưỡng chế", "khởi kiện", "dàn xếp", "cấm", "gỡ bỏ", "đình chỉ"),
+)
+DAILY_GOOGLE_NEWS_ID = _four_lane_queries(
+    "id",
+    '(game OR gim OR permainan) (regulasi OR peraturan OR undang-undang OR kepatuhan OR privasi OR anak OR verifikasi usia OR loot box OR "PP TUNAS" OR "PP Nomor 17 Tahun 2025")',
+    '(game OR gim OR permainan) (penyelidikan OR penegakan OR sanksi OR denda OR gugatan OR gugatan kelompok OR penyelesaian OR larangan)',
+    '(game OR gim OR permainan) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (kebijakan OR pembayaran OR dihapus OR ditangguhkan OR regulasi)',
+    'regulasi OR kepatuhan OR penyelidikan OR penegakan OR sanksi OR denda OR gugatan OR penyelesaian OR larangan OR dihapus',
+    game_terms=("game", "gim", "permainan"),
+    filter_game_terms=("gim", "permainan"),
+    regulatory_terms=("regulasi", "peraturan", "undang-undang", "kepatuhan", "penyelidikan", "penegakan", "sanksi", "denda", "gugatan", "penyelesaian", "larangan", "dihapus", "ditangguhkan", "PP TUNAS"),
+)
+DAILY_GOOGLE_NEWS_PT = _four_lane_queries(
+    "pt",
+    '(jogo OR jogos OR videogame OR jogos online) (regulação OR lei OR conformidade OR LGPD OR ANPD OR Senacon OR CADE OR privacidade OR criança OR verificação de idade OR loot box)',
+    '(jogo OR jogos OR videogame) (investigação OR fiscalização OR multa OR sanção OR processo OR ação coletiva OR acordo OR proibição)',
+    '(jogo OR jogos OR videogame) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (política OR pagamento OR removido OR suspenso OR regulação)',
+    'regulação OR conformidade OR investigação OR fiscalização OR multa OR processo OR ação coletiva OR acordo OR proibição OR removido',
+    game_terms=("jogo", "jogos", "videogame", "jogos online"),
+    regulatory_terms=("regulação", "lei", "conformidade", "investigação", "fiscalização", "multa", "sanção", "ação coletiva", "proibição", "removido", "suspenso"),
+)
+DAILY_GOOGLE_NEWS_TH = _four_lane_queries(
+    "th",
+    '(เกม OR วิดีโอเกม OR เกมออนไลน์) (กฎหมาย OR ระเบียบ OR การกำกับดูแล OR การปฏิบัติตาม OR PDPA OR ความเป็นส่วนตัว OR เด็ก OR การยืนยันอายุ OR กล่องสุ่ม)',
+    '(เกม OR เกมออนไลน์) (สอบสวน OR บังคับใช้ OR ปรับ OR ลงโทษ OR ฟ้องร้อง OR คดีแบบกลุ่ม OR ยอมความ OR ห้าม)',
+    '(เกม OR เกมออนไลน์) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (นโยบาย OR การชำระเงิน OR ถอดออก OR ระงับ OR กฎระเบียบ)',
+    'กำกับดูแล OR ปฏิบัติตาม OR สอบสวน OR บังคับใช้ OR ปรับ OR ฟ้องร้อง OR ยอมความ OR ห้าม OR ถอดออก',
+    game_terms=("เกม", "วิดีโอเกม", "เกมออนไลน์"),
+    regulatory_terms=("กฎหมาย", "ระเบียบ", "การกำกับดูแล", "การปฏิบัติตาม", "สอบสวน", "บังคับใช้", "ปรับ", "ลงโทษ", "ฟ้องร้อง", "คดีแบบกลุ่ม", "ยอมความ", "ห้าม", "ถอดออก", "ระงับ"),
+)
+DAILY_GOOGLE_NEWS_ZH_TW = _four_lane_queries(
+    "zh_tw",
+    '(遊戲 OR 線上遊戲 OR 電子遊戲 OR 手機遊戲) (法規 OR 修法 OR 合規 OR 個資 OR 隱私 OR 未成年人 OR 年齡驗證 OR 轉蛋 OR 虛擬寶物 OR 消費者保護 OR 分級)',
+    '(遊戲 OR 線上遊戲 OR 電子遊戲) (調查 OR 執法 OR 裁罰 OR 罰款 OR 行政處分 OR 訴訟 OR 集體訴訟 OR 和解 OR 禁止)',
+    '(遊戲 OR 線上遊戲) (App Store OR Google Play OR Steam OR PlayStation OR Xbox OR Nintendo eShop) (政策 OR 支付 OR 下架 OR 停權 OR 違規 OR 法規)',
+    '法規 OR 合規 OR 調查 OR 執法 OR 裁罰 OR 訴訟 OR 和解 OR 禁止 OR 下架',
+    game_terms=("遊戲", "線上遊戲", "電子遊戲", "手機遊戲"),
+    filter_game_terms=("線上遊戲", "電子遊戲", "手機遊戲"),
+    regulatory_terms=("法規", "修法", "合規", "調查", "執法", "裁罰", "罰款", "行政處分", "訴訟", "集體訴訟", "和解", "禁止", "下架", "停權", "違規"),
+)
+DAILY_GOOGLE_NEWS_AR = _four_lane_queries(
+    "ar",
+    '(ألعاب OR لعبة فيديو OR ألعاب إلكترونية OR ألعاب عبر الإنترنت) (تنظيم OR قانون OR امتثال OR خصوصية OR أطفال OR التحقق من العمر OR صناديق الغنائم OR ترخيص)',
+    '(ألعاب OR ألعاب إلكترونية) (تحقيق OR إنفاذ OR غرامة OR عقوبة OR دعوى OR دعوى جماعية OR تسوية OR حظر)',
+    '(ألعاب OR ألعاب إلكترونية) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (سياسة OR دفع OR إزالة OR تعليق OR تنظيم)',
+    'تنظيم OR امتثال OR تحقيق OR إنفاذ OR غرامة OR دعوى OR تسوية OR حظر OR إزالة',
+    game_terms=("ألعاب", "لعبة فيديو", "ألعاب إلكترونية", "ألعاب عبر الإنترنت"),
+    regulatory_terms=("تنظيم", "قانون", "امتثال", "تحقيق", "إنفاذ", "غرامة", "عقوبة", "دعوى", "دعوى جماعية", "تسوية", "حظر", "إزالة", "تعليق"),
+)
+DAILY_GOOGLE_NEWS_DE = _four_lane_queries(
+    "de",
+    '(Spiel OR Spiele OR Videospiel OR Online-Spiel) (Regulierung OR Gesetz OR Compliance OR Datenschutz OR Kinder OR Altersverifikation OR Lootbox OR Verbraucherschutz)',
+    '(Spiel OR Spiele OR Videospiel) (Ermittlung OR Durchsetzung OR Geldbuße OR Strafe OR Klage OR Sammelklage OR Vergleich OR Verbot)',
+    '(Spiel OR Spiele OR Videospiel) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (Richtlinie OR Zahlung OR entfernt OR gesperrt OR Regulierung)',
+    'Regulierung OR Compliance OR Ermittlung OR Durchsetzung OR Geldbuße OR Klage OR Vergleich OR Verbot OR entfernt',
+    game_terms=("Spiel", "Spiele", "Videospiel", "Online-Spiel"),
+    regulatory_terms=("Regulierung", "Gesetz", "Compliance", "Ermittlung", "Durchsetzung", "Geldbuße", "Strafe", "Klage", "Sammelklage", "Vergleich", "Verbot", "entfernt", "gesperrt"),
+)
+DAILY_GOOGLE_NEWS_FR = _four_lane_queries(
+    "fr",
+    '(jeu OR jeux OR jeu vidéo OR jeux en ligne) (réglementation OR loi OR conformité OR vie privée OR enfants OR vérification de l’âge OR loot box OR consommateur)',
+    '(jeu OR jeux OR jeu vidéo) (enquête OR application OR amende OR sanction OR procès OR recours collectif OR accord OR interdiction)',
+    '(jeu OR jeux OR jeu vidéo) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (politique OR paiement OR retiré OR suspendu OR réglementation)',
+    'réglementation OR conformité OR enquête OR application OR amende OR procès OR recours collectif OR accord OR interdiction OR retiré',
+    game_terms=("jeu", "jeux", "jeu vidéo", "jeux en ligne"),
+    regulatory_terms=("réglementation", "loi", "conformité", "enquête", "amende", "sanction", "procès", "recours collectif", "interdiction", "retiré", "suspendu"),
+)
+DAILY_GOOGLE_NEWS_ES = _four_lane_queries(
+    "es",
+    '(juego OR juegos OR videojuego OR juegos en línea) (regulación OR ley OR cumplimiento OR privacidad OR menores OR verificación de edad OR loot box OR consumidor)',
+    '(juego OR juegos OR videojuego) (investigación OR ejecución OR multa OR sanción OR demanda OR demanda colectiva OR acuerdo OR prohibición)',
+    '(juego OR juegos OR videojuego) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (política OR pago OR retirado OR suspendido OR regulación)',
+    'regulación OR cumplimiento OR investigación OR ejecución OR multa OR demanda OR demanda colectiva OR acuerdo OR prohibición OR retirado',
+    game_terms=("juego", "juegos", "videojuego", "juegos en línea"),
+    regulatory_terms=("regulación", "ley", "cumplimiento", "investigación", "ejecución", "multa", "sanción", "demanda", "demanda colectiva", "prohibición", "retirado", "suspendido"),
+)

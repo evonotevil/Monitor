@@ -3,6 +3,11 @@ reporter.py 单元测试
 覆盖：事件指纹、去重逻辑、区域推断、报告生成辅助函数
 """
 import pytest
+from types import SimpleNamespace
+
+import feishu_bitable
+import monitor
+from models import LegislationItem
 
 from reporter import (
     _calculate_event_fingerprint,
@@ -22,6 +27,172 @@ from reporter import (
     STATUS_CSS,
     IMPACT_CONFIG,
 )
+
+
+_BITABLE_ENV_KEYS = [
+    "FEISHU_APP_ID",
+    "FEISHU_APP_SECRET",
+    "FEISHU_BITABLE_TABLE_ID",
+    "FEISHU_BITABLE_APP_TOKEN",
+    "FEISHU_BITABLE_WIKI_TOKEN",
+]
+
+
+def _report_args():
+    return SimpleNamespace(
+        period="day",
+        format="html",
+        region=None,
+        category=None,
+        status=None,
+        keyword=None,
+        output=None,
+    )
+
+
+def _legislation_item(**overrides):
+    values = {
+        "region": "北美",
+        "category_l1": "消费者保护",
+        "category_l2": "",
+        "title": "FTC fines game publisher over child purchases",
+        "date": "2026-07-14",
+        "status": "执法动态",
+        "summary": "",
+        "source_name": "Source",
+        "source_url": "https://example.com/story",
+        "lang": "en",
+        "title_zh": "[美国] FTC因儿童游戏内购处罚游戏发行商",
+        "impact_score": 8.0,
+    }
+    values.update(overrides)
+    return LegislationItem(**values)
+
+
+def test_post_translation_dedup_merges_cross_language_reporting(monkeypatch):
+    english = _legislation_item()
+    japanese = _legislation_item(
+        title="米FTC、子どものゲーム内購入を巡りゲーム会社を処分",
+        source_name="Japanese Source",
+        source_url="https://example.jp/report",
+        lang="ja",
+        title_zh="[美国] FTC因儿童游戏内购处罚游戏公司",
+        impact_score=7.0,
+    )
+
+    result = monitor._deduplicate_items([english, japanese])
+
+    assert result == [english]
+
+
+def test_event_fingerprint_uses_llm_for_low_similarity_cross_language_duplicates(monkeypatch):
+    official = _legislation_item(
+        title="South Dakota Attorney General announces Roblox settlement",
+        title_zh="[美国] 南达科他州总检察长宣布与Roblox达成儿童安全和解",
+        source_name="FTC News",
+        source_url="https://official.example/roblox",
+    )
+    translated = _legislation_item(
+        title="南達科他州與Roblox和解千萬美元",
+        title_zh="[美国] Roblox游戏平台将实施强制年龄验证",
+        source_name="Local News",
+        source_url="https://news.example/roblox",
+        lang="zh-TW",
+        impact_score=9.0,
+    )
+    monkeypatch.setattr("translator.verify_duplicate_pairs", lambda pairs: [True] * len(pairs))
+
+    result = monitor._deduplicate_items(
+        [official, translated], enable_fingerprint=True
+    )
+
+    assert result == [official]
+
+
+def test_event_fingerprint_keeps_different_company_lawsuits_when_llm_rejects(monkeypatch):
+    first = _legislation_item(
+        title="Sony faces consumer lawsuit over game discs",
+        title_zh="[荷兰] Sony因停止游戏光盘面临消费者诉讼",
+        source_url="https://example.com/discs",
+    )
+    second = _legislation_item(
+        title="Sony sued over game subscription pricing",
+        title_zh="[荷兰] Sony因游戏订阅定价被起诉",
+        source_url="https://example.com/subscription",
+    )
+    monkeypatch.setattr("translator.verify_duplicate_pairs", lambda pairs: [False] * len(pairs))
+
+    result = monitor._deduplicate_items(
+        [first, second], enable_fingerprint=True
+    )
+
+    assert result == [first, second]
+
+
+def test_cmd_run_propagates_fetch_failure(monkeypatch):
+    state = {"logged": None, "closed": False}
+
+    class FakeDatabase:
+        def log_fetch(self, source, count, status, error=""):
+            state["logged"] = (source, count, status, error)
+
+        def close(self):
+            state["closed"] = True
+
+    monkeypatch.setattr(monitor, "Database", FakeDatabase)
+    monkeypatch.setattr(
+        monitor,
+        "fetch_and_process",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("fetch failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="fetch failed"):
+        monitor.cmd_run(SimpleNamespace(period="day"))
+
+    assert state["logged"] == ("full_run", 0, "error", "fetch failed")
+    assert state["closed"] is True
+
+
+def test_configured_bitable_empty_does_not_fallback_sqlite(monkeypatch, capsys):
+    for key in _BITABLE_ENV_KEYS:
+        monkeypatch.setenv(key, "configured")
+    monkeypatch.setattr(
+        feishu_bitable, "fetch_valid_records_from_bitable", lambda **kwargs: []
+    )
+    monkeypatch.setattr(
+        monitor,
+        "Database",
+        lambda: pytest.fail("configured Bitable must not fall back to SQLite"),
+    )
+
+    monitor.cmd_report(_report_args())
+
+    assert "本次不回退 SQLite" in capsys.readouterr().out
+
+
+def test_unconfigured_bitable_still_falls_back_sqlite(monkeypatch, capsys):
+    for key in _BITABLE_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    state = {"queried": False, "closed": False}
+
+    class FakeDatabase:
+        def query_items(self, **kwargs):
+            state["queried"] = True
+            return []
+
+        def close(self):
+            state["closed"] = True
+
+    monkeypatch.setattr(
+        feishu_bitable, "fetch_valid_records_from_bitable", lambda **kwargs: []
+    )
+    monkeypatch.setattr(monitor, "Database", FakeDatabase)
+
+    monitor.cmd_report(_report_args())
+
+    output = capsys.readouterr().out
+    assert "回退到本地 SQLite" in output
+    assert state == {"queried": True, "closed": True}
 
 
 # ═══════════════════════════════════════════════════════════════════════

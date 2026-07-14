@@ -37,7 +37,12 @@ DIGITAL_INDUSTRY_SIGNALS = [
     # ── 泰语 ──
     "เกม", "แอป", "ออนไลน์",
     # ── 印尼语 ──
-    "permainan", "aplikasi",
+    "permainan", "gim", "aplikasi",
+    # ── 葡萄牙语 / 西班牙语 / 德语 / 法语 ──
+    "jogo", "jogos", "videogame",
+    "juego", "juegos", "videojuego",
+    "spiel", "spiele", "videospiel",
+    "jeu", "jeux", "jeu vidéo",
     # ── 阿拉伯语 ──
     "ألعاب", "لعبة", "تطبيق",
     # ── 中文（繁体，港澳台） ──

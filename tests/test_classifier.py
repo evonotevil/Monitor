@@ -30,8 +30,39 @@ class TestDetectRegion:
     def test_single_country_us(self):
         assert _detect_region("FTC fines game company for COPPA violation") == "北美"
 
+    def test_traditional_chinese_us_state_reporting(self):
+        assert _detect_region("南達科他州與Roblox和解千萬美元") == "北美"
+
+    @pytest.mark.parametrize("text", [
+        "米国FTCがゲーム会社への制裁を発表",
+        "미국 FTC가 게임 회사를 상대로 집행 조치 발표",
+        "Hoa Kỳ điều tra công ty trò chơi điện tử",
+        "Amerika Serikat menjatuhkan denda kepada perusahaan game",
+        "Estados Unidos multa empresa de videojuegos",
+        "Les États-Unis enquêtent sur un éditeur de jeux vidéo",
+        "الولايات المتحدة تحقق مع شركة ألعاب",
+    ])
+    def test_multilingual_us_reporting_uses_event_jurisdiction(self, text):
+        assert _detect_region(text, "日本") == "北美"
+
     def test_single_country_eu(self):
         assert _detect_region("GDPR enforcement action against mobile game") == "欧洲"
+
+    @pytest.mark.parametrize("text", [
+        "欧州連合がオンラインゲーム規制を発表",
+        "유럽연합이 온라인 게임 규제를 발표",
+        "Liên minh châu Âu điều tra trò chơi trực tuyến",
+        "Uni Eropa menyelidiki platform game",
+        "União Europeia aplica regras a jogos digitais",
+    ])
+    def test_multilingual_eu_reporting_uses_event_jurisdiction(self, text):
+        assert _detect_region(text, "韩国") == "欧洲"
+
+    def test_generic_japanese_game_words_do_not_override_foreign_jurisdiction(self):
+        assert _detect_region("米国でガチャゲームへの訴訟", "日本") == "北美"
+
+    def test_generic_korean_game_words_do_not_override_foreign_jurisdiction(self):
+        assert _detect_region("미국에서 확률형 게임 집단소송", "韩国") == "北美"
 
     def test_single_country_japan(self):
         # _detect_region 返回 MONITORED_REGIONS 中的区域名（"日本"），非显示分组名
@@ -48,6 +79,18 @@ class TestDetectRegion:
 
     def test_single_country_brazil(self):
         assert _detect_region("Brazil LGPD game data protection") == "南美"
+
+    def test_traditional_chinese_russia(self):
+        assert _detect_region("俄羅斯重罰遊戲發行商違反數據保護法規") == "欧洲"
+
+    @pytest.mark.parametrize("text", [
+        "Konsumen Belanda menggugat PlayStation",
+        "Procès contre Sony aux Pays-Bas",
+        "Verbraucherschutzklage in den Niederlanden",
+        "Demanda contra Sony en los Países Bajos",
+    ])
+    def test_multilingual_netherlands(self, text):
+        assert _detect_region(text) == "欧洲"
 
     def test_single_country_saudi(self):
         # MONITORED_REGIONS 中区域名为 "中东/非洲"
@@ -83,6 +126,10 @@ class TestDetectRegion:
 
     def test_canada(self):
         assert _detect_region("Canada OPC PIPEDA game app privacy enforcement") == "北美"
+
+    def test_generic_privacy_commissioner_uses_oaic_fallback(self):
+        text = "Privacy Commissioner publishes age assurance guidance for online experiences"
+        assert _detect_region(text, "大洋洲") == "大洋洲"
 
     def test_argentina(self):
         assert _detect_region("Argentina AAIP game data protection") == "南美"
@@ -124,6 +171,18 @@ class TestIsChinaMainland:
 
     def test_taiwan_not_mainland(self):
         assert is_china_mainland("Taiwan game classification law") is False
+
+    def test_overseas_enforcement_of_chinese_company_not_mainland(self):
+        text = "FTC fines Chinese game company for COPPA violations in the United States"
+        assert is_china_mainland(text) is False
+
+    def test_eu_investigation_of_chinese_company_not_mainland(self):
+        text = "European Commission investigates China-based game publisher under the DSA"
+        assert is_china_mainland(text) is False
+
+    def test_other_overseas_enforcement_of_chinese_company_not_mainland(self):
+        text = "Brazil fines Chinese game publisher for consumer protection violations"
+        assert is_china_mainland(text) is False
 
 
 # ═══════════════════════════════════════════════════════════════════════

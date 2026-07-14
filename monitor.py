@@ -18,18 +18,26 @@
 
 import argparse
 import logging
+import os
 import sys
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from models import Database
 from fetcher import fetch_and_process
 from translator import translate_items_batch
-from reporter import print_table, save_markdown, save_html
-from utils import _get_region_group, _bigram_sim, previous_full_week_range
+from reporter import (
+    print_table, save_markdown, save_html,
+    _calculate_event_fingerprint, _fp_same_event,
+)
+from utils import _get_region_group, _bigram_sim, previous_full_week_range, _TIER_SORT
 from config import PERIOD_DAYS
 
 # ─── 日志配置 ─────────────────────────────────────────────────────────
+
+_DATA_DIR = Path(__file__).resolve().parent / "data"
+_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,7 +45,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("data/monitor.log", encoding="utf-8"),
+        logging.FileHandler(_DATA_DIR / "monitor.log", encoding="utf-8"),
     ],
 )
 logger = logging.getLogger(__name__)
@@ -48,6 +56,16 @@ def _period_to_days(period: str) -> int:
     if period == "day":
         return 1
     return PERIOD_DAYS.get(period, PERIOD_DAYS["all"])
+
+
+def _bitable_is_configured() -> bool:
+    """报告链路是否已配置完整 Bitable 凭证。"""
+    app_id = os.environ.get("FEISHU_APP_ID", "")
+    app_secret = os.environ.get("FEISHU_APP_SECRET", "")
+    table_id = os.environ.get("FEISHU_BITABLE_TABLE_ID", "")
+    app_token = os.environ.get("FEISHU_BITABLE_APP_TOKEN", "")
+    wiki_token = os.environ.get("FEISHU_BITABLE_WIKI_TOKEN", "")
+    return bool(app_id and app_secret and table_id and (app_token or wiki_token))
 
 
 # ─── 语义去重（同地区/同日期窗口内高度相似的文章只保留一条）────────────
@@ -67,7 +85,15 @@ def _make_timeline_note(items_group: list) -> str:
     return f"进展：{parts}"
 
 
-def _deduplicate_items(items):
+def _log_item_language_counts(stage: str, items: list) -> None:
+    from collections import Counter
+
+    counts = Counter((item.lang or "unknown").split("-")[0] for item in items)
+    detail = " ".join(f"{lang}={counts[lang]}" for lang in sorted(counts))
+    logger.info(f"[语种漏斗] {stage}: total={len(items)} {detail}".rstrip())
+
+
+def _deduplicate_items(items, enable_fingerprint: bool = False):
     """
     三阶段去重 + 事件级时间轴合并：
 
@@ -93,6 +119,10 @@ def _deduplicate_items(items):
     from datetime import date as _date
     from collections import defaultdict
     dropped: set[int] = set()
+    fingerprints = (
+        [_calculate_event_fingerprint(item.to_dict()) for item in items]
+        if enable_fingerprint else []
+    )
 
     _SOURCE_CAP = 3  # 同源 + 同区域每日最多保留条数
 
@@ -116,6 +146,7 @@ def _deduplicate_items(items):
         )
 
     # ── 阶段 1：2 天窗口，标题去重 ────────────────────────────────────
+    fingerprint_candidates = []
     for i, item_i in enumerate(items):
         if i in dropped:
             continue
@@ -133,18 +164,68 @@ def _deduplicate_items(items):
                     continue
             except ValueError:
                 continue
-            sim = _bigram_sim(item_i.title, item_j.title)
+            title_i = item_i.title_zh or item_i.title
+            title_j = item_j.title_zh or item_j.title
+            same_url = bool(
+                item_i.source_url
+                and item_j.source_url
+                and item_i.source_url.split("?", 1)[0].rstrip("/")
+                == item_j.source_url.split("?", 1)[0].rstrip("/")
+            )
+            sim = _bigram_sim(title_i, title_j)
             # 高相似标题直接合并（>0.8）；同分类则放宽到 0.55
-            if sim > 0.8:
+            if same_url or sim > 0.8:
                 duplicates.append((j, sim))
             elif sim > 0.55 and item_i.category_l1 == item_j.category_l1:
                 duplicates.append((j, sim))
+            elif enable_fingerprint and _fp_same_event(fingerprints[i], fingerprints[j]):
+                fingerprint_candidates.append((i, j))
         if duplicates:
             group = [(i, 0.0)] + duplicates
             group.sort(key=lambda x: (-items[x[0]].impact_score, x[0]))
             winner_idx = group[0][0]
             for idx, _ in group[1:]:
                 dropped.add(idx)
+
+    # 低标题相似度但事件指纹一致：只作为 LLM 候选，不直接自动合并。
+    if fingerprint_candidates:
+        from classifier import get_source_tier
+        from translator import verify_duplicate_pairs
+
+        valid_pairs = [
+            (i, j) for i, j in fingerprint_candidates
+            if i not in dropped and j not in dropped
+        ]
+        titles = [
+            (
+                items[i].title_zh or items[i].title,
+                items[j].title_zh or items[j].title,
+            )
+            for i, j in valid_pairs
+        ]
+        try:
+            verified = verify_duplicate_pairs(titles)
+        except Exception as exc:
+            logger.warning(f"[事件指纹] LLM 验证失败，保守保留: {exc}")
+            verified = [False] * len(valid_pairs)
+
+        for (i, j), is_same_event in zip(valid_pairs, verified):
+            if not is_same_event or i in dropped or j in dropped:
+                continue
+
+            def same_day_priority(index: int) -> tuple:
+                item = items[index]
+                tier = _TIER_SORT.get(get_source_tier(item.source_name), 1)
+                return (tier, item.impact_score, item.date)
+
+            winner, loser = (
+                (i, j) if same_day_priority(i) >= same_day_priority(j) else (j, i)
+            )
+            dropped.add(loser)
+            logger.info(
+                f"[事件指纹] LLM 确认跨语言重复，保留: "
+                f"{(items[winner].title_zh or items[winner].title)[:60]}"
+            )
 
     # ── 阶段 2：30 天窗口，事件级聚类（硬性合并同一法案不同阶段）────────
     # 同一法案在不同阶段（如印尼年龄禁令草案→已生效）严禁拆分展示，必须合并。
@@ -176,9 +257,15 @@ def _deduplicate_items(items):
                     continue
             except ValueError:
                 continue
-            sim = _bigram_sim(item_i.title, item_j.title)
+            sim = _bigram_sim(
+                item_i.title_zh or item_i.title,
+                item_j.title_zh or item_j.title,
+            )
             # 移除上限：sim ≥ 0.5 均为候选（高相似跨阶段对在 LLM 验证后合并）
-            if sim >= 0.5:
+            if sim >= 0.5 or (
+                enable_fingerprint
+                and _fp_same_event(fingerprints[i], fingerprints[j])
+            ):
                 candidates.append((i, j, sim))
 
     if candidates:
@@ -279,8 +366,10 @@ def cmd_run(args):
         if items:
             # 严格日期过滤：只保留 2025/2026 年的条目
             items = _filter_valid_dates(items)
+            _log_item_language_counts("date_valid", items)
             # 语义去重：同 region 同日期窗口内高度相似的文章合并为一条
             items = _deduplicate_items(items)
+            _log_item_language_counts("pre_llm_dedup", items)
 
             no_translate = getattr(args, 'no_translate', False)
             if no_translate:
@@ -355,10 +444,14 @@ def cmd_run(args):
                         f"保留 {len(kept_items)} 条"
                     )
                 items = kept_items
+                _log_item_language_counts("llm_kept", items)
+                # LLM 已修正事件法域并生成中文标题，此时才能可靠合并跨语言转载。
+                items = _deduplicate_items(items, enable_fingerprint=True)
+                _log_item_language_counts("post_llm_dedup", items)
 
-            new_count = db.bulk_upsert(items)
-            logger.info(f"新增 {new_count} 条记录 (共处理 {len(items)} 条)")
-            db.log_fetch("full_run", new_count, "ok")
+            written_count = db.bulk_upsert(items)
+            logger.info(f"写入/更新 {written_count} 条记录 (共处理 {len(items)} 条)")
+            db.log_fetch("full_run", written_count, "ok")
 
         else:
             logger.info("本次抓取未获取到新数据")
@@ -383,6 +476,7 @@ def cmd_run(args):
     except Exception as e:
         logger.error(f"抓取执行失败: {e}", exc_info=True)
         db.log_fetch("full_run", 0, "error", str(e))
+        raise
     finally:
         db.close()
 
@@ -396,7 +490,7 @@ def cmd_report(args):
     数据来源优先级：
       1. 飞书多维表格（SSOT）——仅包含人工筛选过的有效记录
          （「处理状态」≠ 待初筛 且 ≠ 噪音/不推送）
-      2. 本地 SQLite 数据库（回退）——Bitable 凭证未配置或返回空时启用
+      2. 本地 SQLite 数据库（回退）——仅在 Bitable 凭证未配置时启用
     """
     days  = _period_to_days(args.period)
     label = _period_label(args.period)
@@ -414,9 +508,10 @@ def cmd_report(args):
         date_end=week_end,
     )
 
-    # ── Step 2: Bitable 无数据时回退到 SQLite ────────────────────────────
-    if not items:
-        print("⚠️  Bitable 无有效数据，回退到本地 SQLite 数据库…")
+    # ── Step 2: 仅未配置 Bitable 时回退 SQLite ───────────────────────────
+    bitable_configured = _bitable_is_configured()
+    if not items and not bitable_configured:
+        print("⚠️  未配置 Bitable，回退到本地 SQLite 数据库…")
         db = Database()
         try:
             items = db.query_items(
@@ -432,7 +527,13 @@ def cmd_report(args):
             db.close()
 
     if not items:
-        print(f"暂无 [{label}] 有效数据（飞书多维表格和数据库均无匹配记录）。")
+        if bitable_configured:
+            print(
+                f"暂无 [{label}] Bitable 有效数据；为避免发布未经审核的内容，"
+                "本次不回退 SQLite。"
+            )
+        else:
+            print(f"暂无 [{label}] 有效数据（本地 SQLite 无匹配记录）。")
         return
 
     print(f"📊 共获取 {len(items)} 条有效记录，开始生成 [{label}] 报告…")
