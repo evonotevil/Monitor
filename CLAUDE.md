@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Global gaming compliance monitoring system (全球游戏合规动态监控) for Lilith Games. Automatically tracks regulatory dynamics across 50+ markets via RSS feeds and Google News, translates/classifies/risk-scores articles with LLM, and delivers daily Feishu notifications + weekly HTML reports.
+Global gaming compliance monitoring system (全球游戏合规动态监控) for Lilith Games. It tracks all markets outside mainland China via official RSS, Google News, and a best-effort GDELT supplement; translates/classifies/risk-scores articles with an LLM; and delivers daily Feishu notifications plus weekly HTML/PDF reports.
 
-All user-facing text (UI, reports, Feishu cards, documentation) is in Chinese. Source data is multilingual (EN/JA/KO/VI/PT/TH).
+All user-facing text (UI, reports, Feishu cards, documentation) is in Chinese. Daily monitoring supports 12 languages: EN, JA, KO, VI, ID, TH, ZH-TW, PT, ES, DE, FR, and AR.
 
 ## Commands
 
@@ -24,12 +24,14 @@ python -m pytest tests/test_classifier.py -v
 
 # CLI usage
 python monitor.py run                    # fetch + classify + translate
+python monitor.py run --period day       # daily mode: natural-day window + compact queries
 python monitor.py report --format html   # generate HTML report
 python monitor.py report --format md     # generate Markdown report
 python monitor.py report --format table  # terminal table output
 python monitor.py query -k "loot box"    # search articles
 python monitor.py stats                  # database statistics
 python monitor.py schedule --interval 24 # scheduled periodic runs
+python daily_check.py                    # sync Bitable + send daily Feishu card
 
 # Import validation
 python3 -c "import reporter, fetcher, config; print('OK')"
@@ -37,14 +39,22 @@ python3 -c "import reporter, fetcher, config; print('OK')"
 
 ## Architecture
 
-**Data pipeline flow:**
+**Daily data pipeline:**
 ```
-RSS Feeds (100+) + Google News → fetcher.py → classifier.py → translator.py → models.py (SQLite)
-                                                                                    ↓
-                                              daily_check.py → Feishu webhook (日报卡片)
-                                              feishu_bitable.py → Feishu Bitable API (多维表格)
-                                              reporter.py → HTML/PDF reports (周报)
-                                              feishu_notify.py → Feishu webhook (周报卡片)
+Official/legal/industry RSS
+    + 12-locale Google News (4 lanes per locale)
+    + GDELT (3 best-effort composite queries)
+        ↓
+fetcher.py: exact-title dedup → relevance filter → source-date enrichment → recency recheck
+        ↓
+classifier.py: jurisdiction/category/status/risk fallback
+        ↓
+translator.py: LLM relevance + translation + jurisdiction/category/status + 4D risk
+        ↓
+monitor.py: post-LLM region normalization + cross-language event dedup
+        ↓
+models.py (SQLite) → daily_check.py → Feishu Bitable + daily card
+                   → reporter.py / feishu_notify.py → weekly HTML/PDF + weekly card
 ```
 
 **Entry points:**
@@ -54,20 +64,22 @@ RSS Feeds (100+) + Google News → fetcher.py → classifier.py → translator.p
 - `feishu_bitable.py` — sync articles to Feishu multi-dimensional table
 
 **Key modules:**
-- `fetcher.py` — RSS parsing + Google News scraping, deduplication stage 0 (per-source cap). Core filter: `is_legislation_relevant()` (see below).
-- `classifier.py` — article classification into 11 categories, noise filtering, 4-dimensional risk scoring (LLM + regex fallback), deduplication stages 1-2. Owns `is_china_mainland()` which is imported by `fetcher.py`.
-- `translator.py` — LLM translation via Silicon Flow (OpenAI SDK), executive summary generation, duplicate merging
+- `fetcher.py` — RSS/Google News/GDELT fetching, exact-title dedup, multilingual relevance filtering, source-date enrichment, and language-funnel logging. Core filter: `is_legislation_relevant()` (see below).
+- `classifier.py` — regex jurisdiction/category/status classification, mainland-China exclusion, noise helpers, and 4-dimensional fallback risk scoring. Owns `is_china_mainland()`, imported by `fetcher.py`.
+- `translator.py` — LLM relevance, translation, jurisdiction/category/status correction, 4-dimensional risk scoring, summaries, and duplicate verification/merge
+- `monitor.py` — CLI orchestration plus source cap, title similarity dedup, 30-day event clustering, and conservative post-LLM event-fingerprint dedup
 - `models.py` — SQLite ORM with automatic schema migrations
-- `utils.py` — region mapping, bigram similarity
+- `daily_check.py` — daily date/created-at window, Bitable sync, display dedup, normal/empty/failure Feishu cards
+- `utils.py` — display-region mapping, source tier ordering, bigram similarity
 
 **Config system** (`config/`):
 - `settings.py` — output paths, DB path, timeouts, concurrency
-- `regions.py` — 9 regional display groups, country-to-region mapping
+- `regions.py` — monitored jurisdictions and reference priorities; display-group normalization is in `utils.py`
 - `categories.py` — 11 L1 compliance categories, 70+ L2 subcategories, status labels
-- `feeds.py` — 100+ RSS sources with tier classification (official/legal/industry)
+- `feeds.py` — validated RSS sources with tier classification (official/legal/industry)
 - `sources.py` — source authority ranking for deduplication
-- `keywords.py` — search keywords (6 languages), digital industry signal words for noise filtering
-- `queries.py` — Google News search queries
+- `keywords.py` — full/weekly keywords and broad digital-industry signals
+- `queries.py` — official-site queries plus `DAILY_LANGUAGE_PROFILES`; each locale defines four daily query lanes and safe filter terms in one place
 
 **LLM prompts** (`prompts/`): system prompt for classification/translation/risk assessment, daily/weekly summary prompts, duplicate verification/merge prompts.
 
@@ -77,28 +89,36 @@ RSS Feeds (100+) + Google News → fetcher.py → classifier.py → translator.p
 
 - **LLM provider**: Silicon Flow (硅基流动) via OpenAI-compatible SDK, model Qwen3-8B. Translation, classification, and risk scoring happen in a single LLM call to minimize API cost.
 - **Risk scoring**: 4 dimensions (revenue impact, product changes, time urgency, scope) each 0-3, weighted into composite 1.0-10.0 score. Regex fallback when LLM unavailable.
-- **Deduplication**: 3 stages — per-source cap, semantic bigram similarity within 2-day window, 30-day event clustering with LLM verification.
+- **Daily multilingual queries**: 12 locales × 4 lanes (regulation/compliance, enforcement/litigation, platform policy, priority companies/products). Keep query terms and safe filter terms together in `DAILY_LANGUAGE_PROFILES`.
+- **Jurisdiction is not language**: classify the event's actual jurisdiction from country/state/regulator/law evidence. Google News locale is fallback-only. Never drop an article merely because its language and jurisdiction differ.
+- **Date semantics**: daily `max_days=1` includes today and yesterday as calendar dates. Re-run recency filtering after fetching the source page date; recycled Apple/Android RSS dates must not reach the LLM or DB as current news.
+- **Deduplication**: source cap + same-region title similarity + 30-day stage clustering. After LLM correction, event fingerprints may nominate low-similarity cross-language pairs, but only LLM confirmation may merge them. Without LLM confirmation, retain both.
 - **Source priority**: Official government > Legal intelligence > Industry media (for dedup winner selection).
+- **GDELT is non-critical**: only 3 composite fallback queries. Daily mode stops on the first 429 with no retry; weekly mode retries once with a capped wait. GDELT failure must not fail RSS/Google News.
+- **Failure semantics**: a failed fetch must never become a green “no updates” card. GitHub Actions passes `steps.fetch.outcome` as `FETCH_STEP_OUTCOME`; `daily_check.py` sends a red failure card, skips Bitable/normal daily processing, and exits non-zero.
+- **Broken feed policy**: remove persistently malformed/HTML feeds rather than adding unsafe parser hacks. EUR-Lex RSS, GDPRHub Atom, JD Supra Consumer Protection, and Brazil ANPD RSS are intentionally removed; coverage comes from working feeds and query lanes.
 - **Weekly report 3-section structure**: completed tasks (✅已合规/归档), global dynamics (📰行业动态), follow-up tasks (🏃处理/跟进中). Modifying report generation must preserve all three sections.
 
 ### `is_legislation_relevant()` filter chain (fetcher.py)
 
-Four sequential gates; any failed gate drops the article:
+Five sequential gates; any failed gate drops the article:
 
-1. **China mainland exclusion** (`is_china_mainland()` from `classifier.py`): drops articles mentioning 中华人民共和国, 中国大陆, 网信办, 版号, 游戏出海, etc. **This exclusion is a hard business constraint — do NOT remove or relax it. The system intentionally does not track Chinese mainland regulatory content.**
+1. **China mainland exclusion** (`is_china_mainland()` from `classifier.py`): drops domestic mainland-China regulation such as 中华人民共和国, 中国大陆, 网信办, 版号, and PIPL-only developments. **This is a hard business constraint: do not start tracking mainland domestic regulation. However, overseas regulators' enforcement, litigation, bans, or platform actions against Chinese game companies must be retained because the event jurisdiction is overseas.**
 
-2. **EXCLUSION_PATTERNS**: drops noise — game reviews, patch notes, hardware, casino/sports betting, AI product news (Gemini/Copilot), developer tools, etc. Key subtlety: `r"\bupdate.*(?:v\d|version|season)\b"` and `r"\bcontent update\b"` filter patch notes, but bare `content` was deliberately removed from this pattern to avoid suppressing legitimate "content moderation" regulatory articles.
+2. **Traditional consumer-goods guard**: rejects food/supplement/cosmetic/pharma enforcement unless a strong game/digital signal is also present.
 
-3. **REGULATORY_SIGNALS** (must match at least one): ~75 regex patterns covering:
+3. **EXCLUSION_PATTERNS**: drops reviews, patch notes, hardware, gambling, sports, promotions, political “game” metaphors, AI product news, developer tools, etc. Keep exclusions specific enough not to suppress legitimate content-moderation or game-platform regulation.
+
+4. **REGULATORY_SIGNALS** (must match at least one): shared terms from `DAILY_LANGUAGE_PROFILES` plus high-precision regex covering:
    - EN: regulation/law/enforcement/fine/ban/ruling + recommendation/guidance/executive order/NPRM/notice of proposed rulemaking + compound decision patterns (e.g., "commission decision on X")
    - Agency acronyms: FTC, COPPA, GDPR, CCPA, DSA, DMA, IGAC, GRAC, ESRB, PEGI, CERO, CESA
    - Litigation: lawsuit/class action/settlement/consent order
    - JA: 規制/法律/処分/通知/告示/指導/答申 + 景品表示法/資金決済法
    - KO: 규제/법안/제재 + 지침/공고/고시 + 게임산업진흥법
-   - VI/TH/ID regulatory terms
+   - VI/ID/TH/ZH-TW/PT/ES/DE/FR/AR regulatory and enforcement terms
    - Note: bare "decision" alone does NOT match; it requires a co-occurring regulatory context word.
 
-4. **Game/digital industry signal** (must match at least one):
+5. **Game/digital industry signal** (must match at least one):
    - **All sources**: `GAME_SIGNALS` (~90 patterns) — game/gaming/gacha/loot box/mobile game/in-app purchase, ESRB/PEGI ratings, platform names, 50+ company names, etc.
    - **Official/legal tier sources only (relaxed path)**: `DIGITAL_INDUSTRY_SIGNALS` from `config/keywords.py` — broader digital industry terms (app/online/digital/platform/streaming + age verification/digital identity/eIDAS/EUDI/child safety/content moderation + CJK equivalents). This allows official regulators (FTC, 消費者庁, etc.) to pass without a strict game mention, while blocking traditional-industry content (food safety, telecom retail, etc.).
 
@@ -107,16 +127,28 @@ Four sequential gates; any failed gate drops the article:
 | Variable | Purpose |
 |----------|---------|
 | `LLM_API_KEY` | Silicon Flow API key (required) |
+| `LLM_MODEL` | Optional OpenAI-compatible model override; defaults to `Qwen/Qwen3-8B` |
 | `FEISHU_CHAT_ID` | 目标群聊的 chat_id（消息推送用） |
 | `FEISHU_APP_ID` / `FEISHU_APP_SECRET` | Feishu app credentials (for Bitable) |
 | `FEISHU_BITABLE_APP_TOKEN` | Bitable app token |
+| `FEISHU_BITABLE_WIKI_TOKEN` | Wiki-hosted Bitable token alternative |
 | `FEISHU_BITABLE_TABLE_ID` | Bitable table ID |
+
+`FETCH_STEP_OUTCOME` is an internal GitHub Actions handoff, not a secret. If unset during local runs, `daily_check.py` assumes the fetch succeeded.
 
 ## CI/CD
 
-- `test.yml` — runs pytest on push/PR to main. Covers `tests/test_fetcher.py` (22 cases for `is_legislation_relevant()` including REGULATORY_SIGNALS, DIGITAL_INDUSTRY_SIGNALS, and regression cases), `tests/test_classifier.py`, `tests/test_utils.py`, `tests/test_reporter.py`.
-- `daily_check.yml` — daily 8am (UTC+8) fetch + Feishu notification; commits updated `data/monitor.db` back to repo with `[skip ci]` tag.
+- `test.yml` — runs the full pytest suite on push/PR to main. Current suite covers fetch failures, calendar-date windows, multilingual filtering, jurisdiction aliases, GDELT limits, Feishu behavior, and cross-language dedup.
+- `daily_check.yml` — scheduled around 8am (UTC+8): fetch, red failure alert or normal daily processing, then commit `monitor.db` and push-state files back with `[skip ci]` only after success.
 - `publish_report.yml` — manual trigger for weekly report publication
+
+Before finishing behavior changes, run:
+
+```bash
+python -m pytest tests/ -q
+python3 -m py_compile config/queries.py fetcher.py classifier.py translator.py monitor.py daily_check.py reporter.py
+git diff --check
+```
 
 ## Design Context
 
