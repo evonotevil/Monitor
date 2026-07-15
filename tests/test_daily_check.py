@@ -4,12 +4,76 @@ daily_check.py 单元测试
 """
 
 import pytest
+import json
 from datetime import datetime
 from pathlib import Path
 
 import daily_check
 import feishu_bitable
 import translator
+
+
+def _push_item(index, *, value=2, impact=5.0, decision="push", risk=1):
+    return {
+        "source_url": f"https://example.com/{index}",
+        "title_zh": f"[美国] 动态 {index}",
+        "summary_zh": "监管机构发布了明确要求，企业需要在规定期限内完成产品调整。",
+        "region": "北美",
+        "category_l1": "数据隐私",
+        "source_name": "FTC News",
+        "date": "2026-07-14",
+        "impact_score": impact,
+        "push_decision": decision,
+        "value_score": value,
+        "risk_revenue": risk,
+        "risk_product": 0,
+        "risk_urgency": 0,
+        "risk_scope": 0,
+    }
+
+
+def test_select_daily_push_items_applies_gate_sort_and_cap(monkeypatch):
+    monkeypatch.setattr(daily_check, "_MAX_TOTAL", 8)
+    items = [_push_item(i, impact=float(i)) for i in range(10)]
+    items.extend([
+        _push_item("pool", decision="pool_only", impact=99),
+        _push_item("zero-risk", risk=0, impact=99),
+    ])
+    selected = daily_check.select_daily_push_items(items)
+    assert len(selected) == 8
+    assert selected[0]["source_url"].endswith("/9")
+    assert all(item["push_decision"] == "push" for item in selected)
+    assert all(item["risk_revenue"] > 0 for item in selected)
+
+
+def test_select_daily_push_items_prefers_value_before_impact():
+    selected = daily_check.select_daily_push_items([
+        _push_item("medium", value=2, impact=9),
+        _push_item("high", value=3, impact=4),
+    ])
+    assert selected[0]["source_url"].endswith("/high")
+
+
+def test_july_14_golden_replay_keeps_19_noise_items_out_of_push():
+    fixture_path = Path(__file__).parent / "fixtures" / "daily_2026_07_14.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    items = []
+    for index, row in enumerate(fixture):
+        is_push = row["expected"] == "push"
+        item = _push_item(
+            index,
+            decision="push" if is_push else "pool_only",
+            value=2 if is_push else 0,
+            risk=1 if is_push else 0,
+        )
+        item["title_zh"] = row["title"]
+        items.append(item)
+
+    selected = daily_check.select_daily_push_items(items)
+    assert len(fixture) == 26
+    assert sum(row["expected"] == "pool_only" for row in fixture) == 19
+    assert len(selected) == 7
+    assert all(item["push_decision"] == "push" for item in selected)
 
 
 def test_monday_window_only_includes_weekend_and_monday():

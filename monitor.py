@@ -384,7 +384,9 @@ def cmd_run(args):
             if no_translate:
                 logger.info("已跳过翻译 (--no-translate)")
             else:
-                from classifier import score_impact, compute_composite_score
+                from classifier import (
+                    compute_composite_score, normalize_push_assessment, score_impact,
+                )
                 logger.info(f"正在批量翻译并分类 ({len(items)} 条，每批 3 篇)...")
                 kept_items = []
                 llm_filtered = 0
@@ -394,10 +396,9 @@ def cmd_run(args):
                 translated_list = translate_items_batch(items_dicts, batch_size=3)
 
                 for item, translated in zip(items, translated_list):
-                    # ── LLM 相关性过滤 ─────────────────────────────────
+                    # 不相关文章仍保留到候选池，只禁止进入日报。
                     if translated.get("_llm_is_relevant") is False:
                         llm_filtered += 1
-                        continue
 
                     item.summary_zh = translated.get("summary_zh", "")
                     item.title_zh   = translated.get("title_zh", "")
@@ -457,6 +458,26 @@ def cmd_run(args):
                             text=f"{item.title} {item.summary_zh}",
                         )
 
+                    (
+                        item.push_decision,
+                        item.value_score,
+                        item.noise_reason,
+                        item.decision_source,
+                    ) = normalize_push_assessment(
+                        value_score=translated.get("_llm_value_score", 0),
+                        push_decision=translated.get("_llm_push_decision", "pool_only"),
+                        noise_reason=translated.get("_llm_noise_reason", "判定失败"),
+                        decision_source=translated.get("_llm_decision_source", "fallback"),
+                        risk_revenue=item.risk_revenue,
+                        risk_product=item.risk_product,
+                        risk_urgency=item.risk_urgency,
+                        risk_scope=item.risk_scope,
+                        jurisdiction=item.jurisdiction,
+                        applicability_scope=item.applicability_scope,
+                        title=f"{item.title} {item.title_zh}",
+                        summary=item.summary_zh or item.summary,
+                    )
+
                     # ── 区域归一化：统一写入 9 大显示分组名 ────────
                     item.region = _get_region_group(item.region)
 
@@ -464,8 +485,8 @@ def cmd_run(args):
 
                 if llm_filtered:
                     logger.info(
-                        f"[LLM过滤] 共过滤 {llm_filtered} 条不相关文章，"
-                        f"保留 {len(kept_items)} 条"
+                        f"[LLM仅入池] 共识别 {llm_filtered} 条不相关文章，"
+                        f"候选池保留 {len(kept_items)} 条"
                     )
                 items = kept_items
                 _log_item_language_counts("llm_kept", items)
@@ -637,7 +658,7 @@ def cmd_retranslate(args):
     让旧数据库条目也能享受最新翻译质量。
     """
     from translator import _TERM_CORRECTIONS, translate_item_fields
-    from classifier import score_impact, compute_composite_score
+    from classifier import compute_composite_score, normalize_push_assessment, score_impact
 
     db = Database()
     try:
@@ -659,15 +680,8 @@ def cmd_retranslate(args):
 
         logger.info(f"[重译] 开始重译 {len(items_dicts)} 条条目（限额 {limit}）…")
         updated = 0
-        deleted = 0
         for item_dict in items_dicts:
             translated = translate_item_fields(item_dict)
-            # LLM 判定不相关：直接从 DB 删除，避免报告出现大量未翻译低价值条目
-            if translated.get("_llm_is_relevant") is False:
-                db.delete_item(item_dict["id"])
-                deleted += 1
-                logger.info(f"  ✗ [删除] [{item_dict.get('region','')}] {item_dict.get('title','')[:40]}")
-                continue
             if translated.get("title_zh"):
                 # 提取 LLM 分类结果
                 llm_region   = translated.get("_llm_region", "")
@@ -705,6 +719,19 @@ def cmd_retranslate(args):
                     status = llm_status or item_dict.get("status", "立法动态")
                     impact = score_impact(status, item_dict.get("source_name", ""), region=region, text=text)
 
+                push_decision, value_score, noise_reason, decision_source = normalize_push_assessment(
+                    value_score=translated.get("_llm_value_score", 0),
+                    push_decision=translated.get("_llm_push_decision", "pool_only"),
+                    noise_reason=translated.get("_llm_noise_reason", "判定失败"),
+                    decision_source=translated.get("_llm_decision_source", "fallback"),
+                    risk_revenue=r_rev, risk_product=r_pro,
+                    risk_urgency=r_urg, risk_scope=r_sco,
+                    jurisdiction=jurisdiction,
+                    applicability_scope=applicability_scope,
+                    title=f"{item_dict.get('title', '')} {translated.get('title_zh', '')}",
+                    summary=translated.get("summary_zh", ""),
+                )
+
                 db.update_translation(
                     item_dict["id"],
                     translated["title_zh"],
@@ -721,11 +748,13 @@ def cmd_retranslate(args):
                     jurisdiction_source="llm" if (
                         jurisdiction or applicability_scope != "unknown"
                     ) else "",
+                    push_decision=push_decision,
+                    value_score=value_score,
+                    noise_reason=noise_reason,
+                    decision_source=decision_source,
                 )
                 updated += 1
                 logger.info(f"  ✓ [{region}] {translated['title_zh'][:40]}")
-        if deleted:
-            logger.info(f"[重译] 删除 {deleted} 条 LLM 判定不相关条目")
         logger.info(f"[重译] 完成，共更新 {updated} 条。")
     finally:
         db.close()
@@ -735,27 +764,34 @@ def cmd_retranslate(args):
 
 def cmd_noise_sync(args):
     """
-    从 Bitable 读取「🗑️ 噪音/不推送」记录，统计各信源出现次数，
-    将超过阈值的信源写入 data/noise_sources.json。
+    从 Bitable 读取近 30 天人工状态，按样本量和噪音率识别高噪音信源。
     classifier.py 启动时自动加载该文件，对高噪音信源降低 impact_score。
     """
     import json
     from pathlib import Path
-    from feishu_bitable import fetch_noise_source_stats
-    from classifier import _reload_noise_sources
+    from feishu_bitable import fetch_noise_feedback_stats
+    from classifier import _reload_noise_sources, get_source_tier
 
     logger.info("[噪音同步] 从 Bitable 读取噪音记录…")
-    stats = fetch_noise_source_stats()
+    stats = fetch_noise_feedback_stats(days=30)
     if not stats:
         logger.warning("[噪音同步] 未获取到噪音统计（Bitable 未配置或无噪音记录）")
         return
 
     threshold = args.threshold
-    blocklist = [k for k, v in stats.items() if v >= threshold]
+    ratio_threshold = 0.8
+    blocklist = [
+        source for source, entry in stats.items()
+        if entry["total"] >= threshold
+        and entry["noise_ratio"] >= ratio_threshold
+        and get_source_tier(source) != "official"
+    ]
 
     output = {
         "updated_at": datetime.now().strftime("%Y-%m-%d"),
         "threshold":  threshold,
+        "window_days": 30,
+        "noise_ratio_threshold": ratio_threshold,
         "stats":      stats,
         "blocklist":  blocklist,
     }
@@ -766,12 +802,15 @@ def cmd_noise_sync(args):
 
     logger.info(
         f"[噪音同步] 已更新：{len(stats)} 个信源统计，"
-        f"{len(blocklist)} 个高噪音信源（阈值 ≥{threshold} 条）"
+        f"{len(blocklist)} 个高噪音信源（样本 ≥{threshold}，噪音率 ≥80%）"
     )
     print("\n信源噪音排行（前 15）：")
-    for src, cnt in list(stats.items())[:15]:
+    for src, entry in list(stats.items())[:15]:
         flag = "🚫" if src in set(blocklist) else "  "
-        print(f"  {flag} {cnt:3d}x  {src}")
+        print(
+            f"  {flag} {entry['noise']:3d}/{entry['total']:<3d} "
+            f"({entry['noise_ratio']:.0%})  {src}"
+        )
 
     # 让当前进程内的 classifier 立即生效
     _reload_noise_sources()
@@ -890,7 +929,7 @@ def main():
     )
     p_noise.add_argument(
         "--threshold", type=int, default=5,
-        help="噪音次数阈值，达到此值的信源进入降分名单（默认 5）",
+        help="近 30 天最小样本数；样本达标且噪音率≥80%才降分（默认 5）",
     )
     p_noise.set_defaults(func=cmd_noise_sync)
 

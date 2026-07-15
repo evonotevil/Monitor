@@ -109,6 +109,20 @@ def _clamp_risk(val) -> int:
         return 0
 
 
+def _clamp_value_score(val) -> int:
+    try:
+        return max(0, min(3, int(val)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _attach_push_fields(item_dict: dict, result: dict, source: str = "llm") -> None:
+    item_dict["_llm_push_decision"] = result.get("push_decision", "pool_only")
+    item_dict["_llm_value_score"] = _clamp_value_score(result.get("value_score", 0))
+    item_dict["_llm_noise_reason"] = result.get("noise_reason", "判定失败")
+    item_dict["_llm_decision_source"] = source
+
+
 def _apply_term_corrections(text: str) -> str:
     """将 AI 常见音译/意译错误替换回受保护的英文原文。"""
     for wrong, right in _TERM_CORRECTIONS.items():
@@ -266,7 +280,7 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
     # 内容不足时明确提示 AI 须扩充而非复述
     has_enough_context = (summary and len(summary) > 40) or (body_snippet and len(body_snippet) > 50)
     lean_warning = (
-        "\n⚠️ 原始内容极少，请依据专业背景知识扩充摘要，禁止简单复述标题。"
+        "\n⚠️ 原始内容极少，不得补写原文没有的事实；应判为仅入池/信息不足。"
         if not has_enough_context else ""
     )
     user_msg = (
@@ -315,7 +329,12 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
             is_relevant = data.get("is_relevant")
             if is_relevant is False:
                 logger.info(f"[AI过滤] 判定不相关: {title[:60]}")
-                return {"is_relevant": False}
+                return {
+                    "is_relevant": False,
+                    "push_decision": "pool_only",
+                    "value_score": 0,
+                    "noise_reason": data.get("noise_reason", "非电子游戏"),
+                }
 
             # ── 步骤 4b：提取分类字段（校验合法性，非法值留空由正则兜底）─
             legacy_region = (data.get("region") or "").strip()
@@ -414,6 +433,9 @@ def _ai_process(title: str, summary: str, body_snippet: str = "",
 
                 return {
                     "is_relevant":   True,
+                    "push_decision": data.get("push_decision", "pool_only"),
+                    "value_score":   _clamp_value_score(data.get("value_score", 0)),
+                    "noise_reason":  data.get("noise_reason", "判定失败"),
                     "title_zh":      title_zh,
                     "summary_zh":    summary_zh,
                     "region":        llm_region,
@@ -601,7 +623,7 @@ def _ai_process_batch(items_data: list) -> list:
         hint_line = f"\n初步分类参考（可修正）：{'、'.join(hint_parts)}" if hint_parts else ""
 
         has_context = (d.get("summary") and len(d.get("summary", "")) > 40)
-        lean_warn = "\n⚠️ 内容极少，需依专业背景扩充摘要。" if not has_context else ""
+        lean_warn = "\n⚠️ 内容极少，不得补写事实；应判为仅入池/信息不足。" if not has_context else ""
 
         # 检测非英语内容并明确告知 LLM，防止因语言陌生而误判不相关
         title_val = d.get('title', '')
@@ -620,7 +642,7 @@ def _ai_process_batch(items_data: list) -> list:
 
     user_msg = (
         f"以下 {n} 篇文章，逐篇按顺序分析，返回长度严格为 {n} 的 JSON 数组，"
-        f"每个元素格式与单篇相同（is_relevant=false 时只含该字段）。\n\n"
+        f"每个元素格式与单篇相同（is_relevant=false 时仍需包含推送判定和原因）。\n\n"
         + "\n\n".join(parts)
     )
 
@@ -731,17 +753,12 @@ def translate_items_batch(items_dicts: list, batch_size: int = 3) -> list:
 
             # LLM 判定不相关
             if raw.get("is_relevant") is False:
-                # 非英语条目已通过本地语种规则过滤；单次 LLM 负判不应造成小语种漏报。
-                item_lang = item_dict.get("lang", "en").split("-")[0]
-                if item_lang in {"ja", "ko", "vi", "th", "id", "pt", "es", "de", "fr", "ar", "zh"}:
-                    logger.info(
-                        f"[LLM过滤] 非英语({item_lang})条目降级 Google Translate 保留: "
-                        f"{item_dict.get('title','')[:40]}"
-                    )
-                    results.append(translate_item_fields(item_dict))
-                else:
-                    item_dict["_llm_is_relevant"] = False
-                    results.append(item_dict)
+                # 保留原有小语种安全回退，同时把结果锁定为仅入池。
+                item_dict = translate_item_fields(item_dict)
+                item_dict["_llm_is_relevant"] = False
+                _attach_push_fields(item_dict, raw)
+                logger.info(f"[LLM仅入池] {item_dict.get('title','')[:40]}")
+                results.append(item_dict)
                 continue
 
             title_zh   = (raw.get("title_zh")   or "").strip()
@@ -802,6 +819,7 @@ def translate_items_batch(items_dicts: list, batch_size: int = 3) -> list:
             item_dict["_llm_risk_product"] = _clamp_risk(raw.get("risk_product"))
             item_dict["_llm_risk_urgency"] = _clamp_risk(raw.get("risk_urgency"))
             item_dict["_llm_risk_scope"]   = _clamp_risk(raw.get("risk_scope"))
+            _attach_push_fields(item_dict, raw)
             results.append(item_dict)
 
         # 每批次 sleep 一次（代替原来每条 sleep）
@@ -1130,13 +1148,16 @@ def translate_item_fields(item_dict: dict) -> dict:
     生成 title_zh、summary_zh，同时通过 LLM 完成相关性判断和分类优化。
 
     LLM 路径新增返回字段（存储在 item_dict 中，前缀 _llm_）：
-      _llm_is_relevant  : bool  — False 表示 LLM 判定不相关，monitor.py 据此过滤
+      _llm_is_relevant  : bool  — False 表示不相关，但仍保留到候选池
       _llm_region       : str   — LLM 识别的地区（空串表示回退正则）
       _llm_category_l1  : str   — LLM 识别的一级分类
       _llm_status       : str   — LLM 识别的状态
+      _llm_push_decision: str   — push / pool_only
+      _llm_value_score  : int   — 信息价值 0-3
+      _llm_noise_reason : str   — 固定降噪原因
 
-    优先：LLM AI（相关性过滤 + 分类识别 + 规范中文重塑 + 深度摘要）
-    回退：Google Translate（字面翻译，跳过相关性判断）
+    优先：LLM AI（相关性判断 + 推送价值 + 分类识别 + 中文摘要）
+    回退：Google Translate（字面翻译并强制仅入池）
     """
     title = (item_dict.get("title") or "").strip()
     summary = (item_dict.get("summary") or "").strip()
@@ -1153,9 +1174,13 @@ def translate_item_fields(item_dict: dict) -> dict:
                              category_hint=category_hint,
                              status_hint=status_hint)
         if result:
-            # LLM 判定不相关：打标记后直接返回，不填充翻译字段
+            # 不相关内容仍保留在候选池，便于人工反馈和规则回放。
             if result.get("is_relevant") is False:
                 item_dict["_llm_is_relevant"] = False
+                item_dict["title_zh"] = translate_to_zh(title[:200])
+                source_text = _build_source_text(item_dict)
+                item_dict["summary_zh"] = _ensure_complete_sentence(translate_to_zh(source_text))
+                _attach_push_fields(item_dict, result)
                 return item_dict
 
             item_dict["title_zh"]         = result.get("title_zh", "")
@@ -1172,6 +1197,7 @@ def translate_item_fields(item_dict: dict) -> dict:
             item_dict["_llm_risk_product"] = _clamp_risk(result.get("risk_product", 0))
             item_dict["_llm_risk_urgency"] = _clamp_risk(result.get("risk_urgency", 0))
             item_dict["_llm_risk_scope"]   = _clamp_risk(result.get("risk_scope", 0))
+            _attach_push_fields(item_dict, result)
             time.sleep(4)   # 硅基流动免费层限速，4s 间隔确保不超限
             return item_dict
         logger.warning(f"AI 处理未返回有效结果，回退到 Google Translate: {title[:50]}")
@@ -1190,5 +1216,10 @@ def translate_item_fields(item_dict: dict) -> dict:
         raw = translate_to_zh(source_text)
         item_dict["summary_zh"] = _ensure_complete_sentence(raw)
         time.sleep(0.2)
+
+    item_dict["_llm_push_decision"] = "pool_only"
+    item_dict["_llm_value_score"] = 0
+    item_dict["_llm_noise_reason"] = "判定失败"
+    item_dict["_llm_decision_source"] = "fallback"
 
     return item_dict

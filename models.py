@@ -36,6 +36,10 @@ class LegislationItem:
     jurisdiction: str = ""      # 具体国家/地区或欧盟；全球/多国/未知时留空
     applicability_scope: str = "unknown"  # single/supranational/multi/global/unknown
     jurisdiction_source: str = "unknown"  # rule/official_source/llm/locale/backfill/unknown
+    push_decision: str = "pool_only"  # push / pool_only
+    value_score: int = 0              # 信息价值 0-3
+    noise_reason: str = "判定失败"     # 固定枚举，便于人工反馈分析
+    decision_source: str = "fallback" # llm / rule / fallback
     id: Optional[int] = None
 
     def to_dict(self):
@@ -72,6 +76,10 @@ class Database:
                 jurisdiction TEXT DEFAULT '',
                 applicability_scope TEXT DEFAULT 'unknown',
                 jurisdiction_source TEXT DEFAULT 'unknown',
+                push_decision TEXT DEFAULT 'pool_only',
+                value_score INTEGER DEFAULT 0,
+                noise_reason TEXT DEFAULT '判定失败',
+                decision_source TEXT DEFAULT 'fallback',
                 created_at TEXT DEFAULT (datetime('now')),
                 UNIQUE(title, source_url)
             );
@@ -102,6 +110,10 @@ class Database:
             ("jurisdiction", "TEXT DEFAULT ''"),
             ("applicability_scope", "TEXT DEFAULT 'unknown'"),
             ("jurisdiction_source", "TEXT DEFAULT 'unknown'"),
+            ("push_decision", "TEXT DEFAULT 'pool_only'"),
+            ("value_score", "INTEGER DEFAULT 0"),
+            ("noise_reason", "TEXT DEFAULT '判定失败'"),
+            ("decision_source", "TEXT DEFAULT 'fallback'"),
         ]:
             try:
                 self.conn.execute(f"SELECT {col} FROM legislation LIMIT 1")
@@ -122,8 +134,9 @@ class Database:
                     (region, category_l1, category_l2, title, date, status, summary,
                      source_name, source_url, lang, title_zh, summary_zh, impact_score,
                      risk_revenue, risk_product, risk_urgency, risk_scope, risk_source,
-                     jurisdiction, applicability_scope, jurisdiction_source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     jurisdiction, applicability_scope, jurisdiction_source,
+                     push_decision, value_score, noise_reason, decision_source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(title, source_url) DO UPDATE SET
                     region     = excluded.region,
                     category_l1 = CASE WHEN excluded.category_l1 != '' THEN excluded.category_l1 ELSE legislation.category_l1 END,
@@ -142,7 +155,11 @@ class Database:
                         ELSE legislation.jurisdiction
                     END,
                     applicability_scope = CASE WHEN excluded.applicability_scope != 'unknown' THEN excluded.applicability_scope ELSE legislation.applicability_scope END,
-                    jurisdiction_source = CASE WHEN excluded.jurisdiction_source != 'unknown' THEN excluded.jurisdiction_source ELSE legislation.jurisdiction_source END
+                    jurisdiction_source = CASE WHEN excluded.jurisdiction_source != 'unknown' THEN excluded.jurisdiction_source ELSE legislation.jurisdiction_source END,
+                    push_decision = excluded.push_decision,
+                    value_score = excluded.value_score,
+                    noise_reason = excluded.noise_reason,
+                    decision_source = excluded.decision_source
             """, (
                 item.region, item.category_l1, item.category_l2,
                 item.title, item.date, item.status, item.summary,
@@ -152,6 +169,8 @@ class Database:
                 item.risk_scope, item.risk_source,
                 item.jurisdiction, item.applicability_scope,
                 item.jurisdiction_source,
+                item.push_decision, item.value_score,
+                item.noise_reason, item.decision_source,
             ))
             self.conn.commit()
             return self.conn.total_changes > 0
@@ -278,7 +297,9 @@ class Database:
                            risk_urgency: int = 0, risk_scope: int = 0,
                            risk_source: str = "", jurisdiction: Optional[str] = None,
                            applicability_scope: str = "",
-                           jurisdiction_source: str = ""):
+                           jurisdiction_source: str = "",
+                           push_decision: str = "", value_score: Optional[int] = None,
+                           noise_reason: str = "", decision_source: str = ""):
         """直接按 id 更新翻译字段，可选更新分类/地区/风险评估。"""
         sql = "UPDATE legislation SET title_zh = ?, summary_zh = ?"
         params: list = [title_zh, summary_zh]
@@ -306,6 +327,18 @@ class Database:
         if jurisdiction_source:
             sql += ", jurisdiction_source = ?"
             params.append(jurisdiction_source)
+        if push_decision:
+            sql += ", push_decision = ?"
+            params.append(push_decision)
+        if value_score is not None:
+            sql += ", value_score = ?"
+            params.append(value_score)
+        if noise_reason:
+            sql += ", noise_reason = ?"
+            params.append(noise_reason)
+        if decision_source:
+            sql += ", decision_source = ?"
+            params.append(decision_source)
         sql += " WHERE id = ?"
         params.append(item_id)
         self.conn.execute(sql, params)

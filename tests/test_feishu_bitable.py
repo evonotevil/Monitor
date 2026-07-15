@@ -73,6 +73,22 @@ def test_build_record_omits_optional_fields_for_legacy_table():
     assert fields["国家/地区"] == "北美"
     assert "具体国家/地区" not in fields
     assert "适用范围" not in fields
+    assert "推送判定" not in fields
+
+
+def test_build_record_writes_push_assessment_when_fields_exist():
+    fields = _build_record(
+        {
+            "title_zh": "测试",
+            "push_decision": "pool_only",
+            "value_score": 1,
+            "noise_reason": "信息不足",
+        },
+        available_fields={"推送判定", "信息价值分", "降噪原因"},
+    )["fields"]
+    assert fields["推送判定"] == "📥 仅入池"
+    assert fields["信息价值分"] == 1
+    assert fields["降噪原因"] == "信息不足"
 
 
 def test_map_bitable_record_reads_hierarchical_geography():

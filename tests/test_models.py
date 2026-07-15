@@ -64,6 +64,8 @@ class TestLegislationItem:
         assert item.id is None
         assert item.jurisdiction == ""
         assert item.applicability_scope == "unknown"
+        assert item.push_decision == "pool_only"
+        assert item.value_score == 0
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -115,6 +117,17 @@ class TestDatabaseUpsert:
         assert row["jurisdiction"] == "美国"
         assert row["applicability_scope"] == "single"
         assert row["jurisdiction_source"] == "rule"
+
+    def test_push_assessment_fields_round_trip(self, db):
+        db.upsert_item(_make_item(
+            push_decision="push", value_score=3,
+            noise_reason="高价值监管动态", decision_source="llm",
+        ))
+        row = db.query_items(days=0)[0]
+        assert row["push_decision"] == "push"
+        assert row["value_score"] == 3
+        assert row["noise_reason"] == "高价值监管动态"
+        assert row["decision_source"] == "llm"
 
     def test_global_reclassification_clears_old_jurisdiction(self, db):
         db.upsert_item(_make_item(

@@ -1,0 +1,51 @@
+name: 每周同步人工降噪反馈
+
+on:
+  # 每周一北京时间 09:00，在日报完成后运行。
+  schedule:
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monitor-noise-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build 30-day noise feedback profile
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_BITABLE_WIKI_TOKEN: ${{ secrets.FEISHU_BITABLE_WIKI_TOKEN }}
+          FEISHU_BITABLE_APP_TOKEN: ${{ secrets.FEISHU_BITABLE_APP_TOKEN }}
+          FEISHU_BITABLE_TABLE_ID: ${{ secrets.FEISHU_BITABLE_TABLE_ID }}
+        run: python monitor.py noise-sync --threshold 5
+
+      - name: Commit feedback profile
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f data/noise_sources.json 2>/dev/null || true
+          git diff --staged --quiet || \
+            git commit -m "同步人工降噪反馈 $(date -u +%Y-%m-%d) [skip ci]"
+          git pull --rebase origin main
+          git push

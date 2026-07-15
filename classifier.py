@@ -42,6 +42,82 @@ def _reload_noise_sources() -> None:
 _reload_noise_sources()
 
 
+PUSH_DECISIONS = {"push", "pool_only"}
+NOISE_REASONS = {
+    "高价值监管动态", "非电子游戏", "产品资讯", "行业评论", "单一厂商纠纷",
+    "信息不足", "弱信源", "无新增监管动作", "判定失败",
+}
+
+_OBVIOUS_NON_GAME = re.compile(
+    r"电动汽车|银行(?:与|和)?金融|股票|足球|赛前|球队|联赛|公共广场"
+    r"|赌场|博彩|赌博|机会游戏|sports?\s+bet|casino|lottery"
+    r"|改变.{0,8}游戏规则|攻势游戏|政治游戏|jogo\s+pol[ií]tico",
+    re.IGNORECASE,
+)
+_LOW_VALUE_GAME_NEWS = re.compile(
+    r"游戏指南|攻略|新作|新游戏|赛季更新|版本更新|patch\s+notes?"
+    r"|市场调查|玩家占比|销量|推荐.{0,12}(?:角色|游戏|阵容)"
+    r"|匹配.{0,12}(?:改进|调整)|架构改进",
+    re.IGNORECASE,
+)
+_REGULATORY_ACTION = re.compile(
+    r"法案|法律|法规|规则|条例|监管|执法|处罚|罚款|和解|诉讼|禁令|下架"
+    r"|义务|要求|生效|草案|修订|调查|评级|注册|许可|政策变更"
+    r"|\b(?:bill|act|law|regulat\w*|enforc\w*|fine[ds]?|penalt\w*|settle\w*"
+    r"|lawsuit|require\w*|oblig\w*|ban(?:ned)?|investigat\w*|rating|licen[cs]\w*)\b",
+    re.IGNORECASE,
+)
+
+
+def normalize_push_assessment(
+    *,
+    value_score=0,
+    push_decision="pool_only",
+    noise_reason="判定失败",
+    decision_source="fallback",
+    risk_revenue=0,
+    risk_product=0,
+    risk_urgency=0,
+    risk_scope=0,
+    jurisdiction="",
+    applicability_scope="unknown",
+    title="",
+    summary="",
+) -> tuple[str, int, str, str]:
+    """Validate the LLM decision and fail closed for notification delivery."""
+    try:
+        score = max(0, min(3, int(value_score)))
+    except (TypeError, ValueError):
+        score = 0
+    decision = push_decision if push_decision in PUSH_DECISIONS else "pool_only"
+    reason = noise_reason if noise_reason in NOISE_REASONS else "判定失败"
+    source = decision_source if decision_source in {"llm", "rule", "fallback"} else "fallback"
+
+    text = " ".join(filter(None, [title, summary]))
+    if _OBVIOUS_NON_GAME.search(text):
+        return "pool_only", 0, "非电子游戏", "rule"
+    if _LOW_VALUE_GAME_NEWS.search(text):
+        return "pool_only", min(score, 1), "产品资讯", "rule"
+
+    risks = [risk_revenue, risk_product, risk_urgency, risk_scope]
+    try:
+        risk_sum = sum(max(0, min(3, int(v))) for v in risks)
+    except (TypeError, ValueError):
+        risk_sum = 0
+
+    has_geography = bool(jurisdiction) or applicability_scope in {"supranational", "multi", "global"}
+    has_regulatory_action = bool(_REGULATORY_ACTION.search(text))
+    has_incremental_detail = len((summary or "").strip()) >= 30
+
+    if decision != "push" or score < 2:
+        return "pool_only", score, reason, source
+    if risk_sum == 0:
+        return "pool_only", min(score, 1), "无新增监管动作", source
+    if not (has_geography and has_regulatory_action and has_incremental_detail):
+        return "pool_only", min(score, 1), "信息不足", source
+    return "push", score, "高价值监管动态", source
+
+
 # ─── 国家 → 区域 映射 ──────────────────────────────────────────────
 
 COUNTRY_PATTERNS = {

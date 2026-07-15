@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -169,6 +169,15 @@ def _build_record(item: dict, available_fields: Optional[set] = None) -> dict:
         "摘要":       summary,
         "处理状态":   "🤖 待初筛",
     }
+
+    if available_fields is not None and "推送判定" in available_fields:
+        fields["推送判定"] = (
+            "📣 日报推送" if item.get("push_decision") == "push" else "📥 仅入池"
+        )
+    if available_fields is not None and "信息价值分" in available_fields:
+        fields["信息价值分"] = max(0, min(3, int(item.get("value_score", 0) or 0)))
+    if available_fields is not None and "降噪原因" in available_fields:
+        fields["降噪原因"] = item.get("noise_reason") or "判定失败"
 
     if region:
         group = _get_region_group(region)
@@ -640,11 +649,9 @@ def fetch_valid_records_from_bitable(
         return []
 
 
-def fetch_noise_source_stats() -> dict:
+def fetch_noise_feedback_stats(days: int = 30) -> dict:
     """
-    从 Bitable 读取所有「🗑️ 噪音/不推送」记录，统计各信源的噪音出现次数。
-
-    返回：{"source_name": count, ...} 按 count 降序排列。
+    读取最近一段时间的人工状态，按信源统计总样本、噪音数、比率和原因。
     若凭证未配置或 API 失败，返回空字典。
     """
     app_id     = os.environ.get("FEISHU_APP_ID", "")
@@ -683,24 +690,51 @@ def fetch_noise_source_stats() -> dict:
             if not has_more or not page_token:
                 break
 
-        # 只统计被标记为噪音的条目
-        counts: dict = {}
+        cutoff = (datetime.now(tz=timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+        stats: dict = {}
         for rec in all_records:
             fields     = rec.get("fields", {})
+            published = fields.get("发布日期")
+            if isinstance(published, (int, float)):
+                published_date = datetime.fromtimestamp(
+                    published / 1000, tz=timezone.utc
+                ).strftime("%Y-%m-%d")
+            else:
+                published_date = str(published or "")[:10].replace("/", "-")
+            if published_date and published_date < cutoff:
+                continue
+
+            source = str(fields.get("信源名称", "")).strip()
+            if not source:
+                continue
+            entry = stats.setdefault(source, {"total": 0, "noise": 0, "reasons": {}})
+            entry["total"] += 1
             status_val = str(fields.get("处理状态", "")).strip()
             if "噪音" not in status_val and "不推送" not in status_val:
                 continue
-            # 信源名称字段
-            source = str(fields.get("信源名称", "")).strip()
-            if source:
-                counts[source] = counts.get(source, 0) + 1
+            entry["noise"] += 1
+            reason_raw = fields.get("降噪原因") or "未标注"
+            if isinstance(reason_raw, list):
+                reasons = [str(v) for v in reason_raw if v]
+            else:
+                reasons = [str(reason_raw)]
+            for reason in reasons:
+                entry["reasons"][reason] = entry["reasons"].get(reason, 0) + 1
 
-        # 按次数降序返回
-        return dict(sorted(counts.items(), key=lambda x: -x[1]))
+        for entry in stats.values():
+            entry["noise_ratio"] = round(entry["noise"] / entry["total"], 4)
+            entry["reasons"] = dict(sorted(entry["reasons"].items(), key=lambda x: -x[1]))
+        return dict(sorted(stats.items(), key=lambda x: (-x[1]["noise_ratio"], -x[1]["total"])))
 
     except Exception as exc:
         print(f"❌ 获取噪音统计失败: {exc}")
         return {}
+
+
+def fetch_noise_source_stats() -> dict:
+    """Backward-compatible noise counts used by older callers."""
+    stats = fetch_noise_feedback_stats()
+    return {source: entry["noise"] for source, entry in stats.items() if entry["noise"]}
 
 
 # ── 本地测试入口 ──────────────────────────────────────────────────────

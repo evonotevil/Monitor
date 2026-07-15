@@ -4,6 +4,42 @@ classifier.py 单元测试
 """
 import pytest
 
+from classifier import normalize_push_assessment
+
+
+def test_push_assessment_rejects_zero_risk_even_when_llm_says_push():
+    decision = normalize_push_assessment(
+        value_score=3,
+        push_decision="push",
+        noise_reason="高价值监管动态",
+        decision_source="llm",
+        jurisdiction="美国",
+        applicability_scope="single",
+        title="FTC 发布游戏隐私执法决定",
+        summary="FTC 发布针对游戏公司的执法决定，并要求企业更新隐私政策和数据处理流程。",
+    )
+    assert decision[:3] == ("pool_only", 1, "无新增监管动作")
+
+
+def test_push_assessment_requires_incremental_detail():
+    decision = normalize_push_assessment(
+        value_score=2, push_decision="push", noise_reason="高价值监管动态",
+        decision_source="llm", risk_product=1, jurisdiction="欧盟",
+        applicability_scope="supranational", title="PEGI 宣布评级规则调整",
+        summary="PEGI 宣布评级规则调整。",
+    )
+    assert decision[:3] == ("pool_only", 1, "信息不足")
+
+
+def test_push_assessment_overrides_obvious_non_game_keyword_collision():
+    decision = normalize_push_assessment(
+        value_score=3, push_decision="push", noise_reason="高价值监管动态",
+        decision_source="llm", risk_revenue=2, jurisdiction="德国",
+        applicability_scope="single", title="沙尔克赛前骚乱，球队面临罚款",
+        summary="足球俱乐部因为赛前骚乱被联赛处罚并需要缴纳罚款。",
+    )
+    assert decision == ("pool_only", 0, "非电子游戏", "rule")
+
 from classifier import (
     classify_article,
     score_impact,

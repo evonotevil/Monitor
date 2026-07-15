@@ -138,7 +138,11 @@ def get_daily_items() -> list:
                COALESCE(risk_source, 'regex') AS risk_source,
                COALESCE(jurisdiction, '') AS jurisdiction,
                COALESCE(applicability_scope, 'unknown') AS applicability_scope,
-               COALESCE(jurisdiction_source, 'unknown') AS jurisdiction_source
+               COALESCE(jurisdiction_source, 'unknown') AS jurisdiction_source,
+               COALESCE(push_decision, 'pool_only') AS push_decision,
+               COALESCE(value_score, 0) AS value_score,
+               COALESCE(noise_reason, '判定失败') AS noise_reason,
+               COALESCE(decision_source, 'fallback') AS decision_source
         FROM legislation
         WHERE date IN ({placeholders})
           AND created_at >= ?
@@ -168,10 +172,44 @@ def get_daily_items() -> list:
 # ── 构建飞书卡片 ──────────────────────────────────────────────────────
 
 _MAX_PER_GROUP = int(os.environ.get("DAILY_MAX_PER_GROUP", "3"))   # 日报每区域最多展示条数
-_MAX_TOTAL     = int(os.environ.get("DAILY_MAX_ITEMS", "12"))     # 日报全局上限
+_MAX_TOTAL     = int(os.environ.get("DAILY_MAX_ITEMS", "8"))      # 日报全局上限
 
 
-def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = False) -> dict:
+def select_daily_push_items(items: list, pushed_urls: set | None = None) -> list:
+    """Return only validated, not-yet-pushed items, ranked by information value."""
+    pushed_urls = pushed_urls or set()
+    eligible = []
+    for item in items:
+        risk_sum = sum(int(item.get(k, 0) or 0) for k in (
+            "risk_revenue", "risk_product", "risk_urgency", "risk_scope"
+        ))
+        if (
+            item.get("push_decision") == "push"
+            and int(item.get("value_score", 0) or 0) >= 2
+            and risk_sum > 0
+            and item.get("source_url") not in pushed_urls
+        ):
+            eligible.append(item)
+
+    eligible.sort(
+        key=lambda item: (
+            int(item.get("value_score", 0) or 0),
+            float(item.get("impact_score", 0) or 0),
+            _TIER_SORT.get(get_source_tier(item.get("source_name", "")), 1),
+            item.get("date", ""),
+        ),
+        reverse=True,
+    )
+    return eligible[:_MAX_TOTAL]
+
+
+def build_daily_card(
+    items: list,
+    exec_summary: str = "",
+    is_monday: bool = False,
+    collected_count: int | None = None,
+    pool_only_count: int | None = None,
+) -> dict:
     now_cst   = datetime.now(_TZ_CST)
     yesterday = now_cst - timedelta(days=1)
 
@@ -232,10 +270,14 @@ def build_daily_card(items: list, exec_summary: str = "", is_monday: bool = Fals
     if is_monday:
         saturday = (now_cst - timedelta(days=2)).strftime("%Y-%m-%d")
         date_label = f"{saturday} ~ {yesterday.strftime('%Y-%m-%d')}"
-        count_label = f"周末至今新增 **{len(items)}** 条合规动态"
     else:
         date_label = yesterday.strftime("%Y-%m-%d")
-        count_label = f"昨日新增 **{len(items)}** 条合规动态"
+    collected_count = len(items) if collected_count is None else collected_count
+    pool_only_count = max(0, collected_count - len(items)) if pool_only_count is None else pool_only_count
+    count_label = (
+        f"采集 **{collected_count}** 条 / 推荐 **{len(items)}** 条 / "
+        f"仅入池 **{pool_only_count}** 条"
+    )
 
     elements.append({
         "tag": "markdown",
@@ -373,23 +415,27 @@ def main():
         print(f"📅 今天是{'周六' if weekday == 5 else '周日'}，跳过飞书机器人推送")
         return
 
-    # ── 机器人推送去重：过滤已推送过的条目 ────────────────────────────
+    # ── 推送价值门槛 + 机器人推送去重 ─────────────────────────────────
     pushed_urls = _load_pushed_urls()
-    push_items = [i for i in items if i.get("source_url") not in pushed_urls]
+    push_items = select_daily_push_items(items, pushed_urls)
+    pool_only_count = len(items) - len(push_items)
 
     if push_items:
-        print(f"📡 机器人推送去重：{len(items)} 条中 {len(items) - len(push_items)} 条已推送，本次推送 {len(push_items)} 条")
+        print(
+            f"📡 价值筛选：采集 {len(items)} 条 / 仅入池 {pool_only_count} 条 / "
+            f"本次推荐 {len(push_items)} 条"
+        )
 
     if not push_items:
-        # 无新增动态也推送一张简洁卡片，让团队知道系统正常运行
-        print("✅ 无新增动态（或均已推送），推送'今日无新增'卡片")
+        # 无合格推荐也推送运行状态；候选仍已写入 Base。
+        print("✅ 无符合推送门槛的新增动态，发送候选池状态卡")
         yesterday = now_cst - timedelta(days=1)
         if is_monday:
             date_label = f"{(now_cst - timedelta(days=2)).strftime('%Y-%m-%d')} ~ {yesterday.strftime('%Y-%m-%d')}"
-            no_update_text = "周末至今无新增合规动态"
+            no_update_text = "周末至今无高价值推荐"
         else:
             date_label = yesterday.strftime("%Y-%m-%d")
-            no_update_text = "昨日无新增合规动态"
+            no_update_text = "昨日无高价值推荐"
         empty_card = {
             "config": {"wide_screen_mode": True},
             "header": {
@@ -397,7 +443,13 @@ def main():
                 "title": {"tag": "plain_text", "content": f"📅 [日报] 全球游戏合规动态 ({date_label})"},
             },
             "elements": [
-                {"tag": "markdown", "content": f"✅ {no_update_text}"},
+                {
+                    "tag": "markdown",
+                    "content": (
+                        f"✅ {no_update_text}\n"
+                        f"采集 **{len(items)}** 条，均已保留到候选池供人工查看。"
+                    ),
+                },
             ],
         }
         if not send_card(chat_id, empty_card):
@@ -419,7 +471,13 @@ def main():
     except Exception as e:
         print(f"⚠️  综述生成失败（将跳过）: {e}")
 
-    card = build_daily_card(push_items, exec_summary=exec_summary, is_monday=is_monday)
+    card = build_daily_card(
+        push_items,
+        exec_summary=exec_summary,
+        is_monday=is_monday,
+        collected_count=len(items),
+        pool_only_count=pool_only_count,
+    )
     sent = send_card(chat_id, card)
     if not sent:
         print("❌ 飞书通知未发送成功，本次不写入机器人推送去重记录")
