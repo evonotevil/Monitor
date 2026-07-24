@@ -88,6 +88,91 @@ def test_regular_window_includes_today_and_yesterday():
     assert hours == 26
 
 
+def test_daily_card_uses_card_v2_with_prominent_dashboard_button():
+    dashboard_url = "http://10.104.24.13/lilith-legal"
+
+    card = daily_check.build_daily_card(
+        [_push_item("dashboard")],
+        dashboard_url=dashboard_url,
+    )
+
+    assert card["schema"] == "2.0"
+    assert card["config"]["width_mode"] == "default"
+    assert card["header"]["title"]["content"] == "全球游戏合规动态"
+    assert card["header"]["subtitle"]["content"].startswith("日报 · ")
+    assert card["header"]["icon"] == {
+        "tag": "standard_icon",
+        "token": "calendar_outlined",
+    }
+
+    elements = card["body"]["elements"]
+    assert elements[1] == {
+        "tag": "markdown",
+        "content": "<font color='grey'>查看全部动态、区域图谱与筛选</font>",
+        "text_size": "notation",
+    }
+    assert elements[2] == {
+        "tag": "button",
+        "text": {"tag": "plain_text", "content": "打开全球合规看板"},
+        "type": "primary_filled",
+        "size": "large",
+        "width": "fill",
+        "icon": {"tag": "standard_icon", "token": "search_outlined"},
+        "behaviors": [
+            {"type": "open_url", "default_url": dashboard_url},
+        ],
+    }
+    assert sum(element.get("tag") == "button" for element in elements) == 1
+    assert elements[-1].get("tag") != "hr"
+
+
+def test_daily_card_omits_dashboard_button_without_url():
+    card = daily_check.build_daily_card([_push_item("no-dashboard")])
+
+    assert all(
+        element.get("tag") != "button" for element in card["body"]["elements"]
+    )
+    assert all(
+        "查看全部动态" not in element.get("content", "")
+        for element in card["body"]["elements"]
+    )
+
+
+def test_empty_status_card_includes_dashboard_button(monkeypatch):
+    sent_cards = []
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 7, 14, 8, 0, tzinfo=tz)
+
+    monkeypatch.setenv("FEISHU_CHAT_ID", "oc_test")
+    monkeypatch.setenv("DAILY_DASHBOARD_URL", "http://10.104.24.13/lilith-legal")
+    monkeypatch.setattr(daily_check, "datetime", FixedDateTime)
+    monkeypatch.setattr(daily_check, "get_daily_items", lambda: [])
+    monkeypatch.setattr(daily_check, "_load_pushed_urls", lambda: set())
+    monkeypatch.setattr(
+        daily_check,
+        "send_card",
+        lambda chat_id, card: sent_cards.append(card) or True,
+    )
+
+    daily_check.main()
+
+    assert sent_cards[0]["schema"] == "2.0"
+    assert sent_cards[0]["header"]["template"] == "green"
+    assert sent_cards[0]["header"]["subtitle"]["content"] == "日报 · 2026-07-13"
+    elements = sent_cards[0]["body"]["elements"]
+    assert elements[1]["text_size"] == "notation"
+    assert elements[2]["type"] == "primary_filled"
+    assert elements[2]["behaviors"] == [
+        {
+            "type": "open_url",
+            "default_url": "http://10.104.24.13/lilith-legal",
+        }
+    ]
+
+
 def test_push_urls_not_saved_when_send_card_fails(monkeypatch):
     item = {
         "source_url": "https://example.com/news",
@@ -146,6 +231,7 @@ def test_fetch_failure_sends_red_card_and_skips_daily_query(monkeypatch):
     sent_cards = []
 
     monkeypatch.setenv("FEISHU_CHAT_ID", "oc_test")
+    monkeypatch.setenv("DAILY_DASHBOARD_URL", "http://10.104.24.13/lilith-legal")
     monkeypatch.setenv("FETCH_STEP_OUTCOME", "failure")
     monkeypatch.setattr(
         daily_check,
@@ -162,8 +248,16 @@ def test_fetch_failure_sends_red_card_and_skips_daily_query(monkeypatch):
         daily_check.main()
 
     assert exc.value.code == 1
+    assert sent_cards[0]["schema"] == "2.0"
     assert sent_cards[0]["header"]["template"] == "red"
-    assert "不能据此判断为‘无新增’" in sent_cards[0]["elements"][0]["content"]
+    assert sent_cards[0]["header"]["icon"]["token"] == "warning_outlined"
+    assert "不能据此判断为‘无新增’" in (
+        sent_cards[0]["body"]["elements"][0]["content"]
+    )
+    assert all(
+        element.get("tag") != "button"
+        for element in sent_cards[0]["body"]["elements"]
+    )
 
 
 def test_daily_workflow_persists_push_state_and_serializes_runs():
@@ -176,4 +270,5 @@ def test_daily_workflow_persists_push_state_and_serializes_runs():
     assert 'MONITOR_SHADOW_MODE: "true"' in workflow
     assert 'MONITOR_SHADOW_UNTIL: "2026-07-31"' in workflow
     assert "FETCH_STEP_OUTCOME: ${{ steps.fetch.outcome }}" in workflow
+    assert 'DAILY_DASHBOARD_URL: "http://10.104.24.13/lilith-legal"' in workflow
     assert "git add -f data/daily_pushed_urls.json" in workflow

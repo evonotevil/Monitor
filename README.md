@@ -36,6 +36,7 @@ python monitor.py report --period week
 ```
 
 外部服务凭据通过环境变量或仓库密钥提供。实际运行前，请根据部署环境完成必要配置。
+日报可通过 `DAILY_DASHBOARD_URL` 配置统计概览下方的合规看板入口；未设置时不显示按钮。
 
 ## 测试
 
