@@ -648,6 +648,75 @@ GAME_STRONG_SIGNALS = [
 ]
 
 
+# 多语种宽查询会把“比赛/玩法”与“处罚/禁令”的组合误当成电子游戏监管。
+# 这里仅处理高置信度传统体育和博彩；电子竞技、Loot Box 与游戏内经济保留。
+_ELECTRONIC_GAME_CONTEXT = re.compile(
+    r"video\s*games?|mobile\s*games?|online\s*games?|computer\s*games?|gaming\s+industry"
+    r"|in[- ]?game|loot\s*box|gacha|microtransaction|app\s*store|google\s*play|steam"
+    r"|playstation|xbox|nintendo|roblox|fortnite|esports?|e-sports?"
+    r"|ゲーム|オンラインゲーム|ビデオゲーム|ガチャ|ゲーム内"
+    r"|온라인게임|비디오게임|확률형|게임산업"
+    r"|trò\s+chơi\s+(?:điện\s+tử|trực\s+tuyến)|game\s+online"
+    r"|\bgim\b|permainan\s+video|jogos?\s+online|jogos?\s+eletr[oô]nicos?|videogame"
+    r"|วิดีโอเกม|เกมออนไลน์|เกมมือถือ|線上遊戲|電子遊戲|手機遊戲|轉蛋"
+    r"|لعبة\s+فيديو|ألعاب\s+إلكترونية|ألعاب\s+عبر\s+الإنترنت"
+    r"|videospiele?|online-spiel|computerspiel|jeux?\s+vidéo|jeux?\s+en\s+ligne"
+    r"|videojuegos?|juegos?\s+en\s+l[ií]nea",
+    re.IGNORECASE,
+)
+
+_GAME_GAMBLING_CONTEXT = re.compile(
+    r"loot\s*box|gacha|randomi[sz]ed\s+(?:item|reward)|in[- ]?game\s+(?:bet|wager)"
+    r"|virtual\s+currenc|概率型|抽卡|轉蛋|ガチャ|확률형|กล่องสุ่ม|صناديق\s+الغنائم",
+    re.IGNORECASE,
+)
+
+_SPORTS_NOISE = re.compile(
+    r"\b(?:football|soccer|rugby|basketball|baseball|volleyball|cricket|hockey|athlete|"
+    r"premier\s+league|world\s+cup|fifa|uefa|nba|nfl|nhl|mlb)\b"
+    r"|サッカー|野球|バスケットボール|バレーボール|競馬|選手|試合出場停止"
+    r"|축구|야구|농구|배구|선수|경기\s*출전|출장\s*정지"
+    r"|bóng\s+đá|bóng\s+chuyền|cầu\s+thủ|vận\s+động\s+viên|world\s*cup"
+    r"|sepak\s+bola|bola\s+basket|pemain|atlet|liga\s+utama"
+    r"|futebol|basquete|voleibol|jogador|atleta|copa\s+do\s+mundo"
+    r"|ฟุตบอล|บาสเกตบอล|วอลเลย์บอล|นักกีฬา|นักฟุตบอล"
+    r"|足球|籃球|篮球|排球|球隊|球队|球員|球员|運動員|运动员|世界盃|世界杯|國際足聯|国际足联|歐足聯|欧足联"
+    r"|كرة\s+القدم|كرة\s+السلة|لاعب|رياضي"
+    r"|fußball|basketball|spieler|athlet|bundesliga"
+    r"|football|basket-ball|joueur|athlète|ligue\s+1"
+    r"|fútbol|baloncesto|jugador|deportista|la\s+liga",
+    re.IGNORECASE,
+)
+
+_GAMBLING_NOISE = re.compile(
+    r"\b(?:casino|sports?\s*bet(?:ting)?|bookmaker|poker|horse\s*rac(?:e|ing)|lottery|"
+    r"gambling|slot\s*machine)\b"
+    r"|カジノ|賭博|競馬|パチンコ|スポーツベッティング"
+    r"|카지노|도박|스포츠토토|경마"
+    r"|cá\s+cược|cờ\s+bạc|sòng\s+bạc|đua\s+ngựa"
+    r"|judi|taruhan|kasino|pacuan\s+kuda"
+    r"|apostas?|cassino|jogos?\s+de\s+azar|corrida\s+de\s+cavalos"
+    r"|พนัน|การพนัน|เดิมพัน|คาสิโน|แข่งม้า"
+    r"|博彩|賭博|赌博|賭場|赌场|賽馬|赛马|彩票"
+    r"|مراهنات|قمار|كازينو|يانصيب|سباق\s+الخيل"
+    r"|sportwetten|glücksspiel|casino|pferderennen"
+    r"|paris\s+sportifs|jeux?\s+d'argent|casino|courses?\s+hippiques"
+    r"|apuestas?\s+deportivas|juegos?\s+de\s+azar|casino|carreras?\s+de\s+caballos",
+    re.IGNORECASE,
+)
+
+
+def _is_multilingual_hard_noise(text: str) -> bool:
+    """Return True only for high-confidence traditional sports or gambling noise."""
+    if not text:
+        return False
+    if _GAMBLING_NOISE.search(text) and not _GAME_GAMBLING_CONTEXT.search(text):
+        return True
+    if _SPORTS_NOISE.search(text) and not _ELECTRONIC_GAME_CONTEXT.search(text):
+        return True
+    return False
+
+
 def _is_traditional_consumer_goods_noise(text_lower: str) -> bool:
     """排除传统消费品监管噪音，但保留游戏内 cosmetics/skins/IAP 等合规动态。"""
     has_traditional_signal = any(
@@ -679,6 +748,9 @@ def is_legislation_relevant(article: dict) -> bool:
 
     # 排除中国大陆
     if is_china_mainland(text):
+        return False
+
+    if _is_multilingual_hard_noise(text):
         return False
 
     if _is_traditional_consumer_goods_noise(text_lower):

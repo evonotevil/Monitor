@@ -35,6 +35,39 @@ def test_non_video_game_metaphors_and_gambling_are_rejected(title):
     assert is_legislation_relevant({"title": title, "summary": "", "tier": ""}) is False
 
 
+@pytest.mark.parametrize("title,summary", [
+    ("Football club banned after league investigation", "The UK regulator fined the player and team."),
+    ("축구 선수 출전 정지 처분", "한국 리그가 규정 위반으로 벌금을 부과했다."),
+    ("Aturan baru taruhan sepak bola", "Indonesia menerbitkan sanksi untuk bandar judi olahraga."),
+    ("Brasil aprova lei para apostas e cassinos", "A nova regulação prevê multa para operadores."),
+    ("กฎหมายใหม่ควบคุมพนันฟุตบอล", "ประเทศไทยกำหนดโทษปรับสำหรับคาสิโนและการเดิมพันกีฬา"),
+    ("Ley impone multas a casinos y apuestas deportivas", "España publica nuevas reglas de juego de azar."),
+])
+def test_multilingual_sports_and_gambling_noise_is_rejected(title, summary):
+    assert is_legislation_relevant({"title": title, "summary": summary, "tier": ""}) is False
+
+
+@pytest.mark.parametrize("article", [
+    {
+        "title": "Korea proposes an esports player protection law",
+        "summary": "The bill sets contract requirements for esports teams and game publishers.",
+        "tier": "legal",
+    },
+    {
+        "title": "Belgium updates gambling guidance for loot boxes in video games",
+        "summary": "The regulator requires game publishers to disclose paid randomized rewards.",
+        "tier": "official",
+    },
+    {
+        "title": "Brasil publica nova lei para videogames e jogos online",
+        "summary": "A regulação exige proteção do consumidor e regras para compras no jogo.",
+        "tier": "official",
+    },
+])
+def test_hard_noise_filter_preserves_esports_loot_boxes_and_game_regulation(article):
+    assert is_legislation_relevant(article) is True
+
+
 def test_daily_recency_uses_inclusive_calendar_dates():
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     two_days_ago = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")

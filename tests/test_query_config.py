@@ -17,6 +17,7 @@ from config.queries import (
     DAILY_GOOGLE_NEWS_VI,
     DAILY_GOOGLE_NEWS_ZH_TW,
     DAILY_LANGUAGE_PROFILES,
+    DAILY_QUERY_NOISE_SUFFIXES,
     OFFICIAL_SITE_QUERIES,
 )
 from config.feeds import GOOGLE_NEWS_REGIONS, RSS_FEEDS
@@ -83,6 +84,14 @@ def test_daily_queries_use_four_lanes_in_every_supported_language():
     assert all(profile["game_terms"] for profile in DAILY_LANGUAGE_PROFILES.values())
     assert all(profile["filter_game_terms"] for profile in DAILY_LANGUAGE_PROFILES.values())
     assert all(profile["regulatory_terms"] for profile in DAILY_LANGUAGE_PROFILES.values())
+
+
+def test_daily_queries_include_language_specific_noise_exclusions():
+    assert set(DAILY_QUERY_NOISE_SUFFIXES) == set(DAILY_LANGUAGE_PROFILES)
+    for language, profile in DAILY_LANGUAGE_PROFILES.items():
+        suffix = DAILY_QUERY_NOISE_SUFFIXES[language]
+        assert suffix
+        assert all(query.endswith(suffix) for query in profile["queries"])
 
 
 def test_daily_queries_keep_named_local_regulations():

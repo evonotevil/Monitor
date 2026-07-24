@@ -65,10 +65,10 @@ models.py (SQLite) → daily_check.py → Feishu Bitable + daily card
 
 **Key modules:**
 - `fetcher.py` — RSS/Google News/GDELT fetching, exact-title dedup, multilingual relevance filtering, source-date enrichment, and language-funnel logging. Core filter: `is_legislation_relevant()` (see below).
-- `classifier.py` — regex jurisdiction/applicability/category/status classification, mainland-China exclusion, noise helpers, and 4-dimensional fallback risk scoring. Owns `is_china_mainland()`, imported by `fetcher.py`.
+- `classifier.py` — regex jurisdiction/applicability/category/status classification, mainland-China exclusion, v1/v2 push gates, noise helpers, and 4-dimensional fallback risk scoring. v2 gates only on raw source title/summary evidence. Owns `is_china_mainland()`, imported by `fetcher.py`.
 - `translator.py` — LLM relevance, translation, jurisdiction/category/status correction, 4-dimensional risk scoring, summaries, and duplicate verification/merge
 - `monitor.py` — CLI orchestration plus source cap, title similarity dedup, 30-day event clustering, and conservative post-LLM event-fingerprint dedup
-- `models.py` — SQLite ORM with automatic schema migrations and conservative geography backfill
+- `models.py` / `event_dedup.py` — SQLite ORM, automatic schema migrations, conservative geography backfill, and internal 30-day event-key deduplication; event keys never go to Bitable
 - `daily_check.py` — daily date/created-at window, Bitable sync, display dedup, normal/empty/failure Feishu cards
 - `utils.py` — Level-1 region, concrete jurisdiction and applicability-scope normalization; source tier ordering; bigram similarity
 
@@ -94,7 +94,8 @@ models.py (SQLite) → daily_check.py → Feishu Bitable + daily card
 - **Hierarchical geography semantics**: `region` remains one of the nine display groups; nullable `jurisdiction` is a country/territory or the EU; `applicability_scope` is `single`, `supranational`, `multi`, `global`, or `unknown`. Global/multi/unknown are never jurisdiction values. Reports group by `region` and display the concrete jurisdiction when available.
 - **Geography migration**: SQLite adds the three geography columns automatically. Historical rows are backfilled only from strong evidence consistent with their existing Level-1 region; title-prefix conflicts remain unresolved. Bitable keeps `国家/地区` and optionally accepts `具体国家/地区` plus `适用范围` after live field discovery.
 - **Date semantics**: daily `max_days=1` includes today and yesterday as calendar dates. Re-run recency filtering after fetching the source page date; recycled Apple/Android RSS dates must not reach the LLM or DB as current news.
-- **Deduplication**: source cap + same-region title similarity + 30-day stage clustering. After LLM correction, event fingerprints may nominate low-similarity cross-language pairs, but only LLM confirmation may merge them. Without LLM confirmation, retain both.
+- **Deduplication**: source cap + same-region title similarity + 30-day stage clustering. After LLM correction, event fingerprints may nominate low-similarity cross-language pairs, but only LLM confirmation may merge them. Before SQLite/Bitable writes, an internal 30-day event key drops same-stage repeats while retaining later stages supported by raw evidence.
+- **Push evidence and shadow mode**: `normalize_push_assessment_v1()` preserves the old gate. v2 requires raw game/platform linkage, regulatory action, geography, novelty, and substantive source detail; generated Chinese summaries cannot satisfy these gates. `MONITOR_SHADOW_MODE=true` writes v1 while logging v1/v2 differences and totals; `MONITOR_SHADOW_UNTIL` automatically ends a dated observation window.
 - **Source priority**: Official government > Legal intelligence > Industry media (for dedup winner selection).
 - **GDELT is non-critical**: only 3 composite fallback queries. Daily mode stops on the first 429 with no retry; weekly mode retries once with a capped wait. GDELT failure must not fail RSS/Google News.
 - **Failure semantics**: a failed fetch must never become a green “no updates” card. GitHub Actions passes `steps.fetch.outcome` as `FETCH_STEP_OUTCOME`; `daily_check.py` sends a red failure card, skips Bitable/normal daily processing, and exits non-zero.
@@ -103,15 +104,17 @@ models.py (SQLite) → daily_check.py → Feishu Bitable + daily card
 
 ### `is_legislation_relevant()` filter chain (fetcher.py)
 
-Five sequential gates; any failed gate drops the article:
+Six sequential gates; any failed gate drops the article:
 
 1. **China mainland exclusion** (`is_china_mainland()` from `classifier.py`): drops domestic mainland-China regulation such as 中华人民共和国, 中国大陆, 网信办, 版号, and PIPL-only developments. **This is a hard business constraint: do not start tracking mainland domestic regulation. However, overseas regulators' enforcement, litigation, bans, or platform actions against Chinese game companies must be retained because the event jurisdiction is overseas.**
 
-2. **Traditional consumer-goods guard**: rejects food/supplement/cosmetic/pharma enforcement unless a strong game/digital signal is also present.
+2. **Multilingual sports/gambling hard guard**: rejects high-confidence traditional sports, sports betting, casinos and lotteries before LLM use, while preserving esports and game-mechanic contexts such as Loot Box/Gacha.
 
-3. **EXCLUSION_PATTERNS**: drops reviews, patch notes, hardware, gambling, sports, promotions, political “game” metaphors, AI product news, developer tools, etc. Keep exclusions specific enough not to suppress legitimate content-moderation or game-platform regulation.
+3. **Traditional consumer-goods guard**: rejects food/supplement/cosmetic/pharma enforcement unless a strong game/digital signal is also present.
 
-4. **REGULATORY_SIGNALS** (must match at least one): shared terms from `DAILY_LANGUAGE_PROFILES` plus high-precision regex covering:
+4. **EXCLUSION_PATTERNS**: drops reviews, patch notes, hardware, gambling, sports, promotions, political “game” metaphors, AI product news, developer tools, etc. Keep exclusions specific enough not to suppress legitimate content-moderation or game-platform regulation.
+
+5. **REGULATORY_SIGNALS** (must match at least one): shared terms from `DAILY_LANGUAGE_PROFILES` plus high-precision regex covering:
    - EN: regulation/law/enforcement/fine/ban/ruling + recommendation/guidance/executive order/NPRM/notice of proposed rulemaking + compound decision patterns (e.g., "commission decision on X")
    - Agency acronyms: FTC, COPPA, GDPR, CCPA, DSA, DMA, IGAC, GRAC, ESRB, PEGI, CERO, CESA
    - Litigation: lawsuit/class action/settlement/consent order
@@ -120,7 +123,7 @@ Five sequential gates; any failed gate drops the article:
    - VI/ID/TH/ZH-TW/PT/ES/DE/FR/AR regulatory and enforcement terms
    - Note: bare "decision" alone does NOT match; it requires a co-occurring regulatory context word.
 
-5. **Game/digital industry signal** (must match at least one):
+6. **Game/digital industry signal** (must match at least one):
    - **All sources**: `GAME_SIGNALS` (~90 patterns) — game/gaming/gacha/loot box/mobile game/in-app purchase, ESRB/PEGI ratings, platform names, 50+ company names, etc.
    - **Official/legal tier sources only (relaxed path)**: `DIGITAL_INDUSTRY_SIGNALS` from `config/keywords.py` — broader digital industry terms (app/online/digital/platform/streaming + age verification/digital identity/eIDAS/EUDI/child safety/content moderation + CJK equivalents). This allows official regulators (FTC, 消費者庁, etc.) to pass without a strict game mention, while blocking traditional-industry content (food safety, telecom retail, etc.).
 
@@ -135,6 +138,8 @@ Five sequential gates; any failed gate drops the article:
 | `FEISHU_BITABLE_APP_TOKEN` | Bitable app token |
 | `FEISHU_BITABLE_WIKI_TOKEN` | Wiki-hosted Bitable token alternative |
 | `FEISHU_BITABLE_TABLE_ID` | Bitable table ID |
+| `MONITOR_SHADOW_MODE` | When true, persist v1 push results and log v1/v2 comparisons only |
+| `MONITOR_SHADOW_UNTIL` | Inclusive `YYYY-MM-DD` cutoff after which v2 becomes active automatically |
 
 `FETCH_STEP_OUTCOME` is an internal GitHub Actions handoff, not a secret. If unset during local runs, `daily_check.py` assumes the fetch succeeded.
 

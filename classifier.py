@@ -69,7 +69,7 @@ _REGULATORY_ACTION = re.compile(
 )
 
 
-def normalize_push_assessment(
+def normalize_push_assessment_v1(
     *,
     value_score=0,
     push_decision="pool_only",
@@ -84,7 +84,7 @@ def normalize_push_assessment(
     title="",
     summary="",
 ) -> tuple[str, int, str, str]:
-    """Validate the LLM decision and fail closed for notification delivery."""
+    """Original push gate retained for the seven-day shadow comparison."""
     try:
         score = max(0, min(3, int(value_score)))
     except (TypeError, ValueError):
@@ -118,6 +118,175 @@ def normalize_push_assessment(
     return "push", score, "高价值监管动态", source
 
 
+def normalize_push_assessment(**kwargs) -> tuple[str, int, str, str]:
+    """Backward-compatible name for the original (v1) push gate."""
+    return normalize_push_assessment_v1(**kwargs)
+
+
+_RAW_GAME_CONNECTION = re.compile(
+    r"\b(?:video|mobile|online|computer|console)\s+games?\b|\bgaming\s+(?:industry|platform|"
+    r"company|companies|regulat\w*|compliance)\b|\bgame\s+(?:developer|publisher|platform|app|"
+    r"industry|company|companies|player|players|moneti[sz]ation|regulat\w*|compliance)\b"
+    r"|\bin[- ]?game\b|loot\s*box|gacha|microtransaction|virtual\s+currenc|esports?|e-sports?"
+    r"|\b(?:Roblox|Fortnite|HoYoverse|miHoYo|NetEase|Tencent|Lilith Games|Riot Games|Kuro Games)\b"
+    r"|电子游戏|電子遊戲|网络游戏|網路遊戲|線上遊戲|手机游戏|手機遊戲|游戏(?:公司|开发|發行|发行|"
+    r"玩家|平台|行业|產業|内购|內購|监管|監管)|遊戲(?:公司|開發|發行|玩家|平台|產業|內購|監管)"
+    r"|オンラインゲーム|ビデオゲーム|ゲーム(?:業界|会社|開発|配信|課金|規制)|ガチャ"
+    r"|온라인게임|비디오게임|게임(?:산업|회사|개발|유통|결제|규제)|확률형"
+    r"|trò\s+chơi\s+(?:điện\s+tử|trực\s+tuyến)|game\s+online|\bgim\b|permainan\s+video"
+    r"|jogos?\s+(?:online|eletr[oô]nicos?)|videogame|วิดีโอเกม|เกมออนไลน์|เกมมือถือ"
+    r"|لعبة\s+فيديو|ألعاب\s+(?:إلكترونية|عبر\s+الإنترنت)|videospiele?|online-spiel|computerspiel"
+    r"|jeux?\s+(?:vidéo|en\s+ligne)|videojuegos?|juegos?\s+en\s+l[ií]nea",
+    re.IGNORECASE,
+)
+_RAW_PLATFORM_CONNECTION = re.compile(
+    r"\bApp\s*Store\b|\bGoogle\s*Play\b|\bSteam\b|\bPlayStation\b|\bXbox\b"
+    r"|Nintendo\s+eShop|Epic\s+Games\s+Store|app\s+(?:marketplace|distribution|store\s+policy)"
+    r"|mobile\s+app\s+(?:platform|distribution)|digital\s+(?:content\s+)?platform",
+    re.IGNORECASE,
+)
+_RAW_CROSS_SECTOR_LAW = re.compile(
+    r"\bAI\s+Act\b|Artificial\s+Intelligence\s+Act|\bDSA\b|Digital\s+Services\s+Act"
+    r"|\bDMA\b|Digital\s+Markets\s+Act|\bGDPR\b|\bCOPPA\b|Online\s+Safety\s+Act"
+    r"|人工智能法案|人工智慧法案|数字服务法|數位服務法|数字市场法|數位市場法",
+    re.IGNORECASE,
+)
+_RAW_REGULATORY_ACTION = re.compile(
+    r"\b(?:bill|act|law|regulat\w*|rule|policy|guidance|consultation|enforc\w*|investigat\w*|"
+    r"fine[ds]?|penalt\w*|sanction\w*|lawsuit|class\s*action|ruling|judg(?:e)?ment|settlement|"
+    r"injunction|ban(?:ned)?|oblig\w*|requir\w*|compliance)\b"
+    r"|法案|法律|法规|法規|规则|規則|条例|條例|监管|監管|执法|執法|调查|調查|处罚|處罰|裁罚|裁罰|"
+    r"罚款|罰款|诉讼|訴訟|裁决|裁決|判决|判決|和解|禁令|义务|義務|要求|合规|合規"
+    r"|規制|法律|法案|行政処分|課徴金|訴訟|判決|義務|규제|법률|법안|행정처분|과징금|소송|판결|의무"
+    r"|quy\s+định|nghị\s+định|xử\s+phạt|kiện|phán\s+quyết|kewajiban|peraturan|regulasi|sanksi|gugatan"
+    r"|regulaç[aã]o|multa|sanção|processo|กฎหมาย|ระเบียบ|ปรับ|ฟ้องร้อง|تنظيم|قانون|غرامة|دعوى"
+    r"|regulierung|gesetz|geldbuße|klage|réglementation|loi|amende|procès|regulación|ley|multa|demanda",
+    re.IGNORECASE,
+)
+_RAW_NOVELTY = re.compile(
+    r"\b(?:new|propos\w*|introduc\w*|publish\w*|issu\w*|adopt\w*|enact\w*|pass(?:ed|es)?|"
+    r"enter\w*\s+into\s+force|takes?\s+effect|effective|amend\w*|revis\w*|update\w*|launch\w*|"
+    r"open\w*\s+consultation|investigat\w*|enforc\w*|fine[ds]?|penali[sz]\w*|sanction\w*|"
+    r"sue[ds]?|file[ds]?\s+(?:a\s+)?lawsuit|rul(?:e[ds]?|ing)|judg(?:e)?ment|settle\w*|ban(?:ned)?|"
+    r"uphold\w*|strike\w*\s+down|block\w*|allow\w*|lets?\s+.{0,80}\s+stand|expand\w*|extend\w*|"
+    r"repeal\w*|revok\w*|abolish\w*|"
+    r"approv\w*|requir\w*|must|deadline|oblig\w*)\b"
+    r"|新规|新規|发布|發布|公布|出台|提出|通过|通過|生效|实施|實施|施行|修订|修訂|修正|更新|征求意见|"
+    r"諮詢|调查|調查|执法|執法|处罚|處罰|裁罚|裁罰|罚款|罰款|起诉|起訴|裁决|裁決|判决|判決|和解|"
+    r"禁止|要求|必须|必須|期限|义务|義務|废止|廢止|撤销|撤銷"
+    r"|発表|公表|公布|施行|改正|処分|課徴金|提訴|判決|義務|발표|공포|시행|개정|처분|과징금|소송|판결|의무"
+    r"|ban\s+hành|có\s+hiệu\s+lực|sửa\s+đổi|xử\s+phạt|yêu\s+cầu|diterbitkan|ditetapkan|berlaku|"
+    r"diubah|denda|putusan|mewajibkan",
+    re.IGNORECASE,
+)
+_PP_TUNAS = re.compile(r"\bPP\s*TUNAS\b|PP\s*(?:Nomor\s*)?17\s*(?:Tahun\s*)?2025", re.I)
+_PP_TUNAS_PROGRESS = re.compile(
+    r"\b(?:issued|published|effective|takes?\s+effect|amend\w*|revis\w*|enforc\w*|fine[ds]?|"
+    r"sanction\w*|new\s+(?:rule|obligation|requirement)|requir\w*|must|deadline)\b"
+    r"|diterbitkan|ditetapkan|mulai\s+berlaku|berlaku\s+(?:pada|sejak)|diubah|perubahan|penegakan|"
+    r"sanksi|denda|kewajiban\s+baru|mewajibkan|wajib|tenggat",
+    re.IGNORECASE,
+)
+
+
+def _has_sufficient_raw_evidence(title: str, summary: str) -> bool:
+    """Require a substantive source excerpt instead of trusting generated detail."""
+    title_compact = re.sub(r"\s+", " ", title or "").strip()
+    summary_compact = re.sub(r"\s+", " ", summary or "").strip()
+    normalized_title = re.sub(r"\W+", "", title_compact.lower())
+    normalized_summary = re.sub(r"\W+", "", summary_compact.lower())
+
+    title_has_dense_script = bool(
+        re.search(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\u0e00-\u0e7f]", title_compact)
+    )
+    title_is_substantive = (
+        len(title_compact) >= (28 if title_has_dense_script else 55)
+        and (title_has_dense_script or len(title_compact.split()) >= 8)
+    )
+    summary_only_repeats_title = bool(
+        normalized_title
+        and normalized_summary.startswith(normalized_title)
+        and len(normalized_summary) - len(normalized_title) < 20
+    )
+    if not summary_compact or normalized_summary == normalized_title or summary_only_repeats_title:
+        return title_is_substantive
+
+    has_dense_script = bool(re.search(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\u0e00-\u0e7f]", summary_compact))
+    min_summary_chars = 28 if has_dense_script else 55
+    return len(summary_compact) >= min_summary_chars and len(title_compact + summary_compact) >= 75
+
+
+def normalize_push_assessment_v2(
+    *,
+    value_score=0,
+    push_decision="pool_only",
+    noise_reason="判定失败",
+    decision_source="fallback",
+    risk_revenue=0,
+    risk_product=0,
+    risk_urgency=0,
+    risk_scope=0,
+    jurisdiction="",
+    applicability_scope="unknown",
+    raw_title="",
+    raw_summary="",
+    source_name="",
+    is_relevant=True,
+) -> tuple[str, int, str, str]:
+    """Gate notifications only on facts present in the original source text."""
+    try:
+        score = max(0, min(3, int(value_score)))
+    except (TypeError, ValueError):
+        score = 0
+    decision = push_decision if push_decision in PUSH_DECISIONS else "pool_only"
+    reason = noise_reason if noise_reason in NOISE_REASONS else "判定失败"
+    source = decision_source if decision_source in {"llm", "rule", "fallback"} else "fallback"
+    raw_text = " ".join(filter(None, (raw_title, raw_summary)))
+
+    game_connection = bool(_RAW_GAME_CONNECTION.search(raw_text))
+    platform_connection = bool(_RAW_PLATFORM_CONNECTION.search(raw_text))
+    source_tier = get_source_tier(source_name)
+    cross_sector_connection = bool(
+        source_tier in {"official", "legal"} and _RAW_CROSS_SECTOR_LAW.search(raw_text)
+    )
+
+    if _OBVIOUS_NON_GAME.search(raw_text) and not game_connection:
+        return "pool_only", 0, "非电子游戏", "rule"
+    if _LOW_VALUE_GAME_NEWS.search(raw_text):
+        return "pool_only", min(score, 1), "产品资讯", "rule"
+    if is_relevant is False:
+        return "pool_only", 0, "非电子游戏", "rule"
+    if decision != "push" or score < 2:
+        return "pool_only", score, reason, source
+
+    try:
+        risk_sum = sum(
+            max(0, min(3, int(value)))
+            for value in (risk_revenue, risk_product, risk_urgency, risk_scope)
+        )
+    except (TypeError, ValueError):
+        risk_sum = 0
+    if risk_sum == 0:
+        return "pool_only", min(score, 1), "无新增监管动作", source
+
+    if not (game_connection or platform_connection or cross_sector_connection):
+        return "pool_only", 0, "非电子游戏", "rule"
+    if _PP_TUNAS.search(raw_text) and not _PP_TUNAS_PROGRESS.search(raw_text):
+        return "pool_only", min(score, 1), "无新增监管动作", "rule"
+    if not (_RAW_REGULATORY_ACTION.search(raw_text) and _RAW_NOVELTY.search(raw_text)):
+        return "pool_only", min(score, 1), "无新增监管动作", "rule"
+
+    raw_jurisdiction, raw_scope, _ = _detect_geography(
+        raw_text,
+        allow_locale_fallback=False,
+    )
+    has_raw_geography = bool(raw_jurisdiction) or raw_scope in {"supranational", "multi", "global"}
+    if not has_raw_geography or not _has_sufficient_raw_evidence(raw_title, raw_summary):
+        return "pool_only", min(score, 1), "信息不足", "rule"
+
+    return "push", score, "高价值监管动态", source
+
+
 # ─── 国家 → 区域 映射 ──────────────────────────────────────────────
 
 COUNTRY_PATTERNS = {
@@ -143,7 +312,7 @@ COUNTRY_PATTERNS = {
     "俄罗斯": [r"russia|russian|俄罗斯|俄羅斯|Roskomnadzor|RKN"],
     # 北美
     "美国": [
-        r"united states|\bUS\b|\bUSA\b|american|FTC\b|federal trade commission|CCPA|CPRA|COPPA|congress\b|senate\b|california|KIDS act|section 230|tennessee|florida|alabama|missouri|new york|south carolina|south dakota|north dakota|mississippi|connecticut|nevada|pennsylvania|harrisburg|attorney general",
+        r"united states|\bUS\b|\bUSA\b|american|FTC\b|federal trade commission|CCPA|CPRA|COPPA|congress\b|senate\b|california|texas|utah|arkansas|louisiana|ohio|virginia|maryland|colorado|oregon|washington|bucks county|KIDS act|section 230|tennessee|florida|alabama|missouri|new york|south carolina|south dakota|north dakota|mississippi|connecticut|nevada|pennsylvania|harrisburg|attorney general",
         r"南达科他州|南達科他州|北达科他州|北達科他州",
         r"米国|アメリカ|미국|hoa kỳ|nước mỹ|amerika serikat|estados unidos|\bEUA\b|\bEE\.?\s*UU\.?\b|vereinigte staaten|états-unis|สหรัฐอเมริกา|الولايات المتحدة|أمريكا",
     ],

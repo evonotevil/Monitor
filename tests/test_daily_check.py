@@ -173,5 +173,7 @@ def test_daily_workflow_persists_push_state_and_serializes_runs():
     assert "group: monitor-daily-main" in workflow
     assert "cancel-in-progress: false" in workflow
     assert "id: fetch" in workflow
+    assert 'MONITOR_SHADOW_MODE: "true"' in workflow
+    assert 'MONITOR_SHADOW_UNTIL: "2026-07-31"' in workflow
     assert "FETCH_STEP_OUTCOME: ${{ steps.fetch.outcome }}" in workflow
     assert "git add -f data/daily_pushed_urls.json" in workflow

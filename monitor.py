@@ -353,6 +353,70 @@ def _period_label(period: str) -> str:
     return labels.get(period, "全量报告")
 
 
+def _push_shadow_mode_enabled(today=None) -> bool:
+    enabled = os.environ.get("MONITOR_SHADOW_MODE", "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+    if not enabled:
+        return False
+
+    cutoff = os.environ.get("MONITOR_SHADOW_UNTIL", "").strip()
+    if not cutoff:
+        return True
+    try:
+        cutoff_date = datetime.strptime(cutoff, "%Y-%m-%d").date()
+    except ValueError:
+        logger.warning("[推送规则] MONITOR_SHADOW_UNTIL 格式无效，继续使用影子模式")
+        return True
+    return (today or datetime.now().date()) <= cutoff_date
+
+
+def _resolve_push_assessment(
+    *,
+    shadow_mode: bool,
+    raw_title: str,
+    raw_summary: str,
+    generated_title: str,
+    generated_summary: str,
+    source_name: str,
+    is_relevant,
+    **assessment,
+):
+    """Return the active result plus v1/v2 values for shadow logging."""
+    from classifier import normalize_push_assessment_v1, normalize_push_assessment_v2
+
+    v1 = normalize_push_assessment_v1(
+        **assessment,
+        title=" ".join(filter(None, (raw_title, generated_title))),
+        summary=generated_summary or raw_summary,
+    )
+    v2 = normalize_push_assessment_v2(
+        **assessment,
+        raw_title=raw_title,
+        raw_summary=raw_summary,
+        source_name=source_name,
+        is_relevant=is_relevant,
+    )
+    return (v1 if shadow_mode else v2), v1, v2
+
+
+def _log_shadow_comparison(stats: dict, title: str, v1: tuple, v2: tuple) -> None:
+    stats["total"] += 1
+    stats["v1_push"] += int(v1[0] == "push")
+    stats["v2_push"] += int(v2[0] == "push")
+    if v1[:3] == v2[:3]:
+        stats["same"] += 1
+        return
+
+    stats["changed"] += 1
+    stats["blocked_by_v2"] += int(v1[0] == "push" and v2[0] != "push")
+    stats["promoted_by_v2"] += int(v1[0] != "push" and v2[0] == "push")
+    logger.info(
+        "[推送影子] v1=%s/%s/%s v2=%s/%s/%s | %s",
+        v1[0], v1[1], v1[2], v2[0], v2[1], v2[2], title[:80],
+    )
+
+
 # ─── 命令: run ───────────────────────────────────────────────────────
 
 def cmd_run(args):
@@ -360,6 +424,21 @@ def cmd_run(args):
     days = _period_to_days(args.period)
     label = _period_label(args.period)
     logger.info(f"开始执行抓取 [{label}]...")
+    shadow_mode = _push_shadow_mode_enabled()
+    shadow_stats = {
+        "total": 0,
+        "same": 0,
+        "changed": 0,
+        "v1_push": 0,
+        "v2_push": 0,
+        "blocked_by_v2": 0,
+        "promoted_by_v2": 0,
+    }
+    logger.info(
+        "[推送规则] 当前写入 %s；%s",
+        "v1（影子期）" if shadow_mode else "v2（原文证据门槛）",
+        "仅比较并记录 v2" if shadow_mode else "v1 仅用于回归比较",
+    )
     db = Database()
     try:
         backfilled = getattr(db, "backfill_geography", lambda: 0)()
@@ -384,9 +463,7 @@ def cmd_run(args):
             if no_translate:
                 logger.info("已跳过翻译 (--no-translate)")
             else:
-                from classifier import (
-                    compute_composite_score, normalize_push_assessment, score_impact,
-                )
+                from classifier import compute_composite_score, score_impact
                 logger.info(f"正在批量翻译并分类 ({len(items)} 条，每批 3 篇)...")
                 kept_items = []
                 llm_filtered = 0
@@ -458,12 +535,14 @@ def cmd_run(args):
                             text=f"{item.title} {item.summary_zh}",
                         )
 
-                    (
-                        item.push_decision,
-                        item.value_score,
-                        item.noise_reason,
-                        item.decision_source,
-                    ) = normalize_push_assessment(
+                    assessment, v1_assessment, v2_assessment = _resolve_push_assessment(
+                        shadow_mode=shadow_mode,
+                        raw_title=item.title,
+                        raw_summary=item.summary,
+                        generated_title=item.title_zh,
+                        generated_summary=item.summary_zh,
+                        source_name=item.source_name,
+                        is_relevant=translated.get("_llm_is_relevant"),
                         value_score=translated.get("_llm_value_score", 0),
                         push_decision=translated.get("_llm_push_decision", "pool_only"),
                         noise_reason=translated.get("_llm_noise_reason", "判定失败"),
@@ -474,9 +553,20 @@ def cmd_run(args):
                         risk_scope=item.risk_scope,
                         jurisdiction=item.jurisdiction,
                         applicability_scope=item.applicability_scope,
-                        title=f"{item.title} {item.title_zh}",
-                        summary=item.summary_zh or item.summary,
                     )
+                    (
+                        item.push_decision,
+                        item.value_score,
+                        item.noise_reason,
+                        item.decision_source,
+                    ) = assessment
+                    if shadow_mode:
+                        _log_shadow_comparison(
+                            shadow_stats,
+                            item.title_zh or item.title,
+                            v1_assessment,
+                            v2_assessment,
+                        )
 
                     # ── 区域归一化：统一写入 9 大显示分组名 ────────
                     item.region = _get_region_group(item.region)
@@ -493,6 +583,30 @@ def cmd_run(args):
                 # LLM 已修正事件法域并生成中文标题，此时才能可靠合并跨语言转载。
                 items = _deduplicate_items(items, enable_fingerprint=True)
                 _log_item_language_counts("post_llm_dedup", items)
+
+                if shadow_mode:
+                    logger.info(
+                        "[推送影子汇总] total=%d same=%d changed=%d "
+                        "v1_push=%d v2_push=%d blocked_by_v2=%d promoted_by_v2=%d",
+                        shadow_stats["total"], shadow_stats["same"], shadow_stats["changed"],
+                        shadow_stats["v1_push"], shadow_stats["v2_push"],
+                        shadow_stats["blocked_by_v2"], shadow_stats["promoted_by_v2"],
+                    )
+
+            items, persistent_duplicates = db.filter_new_events(items, window_days=30)
+            for duplicate, canonical_title in persistent_duplicates:
+                logger.info(
+                    "[跨日去重] 跳过重复事件: %s -> %s",
+                    (duplicate.title_zh or duplicate.title)[:60],
+                    canonical_title[:60],
+                )
+            if persistent_duplicates:
+                logger.info(
+                    "[跨日去重] 候选 %d 条，保留 %d 条，跳过 %d 条",
+                    len(items) + len(persistent_duplicates),
+                    len(items),
+                    len(persistent_duplicates),
+                )
 
             written_count = db.bulk_upsert(items)
             logger.info(f"写入/更新 {written_count} 条记录 (共处理 {len(items)} 条)")
@@ -658,7 +772,7 @@ def cmd_retranslate(args):
     让旧数据库条目也能享受最新翻译质量。
     """
     from translator import _TERM_CORRECTIONS, translate_item_fields
-    from classifier import compute_composite_score, normalize_push_assessment, score_impact
+    from classifier import compute_composite_score, score_impact
 
     db = Database()
     try:
@@ -719,7 +833,14 @@ def cmd_retranslate(args):
                     status = llm_status or item_dict.get("status", "立法动态")
                     impact = score_impact(status, item_dict.get("source_name", ""), region=region, text=text)
 
-                push_decision, value_score, noise_reason, decision_source = normalize_push_assessment(
+                assessment, _, _ = _resolve_push_assessment(
+                    shadow_mode=_push_shadow_mode_enabled(),
+                    raw_title=item_dict.get("title", ""),
+                    raw_summary=item_dict.get("summary", ""),
+                    generated_title=translated.get("title_zh", ""),
+                    generated_summary=translated.get("summary_zh", ""),
+                    source_name=item_dict.get("source_name", ""),
+                    is_relevant=translated.get("_llm_is_relevant"),
                     value_score=translated.get("_llm_value_score", 0),
                     push_decision=translated.get("_llm_push_decision", "pool_only"),
                     noise_reason=translated.get("_llm_noise_reason", "判定失败"),
@@ -728,9 +849,8 @@ def cmd_retranslate(args):
                     risk_urgency=r_urg, risk_scope=r_sco,
                     jurisdiction=jurisdiction,
                     applicability_scope=applicability_scope,
-                    title=f"{item_dict.get('title', '')} {translated.get('title_zh', '')}",
-                    summary=translated.get("summary_zh", ""),
                 )
+                push_decision, value_score, noise_reason, decision_source = assessment
 
                 db.update_translation(
                     item_dict["id"],

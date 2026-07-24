@@ -92,6 +92,24 @@ PRIORITY_GAME_ENTITIES = (
 DAILY_LANGUAGE_PROFILES = {}
 
 
+# Google News 仍采用宽查询保证召回，但在搜索端先排除各语言最常见的
+# 传统体育和博彩词。后续 fetcher.py 还会基于全文做一次硬过滤。
+DAILY_QUERY_NOISE_SUFFIXES = {
+    "en": "-football -soccer -rugby -basketball -betting -casino",
+    "ja": "-サッカー -野球 -競馬 -カジノ",
+    "ko": "-축구 -야구 -농구 -도박 -카지노",
+    "vi": ' -"bóng đá" -"cá cược" -"sòng bạc"',
+    "id": ' -"sepak bola" -olahraga -judi -kasino',
+    "pt": "-futebol -basquete -apostas -cassino",
+    "th": "-ฟุตบอล -บาสเกตบอล -พนัน -คาสิโน",
+    "zh_tw": "-足球 -籃球 -賽馬 -博彩 -賭博",
+    "ar": ' -"كرة القدم" -مراهنات -قمار -كازينو',
+    "de": "-Fußball -Rugby -Sportwetten -Casino",
+    "fr": ' -football -rugby -"paris sportifs" -casino',
+    "es": "-fútbol -baloncesto -apuestas -casino",
+}
+
+
 def _four_lane_queries(
     language: str,
     regulation: str,
@@ -103,12 +121,14 @@ def _four_lane_queries(
     regulatory_terms: tuple[str, ...],
     filter_game_terms: tuple[str, ...] | None = None,
 ):
+    suffix = DAILY_QUERY_NOISE_SUFFIXES.get(language, "")
     queries = [
         regulation,
         enforcement,
         platform,
         f"({PRIORITY_GAME_ENTITIES}) ({company_actions})",
     ]
+    queries = [f"{query} {suffix}".strip() for query in queries]
     DAILY_LANGUAGE_PROFILES[language] = {
         "queries": tuple(queries),
         "game_terms": game_terms,
@@ -153,6 +173,7 @@ DAILY_GOOGLE_NEWS_VI = _four_lane_queries(
     '(trò chơi OR trò chơi điện tử) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (chính sách OR thanh toán OR gỡ bỏ OR đình chỉ OR quy định)',
     'quy định OR tuân thủ OR điều tra OR xử phạt OR phạt tiền OR kiện OR dàn xếp OR cấm OR gỡ bỏ',
     game_terms=("trò chơi", "trò chơi điện tử", "trò chơi trực tuyến"),
+    filter_game_terms=("trò chơi điện tử", "trò chơi trực tuyến", "game online"),
     regulatory_terms=("quy định", "luật", "nghị định", "tuân thủ", "điều tra", "xử phạt", "phạt tiền", "cưỡng chế", "khởi kiện", "dàn xếp", "cấm", "gỡ bỏ", "đình chỉ"),
 )
 DAILY_GOOGLE_NEWS_ID = _four_lane_queries(
@@ -162,7 +183,7 @@ DAILY_GOOGLE_NEWS_ID = _four_lane_queries(
     '(game OR gim OR permainan) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (kebijakan OR pembayaran OR dihapus OR ditangguhkan OR regulasi)',
     'regulasi OR kepatuhan OR penyelidikan OR penegakan OR sanksi OR denda OR gugatan OR penyelesaian OR larangan OR dihapus',
     game_terms=("game", "gim", "permainan"),
-    filter_game_terms=("gim", "permainan"),
+    filter_game_terms=("gim", "game online", "permainan video"),
     regulatory_terms=("regulasi", "peraturan", "undang-undang", "kepatuhan", "penyelidikan", "penegakan", "sanksi", "denda", "gugatan", "penyelesaian", "larangan", "dihapus", "ditangguhkan", "PP TUNAS"),
 )
 DAILY_GOOGLE_NEWS_PT = _four_lane_queries(
@@ -172,6 +193,7 @@ DAILY_GOOGLE_NEWS_PT = _four_lane_queries(
     '(jogo OR jogos OR videogame) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (política OR pagamento OR removido OR suspenso OR regulação)',
     'regulação OR conformidade OR investigação OR fiscalização OR multa OR processo OR ação coletiva OR acordo OR proibição OR removido',
     game_terms=("jogo", "jogos", "videogame", "jogos online"),
+    filter_game_terms=("videogame", "jogos online", "jogo eletrônico", "jogos eletrônicos"),
     regulatory_terms=("regulação", "lei", "conformidade", "investigação", "fiscalização", "multa", "sanção", "ação coletiva", "proibição", "removido", "suspenso"),
 )
 DAILY_GOOGLE_NEWS_TH = _four_lane_queries(
@@ -181,6 +203,7 @@ DAILY_GOOGLE_NEWS_TH = _four_lane_queries(
     '(เกม OR เกมออนไลน์) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (นโยบาย OR การชำระเงิน OR ถอดออก OR ระงับ OR กฎระเบียบ)',
     'กำกับดูแล OR ปฏิบัติตาม OR สอบสวน OR บังคับใช้ OR ปรับ OR ฟ้องร้อง OR ยอมความ OR ห้าม OR ถอดออก',
     game_terms=("เกม", "วิดีโอเกม", "เกมออนไลน์"),
+    filter_game_terms=("วิดีโอเกม", "เกมออนไลน์", "เกมมือถือ"),
     regulatory_terms=("กฎหมาย", "ระเบียบ", "การกำกับดูแล", "การปฏิบัติตาม", "สอบสวน", "บังคับใช้", "ปรับ", "ลงโทษ", "ฟ้องร้อง", "คดีแบบกลุ่ม", "ยอมความ", "ห้าม", "ถอดออก", "ระงับ"),
 )
 DAILY_GOOGLE_NEWS_ZH_TW = _four_lane_queries(
@@ -200,6 +223,7 @@ DAILY_GOOGLE_NEWS_AR = _four_lane_queries(
     '(ألعاب OR ألعاب إلكترونية) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (سياسة OR دفع OR إزالة OR تعليق OR تنظيم)',
     'تنظيم OR امتثال OR تحقيق OR إنفاذ OR غرامة OR دعوى OR تسوية OR حظر OR إزالة',
     game_terms=("ألعاب", "لعبة فيديو", "ألعاب إلكترونية", "ألعاب عبر الإنترنت"),
+    filter_game_terms=("لعبة فيديو", "ألعاب إلكترونية", "ألعاب عبر الإنترنت"),
     regulatory_terms=("تنظيم", "قانون", "امتثال", "تحقيق", "إنفاذ", "غرامة", "عقوبة", "دعوى", "دعوى جماعية", "تسوية", "حظر", "إزالة", "تعليق"),
 )
 DAILY_GOOGLE_NEWS_DE = _four_lane_queries(
@@ -209,6 +233,7 @@ DAILY_GOOGLE_NEWS_DE = _four_lane_queries(
     '(Spiel OR Spiele OR Videospiel) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (Richtlinie OR Zahlung OR entfernt OR gesperrt OR Regulierung)',
     'Regulierung OR Compliance OR Ermittlung OR Durchsetzung OR Geldbuße OR Klage OR Vergleich OR Verbot OR entfernt',
     game_terms=("Spiel", "Spiele", "Videospiel", "Online-Spiel"),
+    filter_game_terms=("Videospiel", "Videospiele", "Online-Spiel", "Computerspiel"),
     regulatory_terms=("Regulierung", "Gesetz", "Compliance", "Ermittlung", "Durchsetzung", "Geldbuße", "Strafe", "Klage", "Sammelklage", "Vergleich", "Verbot", "entfernt", "gesperrt"),
 )
 DAILY_GOOGLE_NEWS_FR = _four_lane_queries(
@@ -218,6 +243,7 @@ DAILY_GOOGLE_NEWS_FR = _four_lane_queries(
     '(jeu OR jeux OR jeu vidéo) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (politique OR paiement OR retiré OR suspendu OR réglementation)',
     'réglementation OR conformité OR enquête OR application OR amende OR procès OR recours collectif OR accord OR interdiction OR retiré',
     game_terms=("jeu", "jeux", "jeu vidéo", "jeux en ligne"),
+    filter_game_terms=("jeu vidéo", "jeux vidéo", "jeux en ligne"),
     regulatory_terms=("réglementation", "loi", "conformité", "enquête", "amende", "sanction", "procès", "recours collectif", "interdiction", "retiré", "suspendu"),
 )
 DAILY_GOOGLE_NEWS_ES = _four_lane_queries(
@@ -227,5 +253,6 @@ DAILY_GOOGLE_NEWS_ES = _four_lane_queries(
     '(juego OR juegos OR videojuego) (App Store OR Google Play OR Steam OR PlayStation OR Xbox) (política OR pago OR retirado OR suspendido OR regulación)',
     'regulación OR cumplimiento OR investigación OR ejecución OR multa OR demanda OR demanda colectiva OR acuerdo OR prohibición OR retirado',
     game_terms=("juego", "juegos", "videojuego", "juegos en línea"),
+    filter_game_terms=("videojuego", "videojuegos", "juegos en línea"),
     regulatory_terms=("regulación", "ley", "cumplimiento", "investigación", "ejecución", "multa", "sanción", "demanda", "demanda colectiva", "prohibición", "retirado", "suspendido"),
 )

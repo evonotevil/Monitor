@@ -48,6 +48,9 @@ jobs:
         continue-on-error: true
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          # 2026-07-25 至 2026-07-31：仍写入 v1，仅在日志比较原文证据规则 v2。
+          MONITOR_SHADOW_MODE: "true"
+          MONITOR_SHADOW_UNTIL: "2026-07-31"
         run: python monitor.py run --period day
 
       # ── 4. 检查昨日新增，有则推送飞书 + 写入多维表格 ──────────────

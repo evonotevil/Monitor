@@ -40,6 +40,7 @@ class LegislationItem:
     value_score: int = 0              # 信息价值 0-3
     noise_reason: str = "判定失败"     # 固定枚举，便于人工反馈分析
     decision_source: str = "fallback" # llm / rule / fallback
+    event_key: str = ""               # 仅用于本地跨日事件去重，不写入 Bitable
     id: Optional[int] = None
 
     def to_dict(self):
@@ -80,6 +81,7 @@ class Database:
                 value_score INTEGER DEFAULT 0,
                 noise_reason TEXT DEFAULT '判定失败',
                 decision_source TEXT DEFAULT 'fallback',
+                event_key TEXT DEFAULT '',
                 created_at TEXT DEFAULT (datetime('now')),
                 UNIQUE(title, source_url)
             );
@@ -114,6 +116,7 @@ class Database:
             ("value_score", "INTEGER DEFAULT 0"),
             ("noise_reason", "TEXT DEFAULT '判定失败'"),
             ("decision_source", "TEXT DEFAULT 'fallback'"),
+            ("event_key", "TEXT DEFAULT ''"),
         ]:
             try:
                 self.conn.execute(f"SELECT {col} FROM legislation LIMIT 1")
@@ -124,10 +127,14 @@ class Database:
         # idx_impact 依赖 impact_score 列，必须在迁移之后再建
         self.conn.executescript(
             "CREATE INDEX IF NOT EXISTS idx_impact ON legislation(impact_score);"
+            "CREATE INDEX IF NOT EXISTS idx_event_key ON legislation(event_key);"
         )
         self.conn.commit()
 
     def upsert_item(self, item: LegislationItem) -> bool:
+        if not item.event_key:
+            from event_dedup import build_event_key
+            item.event_key = build_event_key(item)
         try:
             self.conn.execute("""
                 INSERT INTO legislation
@@ -135,8 +142,8 @@ class Database:
                      source_name, source_url, lang, title_zh, summary_zh, impact_score,
                      risk_revenue, risk_product, risk_urgency, risk_scope, risk_source,
                      jurisdiction, applicability_scope, jurisdiction_source,
-                     push_decision, value_score, noise_reason, decision_source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     push_decision, value_score, noise_reason, decision_source, event_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(title, source_url) DO UPDATE SET
                     region     = excluded.region,
                     category_l1 = CASE WHEN excluded.category_l1 != '' THEN excluded.category_l1 ELSE legislation.category_l1 END,
@@ -159,7 +166,8 @@ class Database:
                     push_decision = excluded.push_decision,
                     value_score = excluded.value_score,
                     noise_reason = excluded.noise_reason,
-                    decision_source = excluded.decision_source
+                    decision_source = excluded.decision_source,
+                    event_key = CASE WHEN excluded.event_key != '' THEN excluded.event_key ELSE legislation.event_key END
             """, (
                 item.region, item.category_l1, item.category_l2,
                 item.title, item.date, item.status, item.summary,
@@ -171,6 +179,7 @@ class Database:
                 item.jurisdiction_source,
                 item.push_decision, item.value_score,
                 item.noise_reason, item.decision_source,
+                item.event_key,
             ))
             self.conn.commit()
             return self.conn.total_changes > 0
@@ -183,6 +192,69 @@ class Database:
             if self.upsert_item(item):
                 count += 1
         return count
+
+    def filter_new_events(
+        self,
+        items: List[LegislationItem],
+        window_days: int = 30,
+    ) -> tuple[List[LegislationItem], list[tuple[LegislationItem, str]]]:
+        """Drop same-stage event repeats already seen in the rolling window."""
+        if not items:
+            return [], []
+
+        from event_dedup import build_event_key, is_meaningful_progress, same_event
+
+        valid_dates = sorted(item.date for item in items if re.fullmatch(r"\d{4}-\d{2}-\d{2}", item.date or ""))
+        if valid_dates:
+            start = (datetime.strptime(valid_dates[0], "%Y-%m-%d") - timedelta(days=window_days)).strftime("%Y-%m-%d")
+            end = valid_dates[-1]
+            rows = self.conn.execute(
+                """SELECT * FROM legislation WHERE date >= ? AND date <= ?
+                   ORDER BY date DESC, impact_score DESC""",
+                (start, end),
+            ).fetchall()
+        else:
+            rows = self.conn.execute(
+                """SELECT * FROM legislation WHERE date >= date('now', ?)
+                   ORDER BY date DESC, impact_score DESC""",
+                (f"-{window_days} days",),
+            ).fetchall()
+
+        existing = [dict(row) for row in rows]
+        for row in existing:
+            if not row.get("event_key"):
+                row["event_key"] = build_event_key(row)
+
+        ordered = sorted(
+            items,
+            key=lambda item: (
+                int(item.value_score or 0),
+                float(item.impact_score or 0),
+                item.date or "",
+            ),
+            reverse=True,
+        )
+        accepted: List[LegislationItem] = []
+        dropped: list[tuple[LegislationItem, str]] = []
+
+        for item in ordered:
+            item.event_key = item.event_key or build_event_key(item)
+            duplicate = None
+            for candidate in existing + [accepted_item.to_dict() for accepted_item in accepted]:
+                if not same_event(candidate, item):
+                    continue
+                if is_meaningful_progress(candidate, item):
+                    continue
+                duplicate = candidate
+                break
+
+            if duplicate is None:
+                accepted.append(item)
+            else:
+                duplicate_title = duplicate.get("title_zh") or duplicate.get("title") or "同一事件"
+                dropped.append((item, duplicate_title))
+
+        return accepted, dropped
 
     def log_fetch(self, source_name: str, item_count: int, status: str = "ok", error_msg: str = ""):
         self.conn.execute("""

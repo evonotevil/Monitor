@@ -4,6 +4,7 @@ models.py 单元测试
 """
 import pytest
 import os
+import sqlite3
 import tempfile
 
 from models import Database, LegislationItem
@@ -128,6 +129,248 @@ class TestDatabaseUpsert:
         assert row["value_score"] == 3
         assert row["noise_reason"] == "高价值监管动态"
         assert row["decision_source"] == "llm"
+
+    def test_event_key_round_trip(self, db):
+        db.upsert_item(_make_item(
+            title="FTC settles COPPA case against Roblox",
+            summary="The settlement requires child privacy changes.",
+        ))
+        row = db.query_items(days=0)[0]
+        assert row["event_key"].startswith("strong:")
+
+    def test_pp_tunas_multi_source_cluster_collapses(self, db):
+        items = [
+            _make_item(
+                title="Komdigi issues PP TUNAS duties for game platforms",
+                title_zh="印尼发布 PP TUNAS 平台义务",
+                summary="PP TUNAS requires online game platforms to protect children.",
+                jurisdiction="印度尼西亚",
+                category_l1="未成年人保护",
+                source_name="Komdigi",
+                source_url="https://example.com/pp-1",
+                date="2026-07-20",
+            ),
+            _make_item(
+                title="Aturan PP Nomor 17 Tahun 2025 bagi platform gim",
+                title_zh="印尼明确 PP TUNAS 儿童保护要求",
+                summary="PP TUNAS mewajibkan platform gim melindungi anak.",
+                jurisdiction="印度尼西亚",
+                category_l1="未成年人保护",
+                source_name="Local News",
+                source_url="https://example.com/pp-2",
+                date="2026-07-20",
+            ),
+        ]
+
+        accepted, dropped = db.filter_new_events(items)
+
+        assert len(accepted) == 1
+        assert len(dropped) == 1
+
+    def test_same_translated_title_from_different_sources_collapses(self, db):
+        items = [
+            _make_item(
+                title="France fines a mobile game publisher",
+                title_zh="法国处罚手游发行商",
+                jurisdiction="法国",
+                source_url="https://example.com/fr-1",
+                date="2026-07-20",
+            ),
+            _make_item(
+                title="La France sanctionne un éditeur de jeu mobile",
+                title_zh="法国处罚手游发行商",
+                jurisdiction="法国",
+                source_url="https://example.com/fr-2",
+                date="2026-07-20",
+            ),
+        ]
+
+        accepted, dropped = db.filter_new_events(items)
+
+        assert len(accepted) == 1
+        assert len(dropped) == 1
+
+    def test_cross_day_same_stage_record_is_dropped(self, db):
+        db.upsert_item(_make_item(
+            title="Indonesia issues PP TUNAS obligations",
+            jurisdiction="印度尼西亚",
+            category_l1="未成年人保护",
+            status="已生效",
+            date="2026-07-01",
+            source_url="https://example.com/old-pp",
+        ))
+        incoming = _make_item(
+            title="Commentary on PP TUNAS obligations",
+            jurisdiction="印度尼西亚",
+            category_l1="未成年人保护",
+            status="已生效",
+            date="2026-07-20",
+            source_url="https://example.com/new-pp",
+        )
+
+        accepted, dropped = db.filter_new_events([incoming])
+
+        assert accepted == []
+        assert len(dropped) == 1
+
+    def test_explicit_later_legal_stage_is_retained(self, db):
+        db.upsert_item(_make_item(
+            title="California proposes AB 1921 Protect Our Games Act",
+            summary="The bill was proposed for committee review.",
+            jurisdiction="美国",
+            category_l1="消费者保护",
+            status="已提案",
+            date="2026-07-01",
+            source_url="https://example.com/ab-old",
+        ))
+        incoming = _make_item(
+            title="California enacted AB 1921 Protect Our Games Act",
+            summary="California enacted AB 1921 and the new requirements take effect next month.",
+            jurisdiction="美国",
+            category_l1="消费者保护",
+            status="已生效",
+            date="2026-07-20",
+            source_url="https://example.com/ab-new",
+        )
+
+        accepted, dropped = db.filter_new_events([incoming])
+
+        assert accepted == [incoming]
+        assert dropped == []
+
+    def test_enforcement_after_effective_law_is_retained(self, db):
+        db.upsert_item(_make_item(
+            title="Indonesia PP TUNAS takes effect for game platforms",
+            summary="PP TUNAS is effective for online game services.",
+            jurisdiction="印度尼西亚",
+            category_l1="未成年人保护",
+            status="已生效",
+            date="2026-07-01",
+            source_url="https://example.com/pp-effective",
+        ))
+        incoming = _make_item(
+            title="Indonesia enforces PP TUNAS against a game platform",
+            summary="Komdigi issued a sanction and fine under PP TUNAS.",
+            jurisdiction="印度尼西亚",
+            category_l1="未成年人保护",
+            status="执法动态",
+            date="2026-07-20",
+            source_url="https://example.com/pp-enforcement",
+        )
+
+        accepted, dropped = db.filter_new_events([incoming])
+
+        assert accepted == [incoming]
+        assert dropped == []
+
+    def test_repeal_after_effective_law_is_retained(self, db):
+        db.upsert_item(_make_item(
+            title="California AB 1921 takes effect",
+            jurisdiction="美国",
+            category_l1="消费者保护",
+            status="已生效",
+            date="2026-07-01",
+            source_url="https://example.com/ab-effective",
+        ))
+        incoming = _make_item(
+            title="California repeals AB 1921 Protect Our Games Act",
+            summary="The legislature repealed AB 1921 and revoked its requirements.",
+            jurisdiction="美国",
+            category_l1="消费者保护",
+            status="已废止",
+            date="2026-07-20",
+            source_url="https://example.com/ab-repealed",
+        )
+
+        accepted, dropped = db.filter_new_events([incoming])
+
+        assert accepted == [incoming]
+        assert dropped == []
+
+    def test_different_company_lawsuits_are_not_merged(self, db):
+        items = [
+            _make_item(
+                title="Nintendo sued over child safety controls",
+                title_zh="美国游戏公司未成年人诉讼",
+                jurisdiction="美国",
+                category_l1="未成年人保护",
+                status="执法动态",
+                source_url="https://example.com/nintendo-case",
+                date="2026-07-20",
+            ),
+            _make_item(
+                title="Roblox sued over child safety controls",
+                title_zh="美国游戏公司未成年人诉讼",
+                jurisdiction="美国",
+                category_l1="未成年人保护",
+                status="执法动态",
+                source_url="https://example.com/roblox-case",
+                date="2026-07-20",
+            ),
+        ]
+
+        accepted, dropped = db.filter_new_events(items)
+
+        assert len(accepted) == 2
+        assert dropped == []
+
+    def test_same_company_distinct_lawsuits_need_title_similarity(self, db):
+        items = [
+            _make_item(
+                title="Nintendo sued over missing child spending controls",
+                title_zh="",
+                jurisdiction="美国",
+                category_l1="未成年人保护",
+                status="执法动态",
+                source_url="https://example.com/nintendo-spending",
+                date="2026-07-20",
+            ),
+            _make_item(
+                title="Families file child safety lawsuit after Nintendo chat abuse",
+                title_zh="",
+                jurisdiction="美国",
+                category_l1="未成年人保护",
+                status="执法动态",
+                source_url="https://example.com/nintendo-chat",
+                date="2026-07-20",
+            ),
+        ]
+
+        accepted, dropped = db.filter_new_events(items)
+
+        assert len(accepted) == 2
+        assert dropped == []
+
+    def test_old_database_schema_migrates_event_key(self, tmp_path):
+        db_path = tmp_path / "legacy.db"
+        conn = sqlite3.connect(db_path)
+        conn.execute("""
+            CREATE TABLE legislation (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                region TEXT NOT NULL,
+                category_l1 TEXT NOT NULL,
+                category_l2 TEXT DEFAULT '',
+                title TEXT NOT NULL,
+                date TEXT NOT NULL,
+                status TEXT DEFAULT '立法动态',
+                summary TEXT DEFAULT '',
+                source_name TEXT DEFAULT '',
+                source_url TEXT DEFAULT '',
+                lang TEXT DEFAULT 'en',
+                created_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(title, source_url)
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+        migrated = Database(str(db_path))
+        columns = {
+            row[1] for row in migrated.conn.execute("PRAGMA table_info(legislation)")
+        }
+        migrated.close()
+
+        assert "event_key" in columns
 
     def test_global_reclassification_clears_old_jurisdiction(self, db):
         db.upsert_item(_make_item(

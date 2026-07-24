@@ -4,7 +4,7 @@ classifier.py 单元测试
 """
 import pytest
 
-from classifier import normalize_push_assessment
+from classifier import normalize_push_assessment, normalize_push_assessment_v2
 
 
 def test_push_assessment_rejects_zero_risk_even_when_llm_says_push():
@@ -39,6 +39,112 @@ def test_push_assessment_overrides_obvious_non_game_keyword_collision():
         summary="足球俱乐部因为赛前骚乱被联赛处罚并需要缴纳罚款。",
     )
     assert decision == ("pool_only", 0, "非电子游戏", "rule")
+
+
+def _v2_assessment(**overrides):
+    values = {
+        "value_score": 3,
+        "push_decision": "push",
+        "noise_reason": "高价值监管动态",
+        "decision_source": "llm",
+        "risk_product": 2,
+        "jurisdiction": "美国",
+        "applicability_scope": "single",
+        "raw_title": "FTC issues a new COPPA settlement requiring Roblox privacy changes",
+        "raw_summary": (
+            "The United States regulator published the settlement and requires the online game "
+            "platform to change child-data consent flows before the stated compliance deadline."
+        ),
+        "source_name": "FTC News",
+        "is_relevant": True,
+    }
+    values.update(overrides)
+    return normalize_push_assessment_v2(**values)
+
+
+def test_push_assessment_v2_accepts_substantive_raw_game_enforcement():
+    assert _v2_assessment() == ("push", 3, "高价值监管动态", "llm")
+
+
+def test_push_assessment_v2_rejects_sports_even_if_llm_says_push():
+    result = _v2_assessment(
+        raw_title="US football league fines club after banned player appears",
+        raw_summary=(
+            "The United States football league issued a penalty after the athlete appeared in a "
+            "match, and the club must pay the fine before the next round of games."
+        ),
+        source_name="Sports Daily",
+    )
+    assert result == ("pool_only", 0, "非电子游戏", "rule")
+
+
+def test_push_assessment_v2_keeps_pp_tunas_commentary_in_pool():
+    result = _v2_assessment(
+        raw_title="Komdigi promotes PP TUNAS awareness for game online businesses",
+        raw_summary=(
+            "Indonesia held an industry webinar to discuss regulasi PP TUNAS and encouraged game "
+            "online companies to share general views about child safety and digital literacy."
+        ),
+        source_name="Industry Blog",
+        jurisdiction="印度尼西亚",
+    )
+    assert result[:3] == ("pool_only", 1, "无新增监管动作")
+
+
+def test_push_assessment_v2_accepts_explicit_pp_tunas_new_obligation():
+    result = _v2_assessment(
+        raw_title="Indonesia enforces PP TUNAS for game online platforms",
+        raw_summary=(
+            "PP TUNAS mulai berlaku di Indonesia and mewajibkan every game online platform to add "
+            "age checks; operators must complete the change before the published deadline."
+        ),
+        source_name="Komdigi",
+        jurisdiction="印度尼西亚",
+    )
+    assert result[0] == "push"
+
+
+def test_push_assessment_v2_allows_official_cross_sector_ai_act_update():
+    result = _v2_assessment(
+        raw_title="European Commission publishes new AI Act obligations",
+        raw_summary=(
+            "The EU guidance states that AI Act transparency requirements take effect this year "
+            "and requires providers to document generated content before the compliance deadline."
+        ),
+        source_name="EUR-Lex Legislation",
+        jurisdiction="欧盟",
+        applicability_scope="supranational",
+    )
+    assert result[0] == "push"
+
+
+def test_push_assessment_v2_requires_raw_source_detail():
+    result = _v2_assessment(
+        raw_title="FTC publishes Roblox update",
+        raw_summary="New US game regulation.",
+    )
+    assert result[:3] == ("pool_only", 1, "信息不足")
+
+
+def test_push_assessment_v2_accepts_detailed_raw_title_without_summary():
+    result = _v2_assessment(
+        raw_title="Supreme Court lets Texas App Store age-verification law stand",
+        raw_summary="",
+        source_name="nbcdfw.com",
+        jurisdiction="美国",
+    )
+    assert result[0] == "push"
+
+
+def test_push_assessment_v2_recognizes_bucks_county_lawsuit_geography():
+    result = _v2_assessment(
+        raw_title="Bucks County expands its child-safety lawsuit to Roblox, Discord and X",
+        raw_summary="Bucks County expands its child-safety lawsuit to Roblox, Discord and X",
+        source_name="Lower Bucks Times",
+        jurisdiction="",
+        applicability_scope="unknown",
+    )
+    assert result[0] == "push"
 
 from classifier import (
     classify_article,
