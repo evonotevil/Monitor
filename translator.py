@@ -1078,12 +1078,21 @@ def generate_weekly_card_summary(news_items: list) -> str:
         return ""
 
 
-# ── 日报综述生成（150 字以内）────────────────────────────────────────
+# ── 日报客观摘要生成（150 字以内）────────────────────────────────────
+
+_DAILY_ADVISORY_OUTPUT = re.compile(
+    r"建议(?:关注|评估|采取|加强|调整|审查|跟进)"
+    r"|(?:中资|出海)(?:游戏)?(?:公司|企业|厂商).{0,12}(?:应|需|建议|关注|警惕|采取)"
+    r"|(?:上述|相关|这些)(?:动态|事件|变化).{0,8}(?:提醒|意味着).{0,20}(?:公司|企业|厂商|游戏)"
+    r"|(?:游戏公司|游戏企业|游戏厂商).{0,8}(?:应关注|需关注|应当|建议)",
+    re.IGNORECASE,
+)
+
 
 def generate_daily_summary(items: list) -> str:
     """
-    将昨日动态列表传给 LLM，生成 150 字以内的中文日报综述。
-    聚焦：昨日最值得关注的 1-2 个监管动作 + 对移动端的直接影响。
+    将昨日动态列表传给 LLM，生成 150 字以内的中文新闻摘要。
+    只概括素材中的监管事实，不提供建议、提醒或行动结论。
     失败时返回空字符串。
     """
     if not items:
@@ -1111,11 +1120,13 @@ def generate_daily_summary(items: list) -> str:
     material = "\n".join(material_lines)
     user_msg = (
         f"以下是昨日全球游戏合规动态（共 {len(items)} 条，已按重要性排序）。\n"
-        f"请以资深合规分析师视角，为 Lilith 等中资出海游戏公司撰写一段 150 字以内的中文日报综述。\n\n"
+        f"请撰写一段 150 字以内的客观中文新闻摘要。\n\n"
         f"要求：\n"
-        f"① 点出昨日最值得关注的 1-2 个监管动作（具体市场/政策名）\n"
-        f"② 说明对移动端（App Store/Google Play/IAP）的直接影响\n"
-        f"③ 语言简洁专业，像给业务 VP 发的一条 Slack 消息，不用标题或序号\n\n"
+        f"① 概括最主要的 1-2 项事实，写明具体市场、监管机构、政策或案件及其动作\n"
+        f"② 多条动态并列时，只说明各自事实或共同主题，不推断影响\n"
+        f"③ 使用第三人称新闻语气，不面向任何公司或读者提出建议、提醒或行动要求\n"
+        f"④ 不提 Lilith、中资游戏公司或出海企业，不添加素材以外的判断\n"
+        f"⑤ 不用标题、序号或“建议关注”等前缀，只输出摘要正文\n\n"
         f"动态素材：\n{material}"
     )
 
@@ -1130,14 +1141,17 @@ def generate_daily_summary(items: list) -> str:
             ],
         )
         text = resp.choices[0].message.content.strip()
+        if _DAILY_ADVISORY_OUTPUT.search(text):
+            logger.warning("[日报客观摘要] 检测到建议或行动结论，跳过展示")
+            return ""
         # 截断到 160 字以内
         if len(text) > 160:
             cut = text[:160].rfind("。")
             text = text[:cut + 1] if cut > 0 else text[:150]
-        logger.info(f"[日报综述] 生成成功，{len(text)} 字")
+        logger.info(f"[日报客观摘要] 生成成功，{len(text)} 字")
         return text
     except Exception as e:
-        logger.warning(f"[日报综述] LLM 生成失败: {e}")
+        logger.warning(f"[日报客观摘要] LLM 生成失败: {e}")
         return ""
 
 

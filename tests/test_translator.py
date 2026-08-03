@@ -2,6 +2,9 @@
 translator.py 单元测试（纯本地逻辑，不调用 LLM/Google Translate）
 覆盖：专有名词纠错、bigram 相似度、文本构建、区域前缀规则
 """
+import re
+from types import SimpleNamespace
+
 import pytest
 import translator
 
@@ -18,7 +21,81 @@ from translator import (
     _VALID_CATEGORIES_L1,
     _VALID_STATUSES,
 )
-import re
+
+
+def test_daily_summary_prompt_requests_objective_news_only(monkeypatch):
+    captured = {}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content="韩国监管机构要求调查 Google 强制 IAP 行为。"
+                        )
+                    )
+                ]
+            )
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=FakeCompletions())
+    )
+    monkeypatch.setattr(translator, "_HAS_AI", True)
+    monkeypatch.setattr(translator, "_AI_CLIENT", fake_client)
+
+    result = translator.generate_daily_summary([
+        {
+            "title_zh": "韩国监管机构要求调查 Google 强制 IAP 行为",
+            "summary_zh": "通信委员会与公平交易委员会要求迅速推进处罚程序。",
+            "region": "日韩",
+            "category_l1": "平台政策",
+            "impact_score": 6,
+        }
+    ])
+
+    system_prompt = captured["messages"][0]["content"]
+    user_prompt = captured["messages"][1]["content"]
+    assert result == "韩国监管机构要求调查 Google 强制 IAP 行为。"
+    assert "客观" in system_prompt
+    assert "不得输出建议、提醒" in system_prompt
+    assert "第三人称新闻语气" in user_prompt
+    assert "不提 Lilith、中资游戏公司或出海企业" in user_prompt
+    assert "为 Lilith 等中资出海游戏公司" not in user_prompt
+    assert "说明对移动端" not in user_prompt
+
+
+def test_daily_summary_suppresses_advisory_output(monkeypatch):
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content="上述变化提醒中资游戏公司应关注平台政策并及时调整。"
+                        )
+                    )
+                ]
+            )
+
+    monkeypatch.setattr(translator, "_HAS_AI", True)
+    monkeypatch.setattr(
+        translator,
+        "_AI_CLIENT",
+        SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions())),
+    )
+
+    result = translator.generate_daily_summary([
+        {
+            "title_zh": "韩国监管机构要求调查 Google 强制 IAP 行为",
+            "region": "日韩",
+            "category_l1": "平台政策",
+            "impact_score": 6,
+        }
+    ])
+
+    assert result == ""
 
 
 # ═══════════════════════════════════════════════════════════════════════

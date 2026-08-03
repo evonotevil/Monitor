@@ -9,7 +9,7 @@
     FEISHU_CHAT_ID               目标群聊的 chat_id（消息推送用）
 
 可选环境变量:
-    LLM_API_KEY                  用于生成 AI 综述（未设置时跳过综述）
+    LLM_API_KEY                  用于生成客观新闻摘要（未设置时跳过摘要）
     FEISHU_BITABLE_APP_TOKEN     多维表格 app_token（多维表格写入）
     FEISHU_BITABLE_TABLE_ID      多维表格 table_id（多维表格写入）
     DAILY_DASHBOARD_URL          全球合规看板地址（未设置时不显示按钮）
@@ -348,7 +348,7 @@ def build_daily_card(
     # 看板入口紧跟概览，确保在长卡片首屏可见。
     elements.extend(_dashboard_cta_elements(dashboard_url))
 
-    # AI 综述（有则展示为引用块；跳过空行避免飞书渲染孤立 >）
+    # 客观新闻摘要（有则展示为引用块；跳过空行避免飞书渲染孤立 >）
     if exec_summary:
         quoted_lines = [
             f"> {line}" for line in exec_summary.splitlines() if line.strip()
@@ -517,17 +517,17 @@ def main():
 
     print(f"📡 发现 {len(push_items)} 条新增动态，发送飞书通知...")
 
-    # AI 综述（150 字以内，失败不阻断）
+    # 客观新闻摘要（150 字以内，失败不阻断）
     exec_summary = ""
     try:
         from translator import generate_daily_summary
         exec_summary = generate_daily_summary(push_items)
         if exec_summary:
-            print(f"📝 日报综述生成成功，{len(exec_summary)} 字")
+            print(f"📝 日报客观摘要生成成功，{len(exec_summary)} 字")
         else:
-            print("📝 日报综述跳过（无 API Key 或调用失败）")
+            print("📝 日报客观摘要跳过（无 API Key 或调用失败）")
     except Exception as e:
-        print(f"⚠️  综述生成失败（将跳过）: {e}")
+        print(f"⚠️  日报客观摘要生成失败（将跳过）: {e}")
 
     card = build_daily_card(
         push_items,
