@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 _LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.siliconflow.cn/v1")
 _LLM_API_KEY  = os.environ.get("LLM_API_KEY", "")
-_LLM_MODEL    = os.environ.get("LLM_MODEL", "Qwen/Qwen3-8B")  # 可通过环境变量覆盖
+_LLM_MODEL    = os.environ.get("LLM_MODEL", "deepseek-ai/DeepSeek-V4-Flash")  # 可通过环境变量覆盖
 
 # Qwen3 系列默认开启思维链（会生成大段推理过程），翻译场景无需思考直接输出；
 # 其他模型不支持此参数则传空 dict，由硅基流动忽略。
