@@ -87,7 +87,7 @@ models.py (SQLite) → daily_check.py → Feishu Bitable + daily card
 
 ## Key Design Decisions
 
-- **LLM provider**: Silicon Flow (硅基流动) via OpenAI-compatible SDK, model Qwen3-8B. Translation, classification, and risk scoring happen in a single LLM call to minimize API cost.
+- **LLM provider**: Silicon Flow (硅基流动) via OpenAI-compatible SDK, model DeepSeek-V4-Flash. Translation, classification, and risk scoring happen in a single LLM call to minimize API cost.
 - **Risk scoring**: 4 dimensions (revenue impact, product changes, time urgency, scope) each 0-3, weighted into composite 1.0-10.0 score. Regex fallback when LLM unavailable.
 - **Daily multilingual queries**: 12 locales × 4 lanes (regulation/compliance, enforcement/litigation, platform policy, priority companies/products). Keep query terms and safe filter terms together in `DAILY_LANGUAGE_PROFILES`.
 - **Jurisdiction is not language**: classify the event's actual jurisdiction from country/state/regulator/law evidence. Google News locale is fallback-only. Never drop an article merely because its language and jurisdiction differ.
@@ -132,7 +132,7 @@ Six sequential gates; any failed gate drops the article:
 | Variable | Purpose |
 |----------|---------|
 | `LLM_API_KEY` | Silicon Flow API key (required) |
-| `LLM_MODEL` | Optional OpenAI-compatible model override; defaults to `Qwen/Qwen3-8B` |
+| `LLM_MODEL` | Optional OpenAI-compatible model override; defaults to `deepseek-ai/DeepSeek-V4-Flash` |
 | `FEISHU_CHAT_ID` | 目标群聊的 chat_id（消息推送用） |
 | `FEISHU_APP_ID` / `FEISHU_APP_SECRET` | Feishu app credentials (for Bitable) |
 | `FEISHU_BITABLE_APP_TOKEN` | Bitable app token |
