@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-10-19",
+  "updated_at": "2026-10-26",
   "threshold": 5,
   "window_days": 30,
   "noise_ratio_threshold": 0.8,
@@ -13,36 +13,30 @@
       "noise_ratio": 1.0
     },
     "Vietnam.vn": {
-      "total": 10,
+      "total": 13,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
     "게임메카": {
-      "total": 7,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "California AG": {
-      "total": 6,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "ผู้จัดการออนไลน์": {
-      "total": 6,
+      "total": 8,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
     "Pocket Gamer": {
-      "total": 6,
+      "total": 7,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "games.gg": {
+    "GamesIndustry.biz": {
+      "total": 5,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "YouTube": {
       "total": 5,
       "noise": 0,
       "reasons": {},
@@ -54,26 +48,20 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "GamesIndustry.biz": {
+    "California AG": {
       "total": 5,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "지디넷코리아": {
-      "total": 5,
+    "Thansettakij": {
+      "total": 4,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "v.daum.net": {
-      "total": 5,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "facebook.com": {
-      "total": 5,
+    "noyb": {
+      "total": 4,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
@@ -90,13 +78,25 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "YouTube": {
+    "지디넷코리아": {
       "total": 4,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "Thisisgame Thailand": {
+    "PR TIMES": {
+      "total": 3,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Instant Gaming News": {
+      "total": 3,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "千葉テレビ放送株式会社": {
       "total": 3,
       "noise": 0,
       "reasons": {},
@@ -108,7 +108,7 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "MEDIAMIXI": {
+    "ผู้จัดการออนไลน์": {
       "total": 3,
       "noise": 0,
       "reasons": {},
@@ -120,20 +120,110 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "PR TIMES": {
-      "total": 3,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "noyb": {
-      "total": 3,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
     "아이뉴스24": {
       "total": 3,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "facebook.com": {
+      "total": 3,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "ゲーム情報！ゲームのはなし": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "ｄメニューニュース": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "สยามรัฐ": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "RG.org": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "법률신문": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "뉴스핌": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "뉴스투온": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "เนชั่นทีวี สถานีข่าว 24 ชั่วโมง": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "EU Digital Strategy": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Thisisgame Thailand": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "데일리게임": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Online Station": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "市場調査レポート": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "GameMonday": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Head Topics": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "games.gg": {
+      "total": 2,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
@@ -168,12 +258,6 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "Instant Gaming News": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
     "Báo Bảo vệ pháp luật": {
       "total": 2,
       "noise": 0,
@@ -192,12 +276,6 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "Online Station": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
     "더퍼블릭": {
       "total": 2,
       "noise": 0,
@@ -210,49 +288,7 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "ゲーム情報！ゲームのはなし": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
     "디지털데일리": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "포쓰저널": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "千葉テレビ放送株式会社": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Forbes Thailand": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "ドリームニュース": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "商傳媒": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Thansettakij": {
       "total": 2,
       "noise": 0,
       "reasons": {},
@@ -276,24 +312,6 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "FTC News": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "데일리게임": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "LINE TODAY": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
     "마일드경제": {
       "total": 2,
       "noise": 0,
@@ -312,6 +330,12 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
+    "v.daum.net": {
+      "total": 2,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
     "로톡뉴스": {
       "total": 2,
       "noise": 0,
@@ -324,37 +348,325 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "ixbt.games": {
-      "total": 2,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
     "Gamer": {
       "total": 2,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "TRT World": {
-      "total": 2,
+    "Tennessee Titans": {
+      "total": 1,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "starnewskorea.com": {
-      "total": 2,
+    "All About ニュース": {
+      "total": 1,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "khaosod.co.th": {
-      "total": 2,
+    "اليوم السابع": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Objectif Gard": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Kotaku en Español": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "access-online.net": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Law Society Journal": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "GazetaWeb": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "XboxDynasty": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "WJET/WFXP/YourErie.com": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "ゲームハック": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "뉴스1": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Business Wire": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "アットプレス": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Doanh Nhân Trẻ": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Digitec": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "NeoTeo": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "뉴스클레임": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "서울신문": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Palabra BCS": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "스마트비즈": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "LEVELUP": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "GamingDose": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "AppDisqus": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "THE BETTER": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Spiegel": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "PRO | Das christliche Medienmagazin": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "세계일보": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "뉴시스": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "GameBusiness.jp": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Law360": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "OpenCritic": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "財経新聞": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Nintendo Connect": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "PLAY3.DE": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Koubo": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "remio": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "HATYAI FOCUS": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Notebookspec": {
+      "total": 1,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
     "INTERNET Watch": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Morgan Lewis": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "LevelUp": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "WBKO": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "iXBT.games": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Global Banking & Finance Review": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Euronews.com": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "MarketScreener Schweiz": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "플레이포럼": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Macau Business": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "VICE": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "The Independent": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Executive Digest": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "Payment & Banking": {
       "total": 1,
       "noise": 0,
       "reasons": {},
@@ -414,6 +726,12 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
+    "MEDIAMIXI": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
     "Olhar Digital": {
       "total": 1,
       "noise": 0,
@@ -427,12 +745,6 @@
       "noise_ratio": 0.0
     },
     "اخبارك نت": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "뉴스투온": {
       "total": 1,
       "noise": 0,
       "reasons": {},
@@ -463,12 +775,6 @@
       "noise_ratio": 0.0
     },
     "Hu3br": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Head Topics": {
       "total": 1,
       "noise": 0,
       "reasons": {},
@@ -600,12 +906,6 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "법률신문": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
     "電ファミニコゲーマー": {
       "total": 1,
       "noise": 0,
@@ -642,12 +942,6 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "ｄメニューニュース": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
     "유교신문": {
       "total": 1,
       "noise": 0,
@@ -660,12 +954,6 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "RG.org": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
     "Punch Newspapers": {
       "total": 1,
       "noise": 0,
@@ -673,6 +961,12 @@
       "noise_ratio": 0.0
     },
     "게임뷰": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
+    "포쓰저널": {
       "total": 1,
       "noise": 0,
       "reasons": {},
@@ -732,6 +1026,12 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
+    "Forbes Thailand": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
     "Agencia 6 Noticias": {
       "total": 1,
       "noise": 0,
@@ -739,12 +1039,6 @@
       "noise_ratio": 0.0
     },
     "Wyoming Game and Fish (.gov)": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "GameMonday": {
       "total": 1,
       "noise": 0,
       "reasons": {},
@@ -762,6 +1056,12 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
+    "ドリームニュース": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
     "SlashFilm": {
       "total": 1,
       "noise": 0,
@@ -774,7 +1074,7 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "市場調査レポート": {
+    "商傳媒": {
       "total": 1,
       "noise": 0,
       "reasons": {},
@@ -822,6 +1122,12 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
+    "FTC News": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
     "네이트": {
       "total": 1,
       "noise": 0,
@@ -840,13 +1146,13 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "เนชั่นทีวี สถานีข่าว 24 ชั่วโมง": {
+    "Brettspiel-News": {
       "total": 1,
       "noise": 0,
       "reasons": {},
       "noise_ratio": 0.0
     },
-    "Brettspiel-News": {
+    "LINE TODAY": {
       "total": 1,
       "noise": 0,
       "reasons": {},
@@ -1008,6 +1314,12 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
+    "ixbt.games": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
     "gamerwk.com": {
       "total": 1,
       "noise": 0,
@@ -1122,6 +1434,12 @@
       "reasons": {},
       "noise_ratio": 0.0
     },
+    "TRT World": {
+      "total": 1,
+      "noise": 0,
+      "reasons": {},
+      "noise_ratio": 0.0
+    },
     "TrueID": {
       "total": 1,
       "noise": 0,
@@ -1129,312 +1447,6 @@
       "noise_ratio": 0.0
     },
     "gamereactor.asia": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "atomix.vg": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "new-game-plus.fr": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "سعودي جيمر": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "バレーボールキング": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "TVer": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "WTNH.com": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "indiangaming.com": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "efin.finance": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Telset.id": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "eurogamer.net": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Top Class Actions": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "ledge.ai": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Collider": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Northern Nevada Business Weekly": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "WLRN": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Znews": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Shore Local Newsmagazine": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Yogonet": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "PR Newswire": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "ThaiPublica": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Positioningmag": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "SouNova 少女星": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "GameStar": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "IGN": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Insider Gaming": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Philippines NPC": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "spacebar.th": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "workpointtoday.com": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Sanook": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "서울신문": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "ge": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Law.com": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "iGamingFuture": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Drops de Jogos": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "แนวหน้า": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "MGR Online": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Logistik Heute": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Zona Franca": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Polygon.com": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "朝日放送": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Global Network on Extremism and Technology": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Rádio Guaíba": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Seoul Economic Daily": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "TwistedVoxel": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Taylorville Daily News": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "ETtoday遊戲雲": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "tribuna.com.mx": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Valorant News Japan": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "上報": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "اليوم السابع": {
-      "total": 1,
-      "noise": 0,
-      "reasons": {},
-      "noise_ratio": 0.0
-    },
-    "Parents.fr": {
       "total": 1,
       "noise": 0,
       "reasons": {},
